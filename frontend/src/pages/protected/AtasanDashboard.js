@@ -154,17 +154,20 @@ function AtasanDashboard() {
         },
     ]
 
+    const attendanceData = [
+        Number(summary.hadir || 0),
+        Number(summary.izin || 0),
+        Number(summary.sakit || 0),
+        Number(summary.alpha || 0),
+    ]
+    const hasAttendanceData = attendanceData.some((val) => val > 0)
+
     const attendanceCompositionChart = {
         labels: ['Hadir', 'Izin', 'Sakit', 'Alpha'],
         datasets: [
             {
                 label: 'Komposisi Kehadiran',
-                data: [
-                    Number(summary.hadir || 0),
-                    Number(summary.izin || 0),
-                    Number(summary.sakit || 0),
-                    Number(summary.alpha || 0),
-                ],
+                data: attendanceData,
                 backgroundColor: [
                     toRgba('#3B82F6', 0.8),
                     toRgba('#F59E0B', 0.8),
@@ -270,18 +273,24 @@ function AtasanDashboard() {
             <div className="grid lg:grid-cols-3 grid-cols-1 gap-6 mt-6">
                 <TitleCard title="Grafik Kehadiran" topMargin="mt-0">
                     <div className="space-y-4">
-                        <Doughnut data={attendanceCompositionChart} options={chartOptions} />
-                        <div className="flex flex-wrap items-center justify-center gap-4 text-sm font-medium">
-                            {attendanceLegendItems.map((item) => (
-                                <div key={item.label} className="flex items-center gap-2 whitespace-nowrap">
-                                    <span
-                                        className="inline-block h-3 w-3 rounded-sm border border-base-100"
-                                        style={{ backgroundColor: item.color }}
-                                    />
-                                    <span className="text-base-content">{item.label}</span>
+                        {hasAttendanceData ? (
+                            <>
+                                <Doughnut data={attendanceCompositionChart} options={chartOptions} />
+                                <div className="flex flex-wrap items-center justify-center gap-4 text-sm font-medium">
+                                    {attendanceLegendItems.map((item) => (
+                                        <div key={item.label} className="flex items-center gap-2 whitespace-nowrap">
+                                            <span
+                                                className="inline-block h-3 w-3 rounded-sm border border-base-100"
+                                                style={{ backgroundColor: item.color }}
+                                            />
+                                            <span className="text-base-content">{item.label}</span>
+                                        </div>
+                                    ))}
                                 </div>
-                            ))}
-                        </div>
+                            </>
+                        ) : (
+                            <div className="text-center opacity-70 py-10">Belum ada data kehadiran untuk bulan ini</div>
+                        )}
                     </div>
                 </TitleCard>
 

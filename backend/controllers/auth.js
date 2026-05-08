@@ -269,7 +269,7 @@ router.post(
                 { id: userId, roles: finalRoles },
                 process.env.JWT_SECRET,
                 {
-                    expiresIn: "1h",
+                    expiresIn: "3h",
                 },
             );
 
@@ -403,7 +403,7 @@ router.post("/register/candidate", uploadSinglePhoto, async (req, res) => {
         const token = jwt.sign(
             { id: userId, roles: ["kandidat"] },
             process.env.JWT_SECRET,
-            { expiresIn: "1h" },
+            { expiresIn: "3h" },
         );
 
         res.status(201).json({
@@ -527,7 +527,7 @@ router.post("/login", async (req, res) => {
             { id: user.id, roles: finalRoles },
             process.env.JWT_SECRET,
             {
-                expiresIn: "1h",
+                expiresIn: "3h",
             },
         );
 

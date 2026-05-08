@@ -90,6 +90,9 @@ const AtasanReimbursements = lazy(
 const AtasanAttendance = lazy(
   () => import("../pages/protected/AtasanAttendance"),
 );
+const AtasanWarningLetters = lazy(
+  () => import("../pages/protected/AtasanWarningLetters"),
+);
 
 // Finance Pages
 const FinanceDashboard = lazy(
@@ -287,6 +290,10 @@ const atasanRoutes = [
   {
     path: "/team-attendance",
     component: AtasanAttendance,
+  },
+  {
+    path: "/team-warning-letters",
+    component: AtasanWarningLetters,
   },
   {
     path: "/settings-profile",

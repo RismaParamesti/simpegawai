@@ -10,6 +10,21 @@ function secondsToHoursDecimal(seconds) {
     return Math.round((seconds / 3600) * 100) / 100;
 }
 
+const formatTimeLabel = (timeValue) => String(timeValue || "").slice(0, 5) || "-";
+
+const getWorkingHoursWindow = (workingHours = {}) => {
+    const checkInTime = workingHours.check_in_time || STANDARD_CHECK_IN_TIME;
+    const checkOutTime = workingHours.check_out_time || STANDARD_CHECK_OUT_TIME;
+
+    return {
+        check_in_time: checkInTime,
+        check_out_time: checkOutTime,
+        check_in_seconds: timeStringToSeconds(checkInTime),
+        check_out_seconds: timeStringToSeconds(checkOutTime),
+        label: `${formatTimeLabel(checkInTime)} - ${formatTimeLabel(checkOutTime)}`,
+    };
+};
+
 // Helper: format Date ke yyyy-mm-dd
 function formatDateOnly(date) {
     const yyyy = date.getFullYear();
@@ -18,9 +33,6 @@ function formatDateOnly(date) {
     return `${yyyy}-${mm}-${dd}`;
 }
 
-// Konstanta jam pulang standar
-
-const STANDARD_CHECK_OUT_TIME = "17:00:00";
 const express = require("express");
 const router = express.Router();
 const db = require("../config/db");
@@ -104,12 +116,9 @@ const fs = require("fs");
 const Holidays = require("date-holidays");
 const { logActivity, getIpAddress, getUserAgent } = require("../middleware/activityLogger");
 
-const STANDARD_CHECK_IN_TIME = "08:00:00";
-// const STANDARD_CHECK_OUT_TIME = "16:00:00"; // Hapus duplikat, gunakan yang di atas
 const LATE_TOLERANCE_MINUTES = 60;
-const CHECK_IN_START_TIME = "07:00:00";
-const CHECK_IN_CUTOFF_TIME = "12:00:00";
-const CHECK_OUT_START_TIME = "12:01:00";
+const STANDARD_CHECK_IN_TIME = "08:00:00";
+const STANDARD_CHECK_OUT_TIME = "17:00:00";
 const holidayCalendar = new Holidays("ID");
 const MANAGER_POSITION_NAMES = [
     "operations manager",
@@ -249,6 +258,22 @@ const getCalculatedRemainingLeaveQuota = async (employeeId) => {
     return quotaResult[0];
 };
 
+const getEmployeeCreatedDateOnly = async (employeeId) => {
+    const [rows] = await db
+        .promise()
+        .query("SELECT created_at FROM employees WHERE id = ? LIMIT 1", [
+            employeeId,
+        ]);
+
+    if (!rows.length || !rows[0].created_at) return null;
+
+    const createdDate = new Date(rows[0].created_at);
+    if (Number.isNaN(createdDate.getTime())) return null;
+
+    createdDate.setHours(0, 0, 0, 0);
+    return createdDate;
+};
+
 const applyApprovedLeaveEffects = async (leaveRequest) => {
     const startDate = new Date(leaveRequest.start_date);
     const endDate = new Date(leaveRequest.end_date);
@@ -314,6 +339,17 @@ const ensureAlphaAttendanceRecords = async (employeeId, month, year) => {
         return 0;
     }
 
+    const employeeCreatedDate = await getEmployeeCreatedDateOnly(employeeId);
+    if (employeeCreatedDate) {
+        if (employeeCreatedDate > endDate) {
+            return 0;
+        }
+
+        if (employeeCreatedDate > startDate) {
+            startDate.setTime(employeeCreatedDate.getTime());
+        }
+    }
+
     let createdAlphaCount = 0;
 
     for (
@@ -368,6 +404,15 @@ const ensureAlphaAttendanceRecords = async (employeeId, month, year) => {
 };
 
 const ensureAlphaAttendanceByDate = async (employeeId, dateObj) => {
+    const employeeCreatedDate = await getEmployeeCreatedDateOnly(employeeId);
+    if (employeeCreatedDate) {
+        const targetDate = new Date(dateObj);
+        targetDate.setHours(0, 0, 0, 0);
+        if (targetDate < employeeCreatedDate) {
+            return false;
+        }
+    }
+
     // Hari kerja: Senin-Sabtu (Minggu tidak dihitung)
     if (dateObj.getDay() === 0) {
         return false;
@@ -443,13 +488,30 @@ const getSanctionLevelFromAlphaCounts = ({
 };
 
 const evaluateAlphaDisciplineForEmployee = async (employeeId) => {
+    const [employeeData] = await db.promise().query(
+        `SELECT created_at FROM employees WHERE id = ?`,
+        [employeeId]
+    );
+
+    if (!employeeData.length) {
+        return {
+            alpha_consecutive_days: 0,
+            alpha_accumulated_days: 0,
+            alpha_sanction_level: ALPHA_SANCTION_LEVEL.NONE,
+            account_locked: false,
+        };
+    }
+
+    const employeeCreatedDate = employeeData[0].created_at;
+
     const [attendanceRows] = await db.promise().query(
         `SELECT status, date
          FROM attendance
          WHERE employee_id = ?
+           AND date >= DATE(?) 
            AND date <= CURDATE()
          ORDER BY date DESC`,
-        [employeeId]
+        [employeeId, employeeCreatedDate]
     );
 
     const alphaAccumulatedDays = attendanceRows.reduce((total, row) => {
@@ -547,6 +609,24 @@ const getWorkingHoursByEmployee = async (employeeId) => {
              WHERE e.id = ? LIMIT 1`,
             [employeeId]
         );
+
+    if (result[0]) {
+        return result[0];
+    }
+
+    const [defaultResult] = await db
+        .promise()
+        .query(
+            `SELECT * FROM working_hours
+             WHERE is_default = 1 AND deleted_at IS NULL
+             ORDER BY id ASC
+             LIMIT 1`
+        );
+
+    if (defaultResult[0]) {
+        return defaultResult[0];
+    }
+
     return (
         result[0] || {
             check_in_time: "08:00:00",
@@ -582,6 +662,8 @@ router.post(
             }
 
             const employeeId = employeeResult[0].id;
+            const workingHours = await getWorkingHoursByEmployee(employeeId);
+            const workingHoursWindow = getWorkingHoursWindow(workingHours);
 
             // Cek apakah sudah ada record attendance hari ini
             const [existingAttendance] = await db
@@ -613,8 +695,8 @@ router.post(
                 }
             }
 
-            const checkInCutoffSeconds = timeStringToSeconds(CHECK_IN_CUTOFF_TIME);
-            const checkInStartSeconds = timeStringToSeconds(CHECK_IN_START_TIME);
+            const checkInStartSeconds = workingHoursWindow.check_in_seconds;
+            const checkInCutoffSeconds = workingHoursWindow.check_out_seconds;
             const currentCheckInSeconds = timeStringToSeconds(checkInTime);
 
             if (isPublicHoliday(new Date())) {
@@ -627,26 +709,25 @@ router.post(
 
             if (currentCheckInSeconds < checkInStartSeconds) {
                 return res.status(400).json({
-                    message:
-                        "Check-in hanya bisa dilakukan mulai pukul 07:00.",
-                    start_time: CHECK_IN_START_TIME,
+                    message: `Check-in hanya bisa dilakukan pada jam kerja ${workingHoursWindow.label}.`,
+                    start_time: workingHoursWindow.check_in_time,
+                    end_time: workingHoursWindow.check_out_time,
                     check_in_time: checkInTime,
                 });
             }
 
             if (currentCheckInSeconds > checkInCutoffSeconds) {
                 return res.status(400).json({
-                    message:
-                        "Sudah lewat pukul 12:00, check-in tidak diperbolehkan karena sudah terlalu telat.",
-                    cutoff_time: CHECK_IN_CUTOFF_TIME,
+                    message: `Check-in hanya bisa dilakukan pada jam kerja ${workingHoursWindow.label}.`,
+                    cutoff_time: workingHoursWindow.check_out_time,
                     check_in_time: checkInTime,
                 });
             }
 
-            // Aturan telat berdasarkan jam kerja tetap: 08:00
+            // Aturan telat berdasarkan jam kerja dari working_hours
             const lateMinutes = calculateLateMinutes(
                 checkInTime,
-                STANDARD_CHECK_IN_TIME
+                workingHoursWindow.check_in_time
             );
             const latePolicy = getLatePolicy(lateMinutes);
             const isLate = latePolicy.is_penalized_late;
@@ -715,7 +796,9 @@ router.post(
                 check_in: checkInTime,
                 is_late: isLate,
                 late_minutes: lateMinutes,
-                standard_check_in: STANDARD_CHECK_IN_TIME,
+                standard_check_in: workingHoursWindow.check_in_time,
+                standard_check_out: workingHoursWindow.check_out_time,
+                working_hours_schedule: workingHours,
                 is_tolerated_late: latePolicy.is_tolerated_late,
                 is_penalized_late: latePolicy.is_penalized_late,
                 late_penalty_days: latePolicy.late_penalty_days,
@@ -772,6 +855,8 @@ router.post(
             }
 
             const employeeId = employeeResult[0].id;
+            const workingHours = await getWorkingHoursByEmployee(employeeId);
+            const workingHoursWindow = getWorkingHoursWindow(workingHours);
             // Cek apakah sudah ada record attendance hari ini
             const [existingAttendance] = await db
                 .promise()
@@ -821,21 +906,17 @@ router.post(
             }
 
 
-            const checkOutStartSeconds = timeStringToSeconds(CHECK_OUT_START_TIME);
+            const checkOutStartSeconds = workingHoursWindow.check_in_seconds;
+            const checkOutEndSeconds = workingHoursWindow.check_out_seconds;
             const currentCheckOutSeconds = timeStringToSeconds(checkOutTime);
-            const checkOutLimitSeconds = 23 * 3600 + 59 * 60 + 59; // 23:59:59
-            if (currentCheckOutSeconds < checkOutStartSeconds) {
+            if (
+                currentCheckOutSeconds < checkOutStartSeconds ||
+                currentCheckOutSeconds > checkOutEndSeconds
+            ) {
                 return res.status(400).json({
-                    message:
-                        "Check-out hanya bisa dilakukan setelah pukul 12:01.",
-                    start_time: CHECK_OUT_START_TIME,
-                    check_out_time: checkOutTime,
-                });
-            }
-            if (currentCheckOutSeconds > checkOutLimitSeconds) {
-                return res.status(400).json({
-                    message: "Check-out hanya bisa dilakukan maksimal sampai pukul 23:59.",
-                    limit_time: "23:59:59",
+                    message: `Check-out hanya bisa dilakukan pada jam kerja ${workingHoursWindow.label}.`,
+                    start_time: workingHoursWindow.check_in_time,
+                    end_time: workingHoursWindow.check_out_time,
                     check_out_time: checkOutTime,
                 });
             }
@@ -845,7 +926,10 @@ router.post(
                 existingAttendance[0].check_in
             );
             const checkOutSeconds = timeStringToSeconds(checkOutTime);
-            const standardWorkingDurationSeconds = 8 * 3600;
+            const standardWorkingDurationSeconds = Math.max(
+                0,
+                checkOutEndSeconds - checkOutStartSeconds
+            );
 
             let workingDurationSeconds = checkOutSeconds - checkInSeconds;
             if (workingDurationSeconds < 0) {
@@ -917,7 +1001,9 @@ router.post(
                 late_minutes: existingAttendance[0].late_minutes,
                 working_hours: workingHoursDecimal,
                 overtime_hours: overtimeHoursDecimal,
-                standard_check_out: STANDARD_CHECK_OUT_TIME,
+                standard_check_in: workingHoursWindow.check_in_time,
+                standard_check_out: workingHoursWindow.check_out_time,
+                working_hours_schedule: workingHours,
             });
         } catch (error) {
             console.error(error);
@@ -966,6 +1052,8 @@ router.get("/today", verifyToken, verifyRole(["pegawai"]), async (req, res) => {
         }
 
         const employeeId = employeeResult[0].id;
+        const workingHours = await getWorkingHoursByEmployee(employeeId);
+        const workingHoursWindow = getWorkingHoursWindow(workingHours);
 
         // Ambil data attendance hari ini
         const [attendanceResult] = await db
@@ -990,8 +1078,9 @@ router.get("/today", verifyToken, verifyRole(["pegawai"]), async (req, res) => {
                     is_tolerated_late: false,
                     is_penalized_late: false,
                     late_penalty_days: 0,
-                    standard_check_in: STANDARD_CHECK_IN_TIME,
-                    standard_check_out: STANDARD_CHECK_OUT_TIME,
+                    standard_check_in: workingHoursWindow.check_in_time,
+                    standard_check_out: workingHoursWindow.check_out_time,
+                    working_hours_schedule: workingHours,
                 });
             }
 
@@ -1026,8 +1115,9 @@ router.get("/today", verifyToken, verifyRole(["pegawai"]), async (req, res) => {
                     is_tolerated_late: false,
                     is_penalized_late: false,
                     late_penalty_days: 0,
-                    standard_check_in: STANDARD_CHECK_IN_TIME,
-                    standard_check_out: STANDARD_CHECK_OUT_TIME,
+                    standard_check_in: workingHoursWindow.check_in_time,
+                    standard_check_out: workingHoursWindow.check_out_time,
+                    working_hours_schedule: workingHours,
                 });
             }
 
@@ -1041,6 +1131,9 @@ router.get("/today", verifyToken, verifyRole(["pegawai"]), async (req, res) => {
                 late_minutes: 0,
                 working_hours: null,
                 overtime_hours: null,
+                standard_check_in: workingHoursWindow.check_in_time,
+                standard_check_out: workingHoursWindow.check_out_time,
+                working_hours_schedule: workingHours,
             });
         }
 
@@ -1059,8 +1152,9 @@ router.get("/today", verifyToken, verifyRole(["pegawai"]), async (req, res) => {
             is_tolerated_late: latePolicy.is_tolerated_late,
             is_penalized_late: latePolicy.is_penalized_late,
             late_penalty_days: latePolicy.late_penalty_days,
-            standard_check_in: STANDARD_CHECK_IN_TIME,
-            standard_check_out: STANDARD_CHECK_OUT_TIME,
+            standard_check_in: workingHoursWindow.check_in_time,
+            standard_check_out: workingHoursWindow.check_out_time,
+            working_hours_schedule: workingHours,
         });
     } catch (error) {
         console.error(error);
@@ -1177,8 +1271,8 @@ router.get(
                     SUM(COALESCE(overtime_hours, 0)) as total_overtime_hours,
                     AVG(COALESCE(overtime_hours, 0)) as avg_overtime_hours
                 FROM attendance 
-                WHERE employee_id = ?`;
-            const params = [employeeId];
+                WHERE employee_id = ? AND date >= (SELECT DATE(created_at) FROM employees WHERE id = ?)`;
+            const params = [employeeId, employeeId];
 
             if (month && year) {
                 query += " AND MONTH(date) = ? AND YEAR(date) = ?";
@@ -1509,6 +1603,18 @@ router.put(
                 (shouldScopeAsAtasan(req) || (req.user.roles || []).includes("admin")) && status === "hadir";
 
             if (isAdminOrAtasanUpdatingHadir) {
+                const attendanceWorkingHours = await getWorkingHoursByEmployee(
+                    existingAttendance[0].employee_id
+                );
+                const attendanceWorkingHoursWindow = getWorkingHoursWindow(
+                    attendanceWorkingHours
+                );
+                const standardWorkingDurationSeconds = Math.max(
+                    0,
+                    attendanceWorkingHoursWindow.check_out_seconds -
+                        attendanceWorkingHoursWindow.check_in_seconds
+                );
+
                 const recordDate = new Date(existingAttendance[0].date);
                 recordDate.setHours(0, 0, 0, 0);
 
@@ -1533,9 +1639,9 @@ router.put(
                          WHERE id = ?`,
                         [
                             status,
-                            STANDARD_CHECK_IN_TIME,
-                            STANDARD_CHECK_OUT_TIME,
-                            8,
+                            attendanceWorkingHoursWindow.check_in_time,
+                            attendanceWorkingHoursWindow.check_out_time,
+                            secondsToHoursDecimal(standardWorkingDurationSeconds),
                             0,
                             0,
                             0,
@@ -1553,7 +1659,7 @@ router.put(
                              is_late = ?,
                              late_minutes = ?
                          WHERE id = ?`,
-                        [status, STANDARD_CHECK_IN_TIME, 0, 0, id]
+                        [status, attendanceWorkingHoursWindow.check_in_time, 0, 0, id]
                     );
                 } else {
                     await db
@@ -1636,6 +1742,60 @@ router.put(
 // ============================
 // CRON: GENERATE DAILY ALPHA (ALL EMPLOYEES)
 // ============================
+const runDailyAlphaGeneration = async (targetDateInput) => {
+    const targetDate = targetDateInput
+        ? new Date(targetDateInput)
+        : new Date(Date.now() - 24 * 60 * 60 * 1000);
+
+    if (Number.isNaN(targetDate.getTime())) {
+        const error = new Error("Invalid date format. Use YYYY-MM-DD");
+        error.statusCode = 400;
+        throw error;
+    }
+
+    targetDate.setHours(0, 0, 0, 0);
+
+    // Hari Minggu diskip
+    if (targetDate.getDay() === 0) {
+        return {
+            skipped: true,
+            message: "Skipped. Target date is Sunday",
+            date: formatDateOnly(targetDate),
+            total_employees: 0,
+            generated_alpha: 0,
+        };
+    }
+
+    const [employees] = await db.promise().query(
+        `SELECT e.id
+         FROM employees e
+         INNER JOIN users u ON u.id = e.user_id
+         WHERE e.deleted_at IS NULL
+           AND LOWER(COALESCE(u.status, 'active')) = 'active'`
+    );
+
+    let generatedAlphaCount = 0;
+    for (const employee of employees) {
+        const inserted = await ensureAlphaAttendanceByDate(
+            employee.id,
+            targetDate
+        );
+        if (inserted) {
+            generatedAlphaCount += 1;
+        }
+    }
+
+    return {
+        skipped: false,
+        message: "Daily alpha generation completed",
+        date: formatDateOnly(targetDate),
+        total_employees: employees.length,
+        generated_alpha: generatedAlphaCount,
+    };
+};
+
+router.runDailyAlphaGeneration = runDailyAlphaGeneration;
+
 // Endpoint untuk scheduler harian agar alpha tercatat tanpa menunggu user buka halaman
 router.post("/cron/generate-alpha", async (req, res) => {
     try {
@@ -1646,49 +1806,13 @@ router.post("/cron/generate-alpha", async (req, res) => {
             return res.status(401).json({ message: "Unauthorized cron request" });
         }
 
-        const targetDate = req.body?.date
-            ? new Date(req.body.date)
-            : new Date(Date.now() - 24 * 60 * 60 * 1000);
+        const result = await runDailyAlphaGeneration(req.body?.date);
 
-        if (Number.isNaN(targetDate.getTime())) {
-            return res.status(400).json({
-                message: "Invalid date format. Use YYYY-MM-DD",
-            });
-        }
-
-        targetDate.setHours(0, 0, 0, 0);
-
-        // Hari Minggu diskip
-        if (targetDate.getDay() === 0) {
-            return res.status(200).json({
-                message: "Skipped. Target date is Sunday",
-                date: formatDateOnly(targetDate),
-                generated_alpha: 0,
-            });
-        }
-
-        const [employees] = await db
-            .promise()
-            .query("SELECT id FROM employees");
-
-        let generatedAlphaCount = 0;
-        for (const employee of employees) {
-            const inserted = await ensureAlphaAttendanceByDate(
-                employee.id,
-                targetDate
-            );
-            if (inserted) {
-                generatedAlphaCount += 1;
-            }
-        }
-
-        return res.status(200).json({
-            message: "Daily alpha generation completed",
-            date: formatDateOnly(targetDate),
-            total_employees: employees.length,
-            generated_alpha: generatedAlphaCount,
-        });
+        return res.status(200).json(result);
     } catch (error) {
+        if (error.statusCode === 400) {
+            return res.status(400).json({ message: error.message });
+        }
         console.error(error);
         return res.status(500).json({ message: "Server error" });
     }

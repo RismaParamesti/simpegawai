@@ -2,6 +2,7 @@ const express = require("express");
 const router = express.Router();
 const db = require("../config/db");
 const { verifyToken, verifyRole } = require("../middleware/authMiddleware");
+const { resolveManagerScope } = require("../utils/managerScope");
 const fs = require("fs");
 const path = require("path");
 const PDFDocument = require("pdfkit");
@@ -11,7 +12,53 @@ const COMPANY_ADDRESS =
     "Graha Pena, Ruang 1503, Jl. Ahmad Yani No.88, Ketintang, Kec. Gayungan, Surabaya, Jawa Timur 60234";
 
 const VALID_SP_LEVELS = ["sp1", "sp2", "sp3"];
+const ALPHA_SANCTION_LEVEL = {
+    NONE: "none",
+    SP1: "sp1",
+    SP2: "sp2",
+    SP3: "sp3",
+    EVALUASI_HR: "evaluasi_hr",
+};
 const WARNING_LETTER_UPLOAD_SUBDIR = "warning_letters";
+const COMPANY_LOGO_PATH = path.join(
+    __dirname,
+    "../../frontend/src/assets/logo1.svg"
+);
+
+const getSanctionLevelFromAlphaCounts = ({
+    alphaConsecutiveDays,
+    alphaAccumulatedDays,
+}) => {
+    const consecutive = Number(alphaConsecutiveDays || 0);
+    const accumulated = Number(alphaAccumulatedDays || 0);
+
+    if (consecutive >= 7 || accumulated >= 7) {
+        return ALPHA_SANCTION_LEVEL.EVALUASI_HR;
+    }
+
+    if (consecutive >= 6 || accumulated >= 6) {
+        return ALPHA_SANCTION_LEVEL.SP3;
+    }
+
+    if (consecutive >= 5 || accumulated >= 5) {
+        return ALPHA_SANCTION_LEVEL.SP2;
+    }
+
+    if (consecutive >= 3 || accumulated >= 3) {
+        return ALPHA_SANCTION_LEVEL.SP1;
+    }
+
+    return ALPHA_SANCTION_LEVEL.NONE;
+};
+
+const getCompanyLogoDataUri = () => {
+    try {
+        const svg = fs.readFileSync(COMPANY_LOGO_PATH, "utf8");
+        return `data:image/svg+xml;base64,${Buffer.from(svg).toString("base64")}`;
+    } catch (error) {
+        return "";
+    }
+};
 
 const isAdminContext = (req) => {
     const activeRole = String(req.headers["x-active-role"] || "").toLowerCase();
@@ -55,6 +102,102 @@ const formatDateForLetter = (dateValue) => {
     });
 };
 
+const stripHtmlToText = (value) =>
+        String(value || "")
+                .replace(/<br\s*\/?>(\r?\n)?/gi, "\n")
+                .replace(/<[^>]*>/g, "")
+                .replace(/&nbsp;/g, " ")
+                .replace(/&amp;/g, "&")
+                .replace(/&lt;/g, "<")
+                .replace(/&gt;/g, ">")
+                .replace(/&quot;/g, '"')
+                .replace(/&#39;/g, "'");
+
+const buildLetterHtmlDocument = ({
+        title,
+        letterNumber,
+        recipient,
+        bodyParagraphs,
+        detailRows,
+        issuedDate,
+        closingLines = [],
+}) => {
+        const logoDataUri = getCompanyLogoDataUri();
+        const detailHtml = (detailRows || [])
+                .map(
+                        (row) => `
+                                <tr>
+                                        <td style="width: 140px; padding: 0 0 6px 0; vertical-align: top;">${row.label}</td>
+                                        <td style="padding: 0 0 6px 0; vertical-align: top;">: ${row.value}</td>
+                                </tr>`,
+                )
+                .join("");
+        const paragraphHtml = (bodyParagraphs || [])
+                .map((line) => `<p style="margin: 0 0 12px 0; text-align: justify; text-indent: 36px;">${line}</p>`)
+                .join("");
+        const closingHtml = (closingLines || [])
+                .map((line) => `<div style="margin-bottom: ${line.marginBottom || 10}px;">${line.text}</div>`)
+                .join("");
+
+        return `<!doctype html>
+<html>
+    <head>
+        <meta charset="utf-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1" />
+        <title>${letterNumber}</title>
+        <style>
+            @page { size: A4; margin: 24mm 20mm; }
+            * { box-sizing: border-box; }
+            body { margin: 0; font-family: 'Times New Roman', serif; color: #111827; line-height: 1.7; background: #fff; }
+            .sheet { width: 210mm; min-height: 297mm; margin: 0 auto; background: #fff; padding: 22mm 24mm; }
+            .header { border-bottom: 3px solid #222; padding-bottom: 12px; margin-bottom: 18px; }
+            .header-row { display: flex; align-items: center; }
+            .logo { width: 190px; min-width: 190px; }
+            .company { flex: 1; margin-left: 25px; }
+            .company-name { font-weight: 700; font-size: 18px; margin-bottom: 4px; }
+            .title { text-align: center; font-weight: 700; font-size: 18px; letter-spacing: 1px; margin: 8px 0 6px; }
+            .letter-number { text-align: center; margin-bottom: 24px; font-size: 13px; }
+            .recipient-title { margin: 0 0 8px 0; }
+            .recipient-name { margin: 0 0 12px 0; }
+            .closing { margin-top: 40px; width: 260px; margin-left: auto; text-align: center; }
+        </style>
+    </head>
+    <body>
+        <div class="sheet">
+            <div class="header">
+                <div class="header-row">
+                    <div class="logo">${logoDataUri ? `<img src="${logoDataUri}" alt="Logo" style="width: 150px; height: auto;" />` : "<div style='font-weight:700;font-size:18px;'>PT OTAK KANAN</div>"}</div>
+                    <div class="company">
+                        <div class="company-name">PT OTAK KANAN</div>
+                        <div style="font-size: 13px;">Graha Pena Building Lt.15 Suite 1503</div>
+                        <div style="font-size: 13px;">Jl. Ahmad Yani No.88 Surabaya</div>
+                        <div style="font-size: 13px;">Telp: (031) 8286155</div>
+                    </div>
+                </div>
+            </div>
+            <div style="text-align: right; margin-bottom: 24px;">Surabaya, ${formatDateForLetter(issuedDate)}</div>
+            <div class="title">${title}</div>
+            <div class="letter-number">No: ${letterNumber}</div>
+            <div class="recipient-title">Diberikan kepada:</div>
+            <div class="recipient-name">
+                <div>Nama&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;: ${recipient.name}</div>
+                <div>Departemen : ${recipient.department}</div>
+                <div>Posisi&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;: ${recipient.position}</div>
+                ${recipient.npwp ? `<div>NPWP&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;: ${recipient.npwp}</div>` : ""}
+            </div>
+            ${paragraphHtml}
+            ${detailRows?.length ? `<table style="margin: 0 0 20px 0; border-collapse: collapse;">${detailHtml}</table>` : ""}
+            <div>${closingHtml}</div>
+            <div class="closing">
+                <div style="margin-bottom: 70px;">Hormat kami,</div>
+                <div style="font-weight: bold;">${recipient.signedTitle || "HRD PT OTAK KANAN"}</div>
+                <div>${recipient.signedName || "...................."}</div>
+            </div>
+        </div>
+    </body>
+</html>`;
+};
+
 const buildWarningLetterContent = ({
     letterNumber,
     spLevel,
@@ -86,7 +229,26 @@ const buildWarningLetterContent = ({
             ? `Berdasarkan catatan kehadiran, Saudara tidak masuk kerja tanpa\nketerangan (alpha) secara berturut-turut pada tanggal\n${violationDateText} s.d. ${violationDateEndText}.`
             : `Berdasarkan catatan kehadiran, Saudara tidak masuk kerja tanpa\nketerangan (alpha) pada tanggal ${violationDateText}.`);
 
-    return `${COMPANY_NAME}\n${COMPANY_ADDRESS}\n\n${spTitle}\nNo: ${letterNumber}\n\nDiberikan kepada:\nNama       : ${employeeName}\nDepartemen : ${departmentName}\nPosisi     : ${positionName}\nNPWP       : ${npwp}\n\n${violationReason}\n\nSehubungan dengan hal tersebut, perusahaan memberikan ${spTitle}.\nDiharapkan Saudara tidak mengulangi pelanggaran tersebut dan meningkatkan\nkedisiplinan kerja.\n\nSurat peringatan ini berlaku selama 6 bulan sejak tanggal diterbitkan.\n\nSurabaya, ${issuedDateText}\n\n${signedTitle}\n(${signedName || "...................."})`;
+    return buildLetterHtmlDocument({
+        title: spTitle,
+        letterNumber,
+        recipient: {
+            name: employeeName,
+            department: departmentName,
+            position: positionName,
+            npwp,
+            signedTitle,
+            signedName,
+        },
+        bodyParagraphs: [
+            violationReason.replace(/\n/g, "<br/>") ,
+            `Sehubungan dengan hal tersebut, perusahaan memberikan ${spTitle}.`,
+            "Diharapkan Saudara tidak mengulangi pelanggaran tersebut dan meningkatkan kedisiplinan kerja.",
+            "Surat peringatan ini berlaku selama 6 bulan sejak tanggal diterbitkan.",
+        ],
+        detailRows: [],
+        issuedDate,
+    });
 };
 
 const buildEvaluasiHRContent = ({
@@ -112,7 +274,32 @@ const buildEvaluasiHRContent = ({
     const evalTimeText = evaluationTime || "-";
     const evalPlaceText = evaluationPlace || "Ruang HR / Kantor HRD";
 
-    return `${COMPANY_NAME}\n${COMPANY_ADDRESS}\n\nUNDANGAN EVALUASI HR\nNo: ${letterNumber}\n\nDiberikan kepada:\nNama       : ${employeeName}\nDepartemen : ${departmentName}\nPosisi     : ${positionName}\n\nDengan hormat,\n\nSehubungan dengan catatan pelanggaran kedisiplinan kehadiran yang telah\nmencapai tahap Surat Peringatan III (SP3), dengan ini Saudara diminta\nuntuk menghadiri sesi Evaluasi HR.\n\nEvaluasi ini bertujuan untuk melakukan peninjauan terhadap riwayat\nkehadiran serta memberikan kesempatan kepada Saudara untuk menyampaikan\nklarifikasi terkait pelanggaran yang terjadi.\n\nAdapun pelaksanaan evaluasi akan dilakukan pada:\n\nHari/Tanggal : ${evalDateText}\nWaktu        : ${evalTimeText}\nTempat       : ${evalPlaceText}\n\nDiharapkan Saudara dapat hadir sesuai jadwal yang telah ditentukan.\n\nSurabaya, ${issuedDateText}\n\n${signedTitle}\n(${signedName || "...................."})`;
+    return buildLetterHtmlDocument({
+        title: "UNDANGAN EVALUASI HR",
+        letterNumber,
+        recipient: {
+            name: employeeName,
+            department: departmentName,
+            position: positionName,
+            signedTitle,
+            signedName,
+        },
+        bodyParagraphs: [
+            "Dengan hormat,",
+            "Sehubungan dengan catatan pelanggaran kedisiplinan kehadiran yang telah mencapai tahap Surat Peringatan III (SP3), dengan ini Saudara diminta untuk menghadiri sesi Evaluasi HR.",
+            "Evaluasi ini bertujuan untuk melakukan peninjauan terhadap riwayat kehadiran serta memberikan kesempatan kepada Saudara untuk menyampaikan klarifikasi terkait pelanggaran yang terjadi.",
+            "Adapun pelaksanaan evaluasi akan dilakukan pada:",
+        ],
+        detailRows: [
+            { label: "Hari/Tanggal", value: evalDateText },
+            { label: "Waktu", value: evalTimeText },
+            { label: "Tempat", value: evalPlaceText },
+        ],
+        closingLines: [
+            { text: "Diharapkan Saudara dapat hadir sesuai jadwal yang telah ditentukan.", marginBottom: 12 },
+        ],
+        issuedDate,
+    });
 };
 
 const getEmployeeBaseData = async (employeeId) => {
@@ -230,13 +417,33 @@ const toDateOnly = (value) => {
     return `${year}-${month}-${day}`;
 };
 
+const normalizeUploadedFilePath = (value) => {
+    const raw = String(value || "").trim();
+    if (!raw) return null;
+    const normalized = raw.replace(/^\/+/, "");
+    if (!normalized.startsWith("uploads/")) return null;
+    return normalized;
+};
+
 const getAlphaViolationContext = async (employeeId) => {
+    const [employeeData] = await db.promise().query(
+        `SELECT created_at FROM employees WHERE id = ?`,
+        [employeeId]
+    );
+
+    if (!employeeData.length) {
+        return null;
+    }
+
+    const employeeCreatedDate = employeeData[0].created_at;
+
     const [rows] = await db.promise().query(
         `SELECT date, status
          FROM attendance
          WHERE employee_id = ?
+           AND date >= DATE(?)
          ORDER BY date DESC`,
-        [employeeId]
+        [employeeId, employeeCreatedDate]
     );
 
     if (!rows.length) {
@@ -247,9 +454,14 @@ const getAlphaViolationContext = async (employeeId) => {
     let streakStartDate = null;
     let consecutiveAlphaDays = 0;
     let streakStarted = false;
+    let alphaAccumulatedDays = 0;
 
     for (const row of rows) {
         const status = String(row.status || "").toLowerCase();
+
+        if (status === "alpha") {
+            alphaAccumulatedDays += 1;
+        }
 
         if (!latestAlphaDate && status === "alpha") {
             latestAlphaDate = toDateOnly(row.date);
@@ -282,6 +494,11 @@ const getAlphaViolationContext = async (employeeId) => {
         streakStartDate: streakStartDate || latestAlphaDate,
         streakEndDate: latestAlphaDate,
         consecutiveAlphaDays,
+        alphaAccumulatedDays,
+        sanctionLevel: getSanctionLevelFromAlphaCounts({
+            alphaConsecutiveDays: consecutiveAlphaDays,
+            alphaAccumulatedDays,
+        }),
     };
 };
 
@@ -353,7 +570,7 @@ const saveWarningLetterToUploadFolder = async ({
         doc.on("error", reject);
 
         doc.pipe(writeStream);
-        doc.font("Helvetica").fontSize(11).text(String(letterContent || ""), {
+        doc.font("Helvetica").fontSize(11).text(stripHtmlToText(letterContent), {
             align: "left",
             lineGap: 4,
         });
@@ -428,6 +645,13 @@ router.get(
 
                     return {
                         ...row,
+                        alpha_sanction_level:
+                            violationContext?.sanctionLevel ||
+                            ALPHA_SANCTION_LEVEL.NONE,
+                        alpha_consecutive_days:
+                            violationContext?.consecutiveAlphaDays || 0,
+                        alpha_accumulated_days:
+                            violationContext?.alphaAccumulatedDays || 0,
                         latest_alpha_date:
                             violationContext?.latestAlphaDate || row.latest_alpha_date,
                         violation_date_start: violationDateStart,
@@ -573,6 +797,7 @@ router.get("/my", verifyToken, verifyRole(["pegawai"]), async (req, res) => {
                 wl.signed_title,
                 wl.signed_name,
                 wl.letter_content,
+                wl.file_path,
                 wl.created_at,
                 COALESCE(e.full_name, u.name) AS employee_name,
                 e.employee_code,
@@ -598,6 +823,76 @@ router.get("/my", verifyToken, verifyRole(["pegawai"]), async (req, res) => {
         return res.status(500).json({ message: "Server error" });
     }
 });
+
+router.get(
+    "/team",
+    verifyToken,
+    verifyRole(["atasan"]),
+    async (req, res) => {
+        try {
+            const { employee_id } = req.query;
+            const managerScope = await resolveManagerScope(db, req.user.id);
+
+            let query = `SELECT
+                    wl.id,
+                    wl.letter_number,
+                    wl.sp_level,
+                    wl.employee_id,
+                    wl.issued_by_user_id,
+                    wl.issued_by_role,
+                    wl.violation_date,
+                    wl.issued_date,
+                    wl.valid_until,
+                    wl.status,
+                    wl.reason,
+                    wl.signed_title,
+                    wl.signed_name,
+                    wl.letter_content,
+                    wl.file_path,
+                    wl.created_at,
+                    COALESCE(e.full_name, u.name) AS employee_name,
+                    e.employee_code,
+                    e.npwp,
+                    p.name AS position_name,
+                    d.name AS department_name,
+                    issuer.name AS issued_by_name
+                FROM warning_letters wl
+                JOIN employees e ON wl.employee_id = e.id
+                JOIN users u ON e.user_id = u.id
+                LEFT JOIN positions p ON e.position_id = p.id
+                LEFT JOIN departments d ON p.department_id = d.id
+                LEFT JOIN users issuer ON issuer.id = wl.issued_by_user_id
+                WHERE p.department_id = ?
+                  AND e.id <> ?
+                  AND LOWER(COALESCE(wl.issued_by_role, '')) = 'hr'`;
+
+            const params = [
+                managerScope.departmentId,
+                managerScope.managerEmployeeId,
+            ];
+
+            if (employee_id) {
+                query += " AND wl.employee_id = ?";
+                params.push(employee_id);
+            }
+
+            query += " ORDER BY wl.issued_date DESC, wl.id DESC";
+
+            const [rows] = await db.promise().query(query, params);
+
+            return res.json({
+                message: "Team warning letters fetched successfully",
+                total: rows.length,
+                data: rows,
+            });
+        } catch (error) {
+            console.error(error);
+            return res.status(error.statusCode || 500).json({
+                message: error.message || "Server error",
+            });
+        }
+    }
+);
 
 router.get(
     "/:id",
@@ -676,6 +971,7 @@ router.post("/", verifyToken, verifyRole(["hr", "admin"]), async (req, res) => {
             evaluation_date,
             evaluation_time,
             evaluation_place,
+            file_path,
         } = req.body;
 
         if (!employee_id) {
@@ -698,6 +994,7 @@ router.post("/", verifyToken, verifyRole(["hr", "admin"]), async (req, res) => {
 
         const issuerRole = isAdminContext(req) ? "admin" : "hr";
         const issuerSignature = await getIssuerSignatureInfo(req.user.id, issuerRole);
+        const uploadedFilePath = normalizeUploadedFilePath(file_path);
 
         const isEvaluasiHR = String(sp_level || "").toLowerCase().trim() === "evaluasi_hr";
 
@@ -717,12 +1014,12 @@ router.post("/", verifyToken, verifyRole(["hr", "admin"]), async (req, res) => {
                 signedName: issuerSignature.signedName,
             });
 
-            const evalFilePath = await saveWarningLetterToUploadFolder({
+            const evalFilePath = uploadedFilePath || (await saveWarningLetterToUploadFolder({
                 letterNumber: evalLetterNumber,
                 employeeId: employee_id,
                 issuedDate: normalizedIssuedDate,
                 letterContent: evalLetterContent,
-            });
+            }));
 
             const [evalResult] = await db.promise().query(
                 `INSERT INTO warning_letters (
@@ -775,7 +1072,8 @@ router.post("/", verifyToken, verifyRole(["hr", "admin"]), async (req, res) => {
                 ? violationContext.streakStartDate
                 : violationContext.latestAlphaDate;
 
-        const inferredLevel = normalizeSpLevel(employeeData.alpha_sanction_level) || "sp1";
+        const inferredLevel =
+            normalizeSpLevel(violationContext?.sanctionLevel) || "sp1";
         const normalizedSpLevel = normalizeSpLevel(sp_level) || inferredLevel;
 
         const letterNumber = await generateLetterNumber(normalizedIssuedDate);
@@ -796,12 +1094,12 @@ router.post("/", verifyToken, verifyRole(["hr", "admin"]), async (req, res) => {
             signedTitle: issuerSignature.signedTitle,
             signedName: issuerSignature.signedName,
         });
-        const filePath = await saveWarningLetterToUploadFolder({
+        const filePath = uploadedFilePath || (await saveWarningLetterToUploadFolder({
             letterNumber,
             employeeId: employee_id,
             issuedDate: normalizedIssuedDate,
             letterContent,
-        });
+        }));
 
         const [result] = await db.promise().query(
             `INSERT INTO warning_letters (

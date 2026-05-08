@@ -67,7 +67,7 @@ function ForgotPassword() {
     setErrorMessage("");
 
     if (otpObj.otp.trim() === "")
-      return setErrorMessage("Kode OTP adalah wajib diisi");
+      return setErrorMessage("Kode OTP wajib diisi");
     else {
       try {
         setLoading(true);

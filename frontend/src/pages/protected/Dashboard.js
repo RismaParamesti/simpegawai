@@ -132,12 +132,12 @@ function InternalPage(){
                     </div>
                 </TitleCard>
 
-                <TitleCard title="Informasi Shift" topMargin="mt-0">
+                <TitleCard title="Informasi Jam Kerja" topMargin="mt-0">
                     <div className="overflow-x-auto">
                         <table className="table table-zebra">
                             <thead>
                                 <tr>
-                                    <th>Shift</th>
+                                    <th>Jenis</th>
                                     <th>Jam Masuk</th>
                                     <th>Jam Pulang</th>
                                     <th>Pegawai</th>

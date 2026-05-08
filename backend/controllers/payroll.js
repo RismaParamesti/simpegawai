@@ -558,9 +558,12 @@ router.post(
                         COUNT(DISTINCT CASE WHEN status = 'sakit' THEN date END) as total_sakit_days,
                         COUNT(DISTINCT CASE WHEN status IN ('izin', 'cuti') THEN date END) as total_izin_days
                     FROM attendance 
-                    WHERE employee_id = ? AND MONTH(date) = ? AND YEAR(date) = ?
+                    WHERE employee_id = ? 
+                      AND date >= (SELECT DATE(created_at) FROM employees WHERE id = ?)
+                      AND MONTH(date) = ? 
+                      AND YEAR(date) = ?
                     `,
-                [employee_id, period_month, period_year]
+                [employee_id, employee_id, period_month, period_year]
             );
 
             const totalLateMinutes =
