@@ -37,6 +37,22 @@ const parseTimeToSeconds = (timeValue) => {
     return hours * 3600 + minutes * 60 + seconds
 }
 
+const formatTimeLabel = (timeValue) => (timeValue ? String(timeValue).slice(0, 5) : '-')
+
+const getAttendanceWorkingHoursWindow = (attendance = {}) => {
+    const schedule = attendance?.working_hours_schedule || {}
+    const checkInTime = attendance?.standard_check_in || schedule.check_in_time || '08:00:00'
+    const checkOutTime = attendance?.standard_check_out || schedule.check_out_time || '17:00:00'
+
+    return {
+        checkInTime,
+        checkOutTime,
+        checkInSeconds: parseTimeToSeconds(checkInTime) ?? 0,
+        checkOutSeconds: parseTimeToSeconds(checkOutTime) ?? 0,
+        label: `${formatTimeLabel(checkInTime)} - ${formatTimeLabel(checkOutTime)}`,
+    }
+}
+
 const formatDurationFromCheckTimes = (checkIn, checkOut, fallbackHours) => {
     const startSeconds = parseTimeToSeconds(checkIn)
     const endSeconds = parseTimeToSeconds(checkOut)
@@ -119,9 +135,20 @@ function EmployeeAttendance() {
     const attendanceTodayCardRef = useRef(null)
 
     const openWarningLetterPdf = (letter) => {
+        if (letter?.file_path) {
+            const url = String(letter.file_path || '').startsWith('http')
+                ? letter.file_path
+                : `/${String(letter.file_path || '').replace(/^\/+/, '')}`
+            window.open(url, '_blank')
+            return
+        }
+
         if (!letter?.letter_content) return
         const popup = window.open('', '_blank', 'width=900,height=700')
         if (!popup) return
+
+        const rawContent = String(letter.letter_content || '')
+        const isHtml = /^\s*</.test(rawContent)
 
         popup.document.write(`
             <html>
@@ -131,7 +158,7 @@ function EmployeeAttendance() {
                         body { font-family: 'Times New Roman', serif; margin: 32px; white-space: pre-wrap; line-height: 1.6; }
                     </style>
                 </head>
-                <body>${String(letter.letter_content).replace(/\n/g, '<br/>')}</body>
+                <body>${isHtml ? rawContent : String(rawContent).replace(/\n/g, '<br/>')}</body>
             </html>
         `)
         popup.document.close()
@@ -187,14 +214,14 @@ function EmployeeAttendance() {
     const isLeaveIntegratedToday = ['izin', 'sakit', 'libur'].includes(String(today?.status || '').toLowerCase())
     const attendanceDate = today?.date ? new Date(today.date) : new Date()
     const isSundayToday = attendanceDate.getDay() === 0
+    const attendanceWindow = getAttendanceWorkingHoursWindow(today)
     const nowTime = new Date()
     const currentSeconds = nowTime.getHours() * 3600 + nowTime.getMinutes() * 60 + nowTime.getSeconds()
-    const checkInStartSeconds = 7 * 3600
-    const checkInCutoffSeconds = 12 * 3600
-    const checkOutStartSeconds = 12 * 3600 + 60
+    const checkInStartSeconds = attendanceWindow.checkInSeconds
+    const checkInCutoffSeconds = attendanceWindow.checkOutSeconds
     const isCheckInTooEarly = currentSeconds < checkInStartSeconds && !today?.check_in
     const isCheckInCutoffPassed = currentSeconds > checkInCutoffSeconds && !today?.check_in
-    const isCheckOutNotOpenYet = currentSeconds < checkOutStartSeconds && !!today?.check_in && !today?.check_out
+    const isOutsideWorkingHours = currentSeconds < checkInStartSeconds || currentSeconds > checkInCutoffSeconds
 
     useEffect(() => {
         dispatch(setPageTitle({ title: 'Absensi Pegawai' }))
@@ -359,19 +386,19 @@ function EmployeeAttendance() {
 
                 {!isSundayToday && !isLeaveIntegratedToday && isCheckInTooEarly ? (
                     <div className="alert alert-warning mb-4">
-                        <span>Absen masuk hanya bisa dilakukan pada pukul 07.00 hingga 12.00.</span>
+                        <span>Absensi hanya bisa dilakukan pada jam kerja {attendanceWindow.label}.</span>
                     </div>
                 ) : null}
 
                 {!isSundayToday && !isLeaveIntegratedToday && isCheckInCutoffPassed ? (
                     <div className="alert alert-warning mb-4">
-                        <span>Sudah lewat pukul 12.00, anda tidak bisa absen!.</span>
+                        <span>Jam absensi sudah berakhir pada pukul {formatTimeLabel(attendanceWindow.checkOutTime)}.</span>
                     </div>
                 ) : null}
 
-                {!isSundayToday && !isLeaveIntegratedToday && isCheckOutNotOpenYet ? (
-                    <div className="alert alert-warning mb-4">
-                        <span>Absen pulang hanya bisa dilakukan setelah pukul 12.01.</span>
+                {!isSundayToday && !isLeaveIntegratedToday ? (
+                    <div className="alert alert-info mb-4">
+                        <span>Jam kerja pegawai hari ini: {attendanceWindow.label}.</span>
                     </div>
                 ) : null}
 
@@ -383,6 +410,10 @@ function EmployeeAttendance() {
                     <div className="p-4 rounded-lg bg-base-200">
                         <p className="text-sm opacity-70">Status</p>
                         <p className="text-lg font-semibold">{today.status || '-'}</p>
+                    </div>
+                    <div className="p-4 rounded-lg bg-base-200">
+                        <p className="text-sm opacity-70">Jam Kerja</p>
+                        <p className="text-lg font-semibold">{attendanceWindow.label}</p>
                     </div>
                     <div className="p-4 rounded-lg bg-base-200">
                         <p className="text-sm opacity-70">Durasi Kerja</p>
@@ -414,8 +445,8 @@ function EmployeeAttendance() {
                     </div>
                 </div>
                 <div className="flex flex-wrap gap-2 mt-4">
-                    <button className={`btn btn-primary ${actionLoading ? 'loading' : ''}`} onClick={runCheckin} disabled={actionLoading || !!today.check_in || isLeaveIntegratedToday || isSundayToday || isCheckInTooEarly || isCheckInCutoffPassed}>Check In</button>
-                    <button className={`btn btn-secondary ${actionLoading ? 'loading' : ''}`} onClick={runCheckout} disabled={actionLoading || !today.check_in || !!today.check_out || isLeaveIntegratedToday || isSundayToday || isCheckOutNotOpenYet}>Check Out</button>
+                    <button className={`btn btn-primary ${actionLoading ? 'loading' : ''}`} onClick={runCheckin} disabled={actionLoading || !!today.check_in || isLeaveIntegratedToday || isSundayToday || isOutsideWorkingHours}>Check In</button>
+                    <button className={`btn btn-secondary ${actionLoading ? 'loading' : ''}`} onClick={runCheckout} disabled={actionLoading || !today.check_in || !!today.check_out || isLeaveIntegratedToday || isSundayToday || isOutsideWorkingHours}>Check Out</button>
                 </div>
                 </TitleCard>
             </div>

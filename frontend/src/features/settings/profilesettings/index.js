@@ -212,15 +212,23 @@ function ProfileSettings(){
     const updatePassword = async (event) => {
         event.preventDefault()
 
-        const isDevelopment = !process.env.NODE_ENV || process.env.NODE_ENV === 'development'
+        if (!passwordForm.oldPassword) {
+            setError('Password lama wajib diisi')
+            return
+        }
 
         if (!passwordForm.newPassword) {
             setError('Password baru wajib diisi')
             return
         }
 
-        if (!isDevelopment && !passwordForm.oldPassword) {
-            setError('Password lama wajib diisi')
+        if (passwordForm.newPassword.length < 6) {
+            setError('Password baru minimal 6 karakter')
+            return
+        }
+
+        if (passwordForm.oldPassword === passwordForm.newPassword) {
+            setError('Password baru tidak boleh sama dengan password lama')
             return
         }
 
@@ -229,12 +237,15 @@ function ProfileSettings(){
             setError('')
             await pegawaiApi.changePassword(passwordForm)
             setPasswordForm(INITIAL_PASSWORD_FORM)
-            dispatch(showNotification({message : "Password berhasil diperbarui", status : 1}))
-            localStorage.clear()
-            delete axios.defaults.headers.common['Authorization']
-            window.location.href = '/login'
+            dispatch(showNotification({message : "Password berhasil diperbarui, silakan login kembali", status : 1}))
+            setTimeout(() => {
+                localStorage.clear()
+                delete axios.defaults.headers.common['Authorization']
+                window.location.href = '/login'
+            }, 1500)
         } catch (err) {
-            setError(err.message)
+            setError(err.message || 'Gagal mengubah password')
+            console.error('Password change error:', err)
         } finally {
             setSavingPassword(false)
         }

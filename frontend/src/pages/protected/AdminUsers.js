@@ -234,6 +234,27 @@ function AdminUsers() {
     const handleSaveEdit = async () => {
         if (!editingUser) return
 
+        const requiredFields = [
+            { key: 'department_name', label: 'Departemen' },
+            { key: 'position_id', label: 'Posisi' },
+            { key: 'status', label: 'Status' },
+        ]
+
+        const missingFields = requiredFields
+            .filter((field) => !String(editingUser[field.key] || '').trim())
+            .map((field) => field.label)
+
+        if (!Array.isArray(editingUser.roles) || editingUser.roles.length === 0) {
+            missingFields.push('Role')
+        }
+
+        if (missingFields.length > 0) {
+            const message = `Silakan isi semua field wajib sebelum menyimpan: ${missingFields.join(', ')}`
+            setError(message)
+            window.alert(message)
+            return
+        }
+
         try {
             setSubmitting(true)
             setError('')

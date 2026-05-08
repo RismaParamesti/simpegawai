@@ -74,7 +74,7 @@ function FinanceDashboard() {
   }, [selectedMonth, selectedYear]);
 
   useEffect(() => {
-    dispatch(setPageTitle({ title: "Dashboard Payroll" }));
+    dispatch(setPageTitle({ title: "Dashboard Finance" }));
     loadDashboard();
   }, [dispatch, loadDashboard]);
 
@@ -294,7 +294,7 @@ function FinanceDashboard() {
               label: "Total",
               fontSize: "13px",
               color: "#6b7280",
-              formatter: () => fmtM(totalPayout),
+              formatter: () => fmt(totalPayout),
             },
             value: {
               show: true,

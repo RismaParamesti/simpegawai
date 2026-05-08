@@ -17,6 +17,30 @@ const formatTime = (value) => {
   return String(value).slice(0, 5);
 };
 
+const parseTimeToSeconds = (value) => {
+  if (!value || typeof value !== "string") return null;
+  const [hourPart = "0", minutePart = "0", secondPart = "0"] = value.split(":");
+  const hours = Number(hourPart);
+  const minutes = Number(minutePart);
+  const seconds = Number(secondPart);
+  if ([hours, minutes, seconds].some((num) => Number.isNaN(num))) return null;
+  return hours * 3600 + minutes * 60 + seconds;
+};
+
+const getAttendanceWorkingHoursWindow = (attendance = {}) => {
+  const schedule = attendance?.working_hours_schedule || {};
+  const checkInTime = attendance?.standard_check_in || schedule.check_in_time || "08:00:00";
+  const checkOutTime = attendance?.standard_check_out || schedule.check_out_time || "17:00:00";
+
+  return {
+    checkInTime,
+    checkOutTime,
+    checkInSeconds: parseTimeToSeconds(checkInTime) ?? 0,
+    checkOutSeconds: parseTimeToSeconds(checkOutTime) ?? 0,
+    label: `${formatTime(checkInTime)} - ${formatTime(checkOutTime)}`,
+  };
+};
+
 const formatDateKey = (dateValue) => {
   const date = new Date(dateValue);
   if (Number.isNaN(date.getTime())) return "";
@@ -60,9 +84,20 @@ function EmployeeDashboard() {
   const [currentYear, setCurrentYear] = useState(new Date().getFullYear());
 
   const openWarningLetterPdf = (letter) => {
+    if (letter?.file_path) {
+      const url = String(letter.file_path || "").startsWith("http")
+        ? letter.file_path
+        : `/${String(letter.file_path || "").replace(/^\/+/, "")}`;
+      window.open(url, "_blank");
+      return;
+    }
+
     if (!letter?.letter_content) return;
     const popup = window.open("", "_blank", "width=900,height=700");
     if (!popup) return;
+
+    const rawContent = String(letter.letter_content || "");
+    const isHtml = /^\s*</.test(rawContent);
 
     popup.document.write(`
       <html>
@@ -72,7 +107,7 @@ function EmployeeDashboard() {
             body { font-family: 'Times New Roman', serif; margin: 32px; white-space: pre-wrap; line-height: 1.6; }
           </style>
         </head>
-        <body>${String(letter.letter_content).replace(/\n/g, "<br/>")}</body>
+        <body>${isHtml ? rawContent : String(rawContent).replace(/\n/g, "<br/>")}</body>
       </html>
     `);
     popup.document.close();
@@ -328,12 +363,12 @@ function EmployeeDashboard() {
     ? new Date(todayAttendance.date)
     : new Date();
   const isSundayToday = attendanceDate.getDay() === 0;
+  const attendanceWindow = getAttendanceWorkingHoursWindow(todayAttendance);
   const now = new Date();
   const currentSeconds =
     now.getHours() * 3600 + now.getMinutes() * 60 + now.getSeconds();
-  const checkInStartSeconds = 7 * 3600;
-  const checkInCutoffSeconds = 12 * 3600;
-  const checkOutStartSeconds = 12 * 3600 + 60;
+  const checkInStartSeconds = attendanceWindow.checkInSeconds;
+  const checkInCutoffSeconds = attendanceWindow.checkOutSeconds;
   const todayDateKey = formatDateKey(new Date());
   const activeApprovedLeaveToday = leaveRequests.find((item) => {
     if (String(item?.status || "").toLowerCase() !== "approved") return false;
@@ -347,8 +382,8 @@ function EmployeeDashboard() {
     currentSeconds < checkInStartSeconds && !hasCheckedIn;
   const isCheckInCutoffPassed =
     currentSeconds > checkInCutoffSeconds && !hasCheckedIn;
-  const isCheckOutNotOpenYet =
-    currentSeconds < checkOutStartSeconds && hasCheckedIn && !hasCheckedOut;
+  const isOutsideWorkingHours =
+    currentSeconds < checkInStartSeconds || currentSeconds > checkInCutoffSeconds;
 
   const openAttendanceTodayCard = () => {
     navigate("/app/attendance", {
@@ -379,11 +414,9 @@ function EmployeeDashboard() {
                 : isLeaveIntegratedToday || isApprovedLeaveToday
                   ? `Hari ini status kamu ${todayAttendance?.status || activeApprovedLeaveToday?.leave_type || "izin/cuti"}. Anda tidak perlu absen.`
                   : isCheckInTooEarly
-                    ? "Absen masuk hanya bisa dilakukan pada pukul 07.00 hingga 12.00."
+                    ? `Absensi hanya bisa dilakukan pada jam kerja ${attendanceWindow.label}.`
                     : isCheckInCutoffPassed
-                      ? "Sudah lewat pukul 12.00, anda tidak bisa absen!."
-                      : isCheckOutNotOpenYet
-                        ? "Absen pulang hanya bisa dilakukan setelah pukul 12.01."
+                      ? `Jam absensi sudah berakhir pada pukul ${formatTime(attendanceWindow.checkOutTime)}.`
                         : !hasCheckedIn
                           ? "Hari ini kamu belum absen masuk."
                           : !hasCheckedOut
@@ -399,8 +432,7 @@ function EmployeeDashboard() {
                   isLeaveIntegratedToday ||
                   isApprovedLeaveToday ||
                   isSundayToday ||
-                  isCheckInTooEarly ||
-                  isCheckInCutoffPassed
+                  isOutsideWorkingHours
                 }
                 onClick={handleCheckIn}
               >
@@ -414,7 +446,7 @@ function EmployeeDashboard() {
                   isLeaveIntegratedToday ||
                   isApprovedLeaveToday ||
                   isSundayToday ||
-                  isCheckOutNotOpenYet
+                  isOutsideWorkingHours
                 }
                 onClick={handleCheckOut}
               >

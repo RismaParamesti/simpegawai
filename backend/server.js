@@ -28,6 +28,63 @@ const candidateCallRoutes = require("./controllers/candidateCall");
 const uploadInvitationRoutes = require("./controllers/uploadInvitation");
 const hrcandidateRoutes = require("./controllers/candidateHR");
 
+const getAlphaGenerationTime = () => {
+    const rawTime = String(process.env.DAILY_ALPHA_CRON_TIME || "23:59").trim();
+    const [hourPart, minutePart] = rawTime.split(":");
+    const hour = Number(hourPart);
+    const minute = Number(minutePart);
+
+    if (!Number.isFinite(hour) || !Number.isFinite(minute)) {
+        return { hour: 23, minute: 59 };
+    }
+
+    return {
+        hour: Math.max(0, Math.min(23, hour)),
+        minute: Math.max(0, Math.min(59, minute)),
+    };
+};
+
+const scheduleDailyAlphaGeneration = () => {
+    const runJob = async () => {
+        try {
+            if (typeof attendanceRoutes.runDailyAlphaGeneration !== "function") {
+                console.warn("[WARN] Daily alpha generator is not available.");
+                return;
+            }
+
+            const result = await attendanceRoutes.runDailyAlphaGeneration();
+            console.log(
+                `[CRON] Daily alpha generation finished for ${result.date}: ${result.generated_alpha}/${result.total_employees}`
+            );
+        } catch (error) {
+            console.error("[CRON] Daily alpha generation failed:", error.message);
+        }
+    };
+
+    const scheduleNextRun = () => {
+        const { hour, minute } = getAlphaGenerationTime();
+        const now = new Date();
+        const nextRun = new Date(now);
+        nextRun.setHours(hour, minute, 0, 0);
+
+        if (nextRun <= now) {
+            nextRun.setDate(nextRun.getDate() + 1);
+        }
+
+        const delay = nextRun.getTime() - now.getTime();
+        setTimeout(async () => {
+            await runJob();
+            setInterval(runJob, 24 * 60 * 60 * 1000);
+        }, delay);
+
+        console.log(
+            `[CRON] Daily alpha generation scheduled at ${String(hour).padStart(2, "0")}:${String(minute).padStart(2, "0")}`
+        );
+    };
+
+    scheduleNextRun();
+};
+
 const app = express();
 // Menggunakan middleware CORS untuk mengizinkan permintaan dari domain yang berbeda
 app.use(cors());
@@ -90,3 +147,5 @@ const startServer = async () => {
 };
 
 startServer();
+
+scheduleDailyAlphaGeneration();

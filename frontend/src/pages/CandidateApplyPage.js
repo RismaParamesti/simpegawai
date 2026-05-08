@@ -11,7 +11,13 @@ function CandidateApplyPage() {
   const [appliedJobIds, setAppliedJobIds] = useState([]);
   const [isApplicationBlocked, setIsApplicationBlocked] = useState(false);
   const [blockReasons, setBlockReasons] = useState([]);
-
+  const formatRupiah = (value) => {
+    return new Intl.NumberFormat("id-ID", {
+      style: "currency",
+      currency: "IDR",
+      minimumFractionDigits: 0,
+    }).format(value);
+  };
   // Ambil daftar aplikasi user saat mount
   useEffect(() => {
     const fetchAppliedJobs = async () => {
@@ -660,9 +666,10 @@ function CandidateApplyPage() {
                   </div>
                   <div>
                     <span className="font-semibold">Gaji:</span>{" "}
+                    <span className="font-semibold">Gaji:</span>{" "}
                     {selectedJob.salary_range_min &&
                     selectedJob.salary_range_max
-                      ? `Rp ${(selectedJob.salary_range_min / 1000000).toFixed(1)}M - Rp ${(selectedJob.salary_range_max / 1000000).toFixed(1)}M`
+                      ? `${formatRupiah(selectedJob.salary_range_min)} - ${formatRupiah(selectedJob.salary_range_max)}`
                       : "Gaji dirahasiakan"}
                   </div>
                   <div>
@@ -1213,7 +1220,7 @@ function CandidateApplyPage() {
                         <div>
                           <span className="font-semibold">Gaji:</span>{" "}
                           {job.salary_range_min && job.salary_range_max
-                            ? `Rp ${(job.salary_range_min / 1000000).toFixed(1)}M - Rp ${(job.salary_range_max / 1000000).toFixed(1)}M`
+                            ? `${formatRupiah(job.salary_range_min)} - ${formatRupiah(job.salary_range_max)}`
                             : "Gaji dirahasiakan"}
                         </div>
                         <div>

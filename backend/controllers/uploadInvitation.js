@@ -24,6 +24,26 @@ const storage = multer.diskStorage({
 
 const upload = multer({ storage });
 
+// Folder tujuan upload untuk warning letter
+const warningLetterUploadDir = path.join(__dirname, "../uploads/warning_letters");
+if (!fs.existsSync(warningLetterUploadDir)) {
+  fs.mkdirSync(warningLetterUploadDir, { recursive: true });
+}
+
+const warningLetterStorage = multer.diskStorage({
+  destination: function (req, file, cb) {
+    cb(null, warningLetterUploadDir);
+  },
+  filename: function (req, file, cb) {
+    const ext = path.extname(file.originalname);
+    const name = path.basename(file.originalname, ext);
+    const unique = Date.now();
+    cb(null, `${name}_${unique}${ext}`);
+  },
+});
+
+const warningLetterUpload = multer({ storage: warningLetterStorage });
+
 // POST /api/upload-invitation
 router.post("/upload-invitation", upload.single("file"), (req, res) => {
   if (!req.file) {
@@ -32,6 +52,16 @@ router.post("/upload-invitation", upload.single("file"), (req, res) => {
   // Path relatif untuk disimpan di DB
   const relativePath = `uploads/invitation_letters/${req.file.filename}`;
   res.json({ path: relativePath, url: `/uploads/invitation_letters/${req.file.filename}` });
+});
+
+// POST /api/upload-warning-letter
+router.post("/upload-warning-letter", warningLetterUpload.single("file"), (req, res) => {
+  if (!req.file) {
+    return res.status(400).json({ message: "No file uploaded" });
+  }
+
+  const relativePath = `uploads/warning_letters/${req.file.filename}`;
+  res.json({ path: relativePath, url: `/uploads/warning_letters/${req.file.filename}` });
 });
 
 module.exports = router;

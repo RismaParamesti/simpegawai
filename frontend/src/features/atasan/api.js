@@ -83,6 +83,15 @@ export const atasanApi = {
         }
     },
 
+    async getTeamWarningLetters(params = {}) {
+        try {
+            const response = await axios.get('/api/warning-letters/team', { params })
+            return response.data || { data: [] }
+        } catch (error) {
+            throw new Error(parseApiError(error, 'Gagal memuat surat peringatan tim'))
+        }
+    },
+
     async updateAttendanceStatus(id, status) {
         try {
             const response = await axios.put(`/api/attendance/${id}/status`, { status })

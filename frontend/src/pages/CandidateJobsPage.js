@@ -254,7 +254,7 @@ animate-gradient"
       {/* ABOUT COMPANY */}
       <section className="bg-base-100 py-20">
         <div className="container mx-auto px-4 grid md:grid-cols-2 gap-12 items-center">
-          <img src="/Desain tanpa judul (2).svg" />
+          <img src="/logo1.svg" />
 
           <div>
             <h2 className="text-3xl font-bold text-primary mb-4">

@@ -185,7 +185,6 @@ function AtasanAttendance() {
                     <div className="stat rounded-lg bg-base-200">
                         <div className="stat-title">Terlambat</div>
                         <div className="stat-value text-xl">{summary.late || 0}</div>
-                        <div className="stat-desc">{formatLateDuration(summary.late_minutes || 0)}</div>
                     </div>
                 </div>
 

@@ -163,6 +163,11 @@ const atasanRoutes = [
     icon: <CalendarDaysIcon className={iconClasses}/> ,
     name: 'Kehadiran Tim',
   },
+  {
+    path: '/app/team-warning-letters',
+    icon: <DocumentTextIcon className={iconClasses}/> ,
+    name: 'Surat Peringatan Tim',
+  },
 ]
 
 const financeRoutes = [
