@@ -10,6 +10,8 @@ const INITIAL_FORM = {
   end_date: "",
   reason: "",
   bukti: null,
+  time: "",
+  cuti_khusus_option: "",
 };
 
 const LEAVE_TYPE_LABEL = {
@@ -17,7 +19,40 @@ const LEAVE_TYPE_LABEL = {
   cuti_tahunan: "Cuti Tahunan",
   cuti_sakit: "Cuti Sakit",
   cuti_melahirkan: "Cuti Melahirkan",
+  cuti_keguguran: "Cuti Keguguran",
+  cuti_menikah: "Cuti Menikah",
+  cuti_khusus: "Cuti Penting (Cuti Khusus)",
+  izin_sakit: "Izin Sakit",
+  izin_pribadi: "Izin Keperluan Pribadi",
+  izin_terlambat: "Izin Terlambat / Pulang Cepat",
+  izin_lainnya: "Izin Lainnya",
+  cuti_lainnya: "Cuti Lainnya",
 };
+
+const LEAVE_MODE_LABEL = {
+  izin: "Izin",
+  cuti: "Cuti",
+};
+
+const LEAVE_MODE_TYPES = {
+  izin: ["izin_sakit", "izin_pribadi", "izin_terlambat", "izin_lainnya"],
+  cuti: [
+    "cuti_tahunan",
+    "cuti_sakit",
+    "cuti_melahirkan",
+    "cuti_keguguran",
+    "cuti_menikah",
+    "cuti_khusus",
+    "cuti_lainnya",
+  ],
+};
+
+const CUTI_KHUSUS_OPTIONS = [
+  { key: "menikahkan_anak", label: "Anggota keluarga menikah", days: 2 },
+  { key: "istri_melahirkan", label: "Istri melahirkan/keguguran", days: 2 },
+  { key: "pasangan_orangtua_anak_meninggal", label: "Keluarga meninggal", days: 2 },
+  { key: "anggota_keluarga_serumah_meninggal", label: "Saudara meninggal", days: 1 },
+];
 
 const STATUS_BADGE_CLASS = {
   pending: "badge-warning",
@@ -62,6 +97,24 @@ const calculateRequestedDays = (startDate, endDate) => {
   return Math.floor(difference / (1000 * 60 * 60 * 24)) + 1;
 };
 
+const addDaysToDateString = (dateString, daysToAdd) => {
+  if (!dateString || Number.isNaN(Number(daysToAdd))) return "";
+
+  const baseDate = new Date(`${dateString}T00:00:00`);
+  if (Number.isNaN(baseDate.getTime())) return "";
+
+  baseDate.setDate(baseDate.getDate() + Number(daysToAdd));
+
+  const yyyy = baseDate.getFullYear();
+  const mm = String(baseDate.getMonth() + 1).padStart(2, "0");
+  const dd = String(baseDate.getDate()).padStart(2, "0");
+  return `${yyyy}-${mm}-${dd}`;
+};
+
+const getMaxDaysForLeaveType = (leaveType, cutiKhususOptionKey) => {
+  return 0;
+};
+
 const getFileTypeFromPath = (filePath) => {
   if (!filePath) return "unknown";
 
@@ -94,6 +147,7 @@ const getAssetUrl = (filePath) => {
 function EmployeeLeave() {
   const dispatch = useDispatch();
   const [form, setForm] = useState(INITIAL_FORM);
+  const [leaveMode, setLeaveMode] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -104,6 +158,72 @@ function EmployeeLeave() {
   const [profile, setProfile] = useState({});
   const [todayAttendance, setTodayAttendance] = useState({});
   const [selectedProof, setSelectedProof] = useState(null);
+  const [leavePolicy, setLeavePolicy] = useState(null);
+
+  useEffect(() => {
+    let mounted = true;
+    const fetchPolicy = async () => {
+      if (!form.leave_type) {
+        setLeavePolicy(null);
+        return;
+      }
+
+      try {
+        const res = await pegawaiApi.getLeavePolicy(form.leave_type);
+        const payload = res && res.data ? res.data : res;
+        if (mounted) setLeavePolicy(payload || null);
+      } catch (e) {
+        if (mounted) setLeavePolicy(null);
+      }
+    };
+
+    fetchPolicy();
+    return () => {
+      mounted = false;
+    };
+  }, [form.leave_type]);
+
+  const getEffectiveMaxDays = (leaveType, cutiKhususOptionKey) => {
+    if (leavePolicy && leavePolicy.leave_type === leaveType) {
+      if (leaveType === "cuti_khusus") {
+        const opts = (leavePolicy.meta && leavePolicy.meta.options) || [];
+        const opt = opts.find((o) => o.key === cutiKhususOptionKey);
+        if (opt && Number(opt.days)) return Number(opt.days);
+      }
+      if (Number(leavePolicy.max_days || 0) > 0) return Number(leavePolicy.max_days);
+    }
+
+    return getMaxDaysForLeaveType(leaveType, cutiKhususOptionKey);
+  };
+
+  const getAllowedEndDate = (startDate, leaveType, cutiKhususOptionKey) => {
+    const maxDays = getEffectiveMaxDays(leaveType, cutiKhususOptionKey);
+    if (!startDate || maxDays <= 0) return "";
+
+    return addDaysToDateString(startDate, maxDays - 1);
+  };
+
+  const normalizeLeaveDates = (draftForm) => {
+    const nextForm = { ...draftForm };
+
+    if (!nextForm.start_date) return nextForm;
+
+    if (nextForm.end_date && nextForm.end_date < nextForm.start_date) {
+      nextForm.end_date = nextForm.start_date;
+    }
+
+    const allowedEndDate = getAllowedEndDate(
+      nextForm.start_date,
+      nextForm.leave_type,
+      nextForm.cuti_khusus_option,
+    );
+
+    if (allowedEndDate && nextForm.end_date && nextForm.end_date > allowedEndDate) {
+      nextForm.end_date = allowedEndDate;
+    }
+
+    return nextForm;
+  };
 
   const todayDateKey = new Date().toISOString().split("T")[0];
 
@@ -167,7 +287,27 @@ function EmployeeLeave() {
   }, [dispatch, loadData]);
 
   const updateForm = (field, value) => {
-    setForm((prev) => ({ ...prev, [field]: value }));
+    setForm((prev) => {
+      const nextForm = {
+        ...prev,
+        [field]: value,
+      };
+
+      if (field === "leave_type") {
+        nextForm.cuti_khusus_option = value === "cuti_khusus" ? prev.cuti_khusus_option : "";
+        nextForm.time = value === "izin_terlambat" ? prev.time : "";
+      }
+
+      return normalizeLeaveDates(nextForm);
+    });
+  };
+
+  const selectLeaveMode = (mode) => {
+    setLeaveMode(mode);
+    setForm((prev) => ({
+      ...prev,
+      leave_type: mode === "cuti" ? "cuti_tahunan" : "izin",
+    }));
   };
 
   const submitForm = async (event) => {
@@ -184,7 +324,87 @@ function EmployeeLeave() {
       return;
     }
 
-    if (new Date(form.end_date) < new Date(form.start_date)) {
+    const submittedForm = normalizeLeaveDates({
+      ...form,
+      end_date: getAllowedEndDate(
+        form.start_date,
+        form.leave_type,
+        form.cuti_khusus_option,
+      ) || form.end_date,
+    });
+    const requestedDaysForSubmit = calculateRequestedDays(
+      submittedForm.start_date,
+      submittedForm.end_date,
+    );
+
+    // Client-side specific validations (use policy from backend when available)
+    const policy = leavePolicy || null;
+    const requiresBukti = (() => {
+      if (policy) {
+        if (Number(policy.require_bukti || 0) === 1) return true;
+        if (
+          Number(policy.require_bukti_if_days_gt || 0) > 0 &&
+          requestedDaysForSubmit > Number(policy.require_bukti_if_days_gt || 0)
+        )
+          return true;
+        return false;
+      }
+
+      return [
+        "cuti_melahirkan",
+        "cuti_keguguran",
+        "cuti_sakit",
+        "izin_sakit",
+      ].includes(form.leave_type);
+    })();
+
+    if (requiresBukti && !form.bukti) {
+      setError("Jenis ini mensyaratkan bukti pendukung (surat dokter/dokumen).");
+      return;
+    }
+
+    // Frontend: prevent submitting long izin_sakit; suggest cuti_sakit instead
+    const izinSakitMaxDays = Number(
+      form.leave_type === "izin_sakit" ? leavePolicy?.max_days || 0 : 0,
+    );
+
+    if (
+      form.leave_type === "izin_sakit" &&
+      izinSakitMaxDays > 0 &&
+      requestedDaysForSubmit > izinSakitMaxDays
+    ) {
+      setError(`Izin Sakit hanya bisa diajukan maksimal ${izinSakitMaxDays} hari sesuai aturan database.`);
+      return;
+    }
+
+    if (form.leave_type === "cuti_khusus" && !form.cuti_khusus_option) {
+      setError("Pilih alasan untuk Cuti Penting (Cuti Khusus).");
+      return;
+    }
+
+    if (form.leave_type === "izin_terlambat" && !form.time) {
+      setError("Masukkan jam terlambat / pulang cepat untuk Izin Terlambat.");
+      return;
+    }
+
+    if (form.leave_type === "izin_pribadi") {
+      const monthlyLimit = (policy && policy.meta && policy.meta.monthly_limit) || 2;
+      if (requestedDaysForSubmit > Number(monthlyLimit)) {
+        setError(`Izin Keperluan Pribadi dibatasi maksimal ${monthlyLimit} hari per pengajuan.`);
+        return;
+      }
+    }
+
+    const maxDaysForLeave = getEffectiveMaxDays(form.leave_type, form.cuti_khusus_option);
+
+    if (maxDaysForLeave > 0 && requestedDaysForSubmit > maxDaysForLeave) {
+      setError(
+        `${LEAVE_TYPE_LABEL[form.leave_type] || form.leave_type} maksimal ${maxDaysForLeave} hari per pengajuan.`,
+      );
+      return;
+    }
+
+    if (new Date(submittedForm.end_date) < new Date(submittedForm.start_date)) {
       setError("Tanggal akhir tidak boleh lebih kecil dari tanggal mulai");
       return;
     }
@@ -193,7 +413,7 @@ function EmployeeLeave() {
       setSubmitting(true);
       setError("");
       setSuccessMessage("");
-      await pegawaiApi.submitLeaveRequest(form);
+      await pegawaiApi.submitLeaveRequest(submittedForm);
       setForm(INITIAL_FORM);
       setSuccessMessage("Pengajuan cuti/izin berhasil dikirim");
       await loadData(statusFilter);
@@ -207,6 +427,15 @@ function EmployeeLeave() {
   const annualLeaveQuota = profile?.employee?.annual_leave_quota ?? 0;
   const remainingLeaveQuota = profile?.employee?.remaining_leave_quota ?? 0;
   const requestedDays = calculateRequestedDays(form.start_date, form.end_date);
+  const maxDaysForCurrentLeave = getEffectiveMaxDays(
+    form.leave_type,
+    form.cuti_khusus_option,
+  );
+  const maxEndDate = getAllowedEndDate(
+    form.start_date,
+    form.leave_type,
+    form.cuti_khusus_option,
+  );
   const pendingCount = allRequests.filter(
     (item) => item.status === "pending",
   ).length;
@@ -238,6 +467,13 @@ function EmployeeLeave() {
   const closeProofModal = () => {
     setSelectedProof(null);
   };
+
+  useEffect(() => {
+    if (!form.start_date || !form.end_date || !maxEndDate) return;
+    if (form.end_date > maxEndDate) {
+      setForm((prev) => ({ ...prev, end_date: maxEndDate }));
+    }
+  }, [form.start_date, form.end_date, maxEndDate]);
 
   return (
     <>
@@ -313,60 +549,181 @@ function EmployeeLeave() {
             )}
           </div>
         </div>
-        <form
-          className="grid md:grid-cols-2 grid-cols-1 gap-4"
-          onSubmit={submitForm}
-        >
-          <select
-            className="select select-bordered"
-            value={form.leave_type}
-            onChange={(e) => updateForm("leave_type", e.target.value)}
+
+        {!leaveMode ? (
+          <div className="mb-5 rounded-2xl border border-base-300 bg-base-100 p-5 shadow-sm">
+            <div className="mb-4">
+              <h3 className="text-base font-semibold text-base-content">
+                Jenis Pengajuan
+              </h3>
+
+              <p className="mt-1 text-sm text-base-content/70">
+                Silakan pilih <b>Izin</b> atau <b>Cuti</b> untuk membuka form
+                pengajuan.
+              </p>
+            </div>
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+              <button
+                type="button"
+                onClick={() => selectLeaveMode("izin")}
+                className={`
+        rounded-xl px-4 py-3 text-sm font-semibold transition-all duration-200
+        ${
+          leaveMode === "izin"
+            ? "bg-primary text-primary-content shadow-md hover:bg-primary-focus"
+            : "bg-base-200 text-base-content hover:bg-accent hover:text-accent-content"
+        }
+      `}
+              >
+                {LEAVE_MODE_LABEL.izin}
+              </button>
+
+              <button
+                type="button"
+                onClick={() => selectLeaveMode("cuti")}
+                className={`
+        rounded-xl px-4 py-3 text-sm font-semibold transition-all duration-200
+        ${
+          leaveMode === "cuti"
+            ? "bg-primary text-primary-content shadow-md hover:bg-primary-focus"
+            : "bg-base-200 text-base-content hover:bg-accent hover:text-accent-content"
+        }
+      `}
+              >
+                {LEAVE_MODE_LABEL.cuti}
+              </button>
+            </div>
+          </div>
+        ) : null}
+
+        {leaveMode ? (
+          <form
+            className="grid md:grid-cols-2 grid-cols-1 gap-4"
+            onSubmit={submitForm}
           >
-            <option value="izin">Izin</option>
-            <option value="cuti_tahunan">Cuti Tahunan</option>
-            <option value="cuti_sakit">Cuti Sakit</option>
-            <option value="cuti_melahirkan">Cuti Melahirkan</option>
-          </select>
-          <div className="text-sm opacity-70 flex items-center">
-            Total pengajuan: <b className="ml-1">{requestedDays} hari</b>
-          </div>
-          <input
-            className="input input-bordered border-base-300 bg-base-100 focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
-            type="date"
-            value={form.start_date}
-            onChange={(e) => updateForm("start_date", e.target.value)}
-          />
-          <input
-            className="input input-bordered border-base-300 bg-base-100 focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
-            type="date"
-            value={form.end_date}
-            onChange={(e) => updateForm("end_date", e.target.value)}
-          />
-          <textarea
-            className="textarea textarea-bordered md:col-span-2"
-            placeholder="Alasan pengajuan"
-            value={form.reason}
-            onChange={(e) => updateForm("reason", e.target.value)}
-          />
-          <input
-            className="file-input file-input-bordered md:col-span-2"
-            type="file"
-            accept=".pdf,.jpg,.jpeg,.png"
-            onChange={(e) => updateForm("bukti", e.target.files?.[0] || null)}
-          />
-          <div className="md:col-span-2 text-xs opacity-70">
-            Tipe file bukti: PDF/JPG/JPEG/PNG. Bukti bersifat opsional.
-          </div>
-          <div className="md:col-span-2">
-            <button
-              className={`btn btn-primary ${submitting ? "loading" : ""}`}
-              type="submit"
-              disabled={submitting}
+            <select
+              className="select select-bordered"
+              value={form.leave_type}
+              onChange={(e) => updateForm("leave_type", e.target.value)}
             >
-              Kirim Pengajuan
-            </button>
-          </div>
-        </form>
+              {LEAVE_MODE_TYPES[leaveMode].map((leaveType) => (
+                <option key={leaveType} value={leaveType}>
+                  {LEAVE_TYPE_LABEL[leaveType] || leaveType}
+                </option>
+              ))}
+            </select>
+            {form.leave_type === "cuti_khusus" ? (
+              <select
+                className="select select-bordered"
+                value={form.cuti_khusus_option}
+                onChange={(e) => updateForm("cuti_khusus_option", e.target.value)}
+              >
+                <option value="">Pilih alasan cuti khusus</option>
+                {((leavePolicy && leavePolicy.meta && leavePolicy.meta.options) || CUTI_KHUSUS_OPTIONS).map((opt) => (
+                  <option key={opt.key} value={opt.key}>
+                    {opt.label}
+                  </option>
+                ))}
+              </select>
+            ) : null}
+            {form.leave_type === "izin_terlambat" ? (
+              <div className="text-sm">
+                <label className="block text-xs opacity-70">Jam terlambat / pulang cepat</label>
+                <input
+                  type="time"
+                  className="input input-bordered"
+                  value={form.time}
+                  onChange={(e) => updateForm("time", e.target.value)}
+                />
+                <p className="text-xs opacity-60 mt-1">Izin terlambat hanya untuk 1 hari; catat pula jam keterlambatan.</p>
+              </div>
+            ) : null}
+            <div className="text-sm opacity-70 flex items-center">
+              Total pengajuan: <b className="ml-1">{requestedDays} hari</b>
+            </div>
+            <input
+              className="input input-bordered border-base-300 bg-base-100 focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
+              type="date"
+              value={form.start_date}
+              onChange={(e) => updateForm("start_date", e.target.value)}
+            />
+            <input
+              className="input input-bordered border-base-300 bg-base-100 focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
+              type="date"
+              value={form.end_date}
+              min={form.start_date || undefined}
+              max={maxEndDate || undefined}
+              onChange={(e) => updateForm("end_date", e.target.value)}
+            />
+            <div className="md:col-span-2 text-xs opacity-70">
+              {maxDaysForCurrentLeave > 0
+                ? `Rentang tanggal otomatis dibatasi maksimal ${maxDaysForCurrentLeave} hari sesuai leave_request_settings.`
+                : "Rentang tanggal mengikuti aturan leave_request_settings yang aktif."}
+            </div>
+            <textarea
+              className="textarea textarea-bordered md:col-span-2"
+              placeholder="Alasan pengajuan"
+              value={form.reason}
+              onChange={(e) => updateForm("reason", e.target.value)}
+            />
+            <input
+              className="file-input file-input-bordered md:col-span-2"
+              type="file"
+              accept=".pdf,.jpg,.jpeg,.png"
+              onChange={(e) => updateForm("bukti", e.target.files?.[0] || null)}
+            />
+            <div className="md:col-span-2 text-xs opacity-70">
+              {(() => {
+                const policy = leavePolicy || null;
+                const requiresBuktiNow = (() => {
+                  if (policy) {
+                    if (Number(policy.require_bukti || 0) === 1) return true;
+                    if (
+                      Number(policy.require_bukti_if_days_gt || 0) > 0 &&
+                      requestedDays > Number(policy.require_bukti_if_days_gt || 0)
+                    )
+                      return true;
+                    return false;
+                  }
+
+                  return [
+                    "cuti_melahirkan",
+                    "cuti_keguguran",
+                    "cuti_sakit",
+                    "izin_sakit",
+                  ].includes(form.leave_type);
+                })();
+
+                if (requiresBuktiNow) return "Bukti (surat dokter/dokumen) wajib untuk jenis ini.";
+                if (form.leave_type === "izin_pribadi") {
+                  const monthlyLimit = (policy && policy.meta && policy.meta.monthly_limit) || 2;
+                  return `Izin Keperluan Pribadi: maksimal ${monthlyLimit} hari per bulan; tidak dibayar.`;
+                }
+                if (form.leave_type === "cuti_sakit") return "Skema pembayaran untuk cuti sakit: 4 bulan 100%, 4 bulan 75%, 4 bulan 50%, selanjutnya 25%.";
+                if (maxDaysForCurrentLeave > 0) return `Maksimal ${maxDaysForCurrentLeave} hari untuk jenis ini.`;
+                return "Tipe file bukti: PDF/JPG/JPEG/PNG. Bukti bersifat opsional.";
+              })()}
+            </div>
+            <div className="md:col-span-2 flex gap-2 flex-wrap">
+              <button
+                className={`btn btn-primary ${submitting ? "loading" : ""}`}
+                type="submit"
+                disabled={submitting}
+              >
+                Kirim Pengajuan
+              </button>
+              <button
+                type="button"
+                className="btn btn-ghost"
+                onClick={() => setLeaveMode("")}
+              >
+                Ulangi Pilihan
+              </button>
+            </div>
+          </form>
+        ) : (
+          <></>
+        )}
       </TitleCard>
 
       <TitleCard title="Riwayat Pengajuan Cuti / Izin" topMargin="mt-6">

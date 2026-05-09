@@ -77,6 +77,89 @@ const calculateAbsentDeduction = (absentDays, baseSalary) => {
     return Math.round(deduction);
 };
 
+const getUnpaidLeaveDaysForPeriod = async (employeeId, periodMonth, periodYear) => {
+    const periodStart = `${periodYear}-${String(periodMonth).padStart(2, "0")}-01`;
+    const periodEndDate = new Date(Number(periodYear), Number(periodMonth), 0);
+    const periodEnd = `${periodEndDate.getFullYear()}-${String(
+        periodEndDate.getMonth() + 1
+    ).padStart(2, "0")}-${String(periodEndDate.getDate()).padStart(2, "0")}`;
+
+    const fallbackUnpaidTypes = ["cuti_lainnya", "izin_lainnya", "izin_pribadi"];
+
+    try {
+        const [rows] = await db.promise().query(
+            `SELECT COALESCE(
+                SUM(
+                    GREATEST(
+                        DATEDIFF(
+                            LEAST(lr.end_date, ?),
+                            GREATEST(lr.start_date, ?)
+                        ) + 1,
+                        0
+                    )
+                ),
+                0
+            ) AS unpaid_leave_days
+             FROM leave_requests lr
+             LEFT JOIN leave_request_settings lrs ON lrs.leave_type = lr.leave_type
+             WHERE lr.employee_id = ?
+               AND lr.status = 'approved'
+               AND lr.end_date >= ?
+               AND lr.start_date <= ?
+               AND (
+                    COALESCE(JSON_UNQUOTE(JSON_EXTRACT(lrs.meta, '$.paid')), '') = '0'
+                    OR (lrs.leave_type IS NULL AND lr.leave_type IN (?, ?, ?))
+               )`,
+            [
+                periodEnd,
+                periodStart,
+                employeeId,
+                periodStart,
+                periodEnd,
+                ...fallbackUnpaidTypes,
+            ]
+        );
+
+        return Number(rows[0]?.unpaid_leave_days || 0);
+    } catch (error) {
+        // Fallback when leave_request_settings table has not been migrated yet
+        if (error?.code === "ER_NO_SUCH_TABLE" || error?.errno === 1146) {
+            const [rows] = await db.promise().query(
+                `SELECT COALESCE(
+                    SUM(
+                        GREATEST(
+                            DATEDIFF(
+                                LEAST(lr.end_date, ?),
+                                GREATEST(lr.start_date, ?)
+                            ) + 1,
+                            0
+                        )
+                    ),
+                    0
+                ) AS unpaid_leave_days
+                 FROM leave_requests lr
+                 WHERE lr.employee_id = ?
+                   AND lr.status = 'approved'
+                   AND lr.end_date >= ?
+                   AND lr.start_date <= ?
+                   AND lr.leave_type IN (?, ?, ?)`,
+                [
+                    periodEnd,
+                    periodStart,
+                    employeeId,
+                    periodStart,
+                    periodEnd,
+                    ...fallbackUnpaidTypes,
+                ]
+            );
+
+            return Number(rows[0]?.unpaid_leave_days || 0);
+        }
+
+        throw error;
+    }
+};
+
 const toNumber = (value) => Number(value || 0);
 
 const formatCurrency = (value) =>
@@ -571,7 +654,13 @@ router.post(
             const totalAlphaDays = attendanceSummary[0].total_alpha_days || 0;
             const totalSakitDays = attendanceSummary[0].total_sakit_days || 0;
             const totalIzinDays = attendanceSummary[0].total_izin_days || 0;
-            const totalDeductibleAbsentDays = Number(totalAlphaDays || 0);
+            const totalUnpaidLeaveDays = await getUnpaidLeaveDaysForPeriod(
+                employee_id,
+                period_month,
+                period_year
+            );
+            const totalDeductibleAbsentDays =
+                Number(totalAlphaDays || 0) + Number(totalUnpaidLeaveDays || 0);
 
             // Hitung tunjangan & potongan tetap
             const transportAllowance = presentDays * SETTINGS.transport_per_day;
@@ -814,6 +903,7 @@ router.post(
                     attendance_summary: {
                         total_late_minutes: totalLateMinutes,
                         total_alpha_days: totalAlphaDays,
+                        total_unpaid_leave_days: totalUnpaidLeaveDays,
                         total_sakit_days: totalSakitDays,
                         total_izin_days: totalIzinDays,
                         total_deductible_absent_days:
