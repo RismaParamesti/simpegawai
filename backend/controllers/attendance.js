@@ -1,16 +1,50 @@
-// Helper: konversi "HH:mm:ss" ke detik
+const express = require("express");
+const router = express.Router();
+const db = require("../config/db");
+const { verifyToken, verifyRole } = require("../middleware/authMiddleware");
+const { resolveManagerScope } = require("../utils/managerScope");
+const multer = require("multer");
+const path = require("path");
+const fs = require("fs");
+const Holidays = require("date-holidays");
+const { logActivity, getIpAddress, getUserAgent } = require("../middleware/activityLogger");
+
+const STANDARD_CHECK_IN_TIME = "08:00:00";
+const STANDARD_CHECK_OUT_TIME = "17:00:00";
+const LATE_TOLERANCE_MINUTES = 60;
+const holidayCalendar = new Holidays("ID");
+
+const MANAGER_POSITION_NAMES = [
+    "operations manager",
+    "marketing & sales manager",
+    "finance, accounting & tax manager",
+    "hr manager",
+    "head of operations",
+];
+
+const ALPHA_SANCTION_LEVEL = {
+    NONE: "none",
+    SP1: "sp1",
+    SP2: "sp2",
+    SP3: "sp3",
+    EVALUASI_HR: "evaluasi_hr",
+};
+
 function timeStringToSeconds(timeStr) {
     if (!timeStr) return 0;
     const [h, m, s] = timeStr.split(":").map(Number);
-    return h * 3600 + m * 60 + (s || 0);
+    return (Number(h) || 0) * 3600 + (Number(m) || 0) * 60 + (Number(s) || 0);
 }
 
-// Helper: konversi detik ke jam desimal (2 digit)
 function secondsToHoursDecimal(seconds) {
-    return Math.round((seconds / 3600) * 100) / 100;
+    return Math.round((Number(seconds) / 3600) * 100) / 100;
 }
 
-const formatTimeLabel = (timeValue) => String(timeValue || "").slice(0, 5) || "-";
+const formatTimeLabel = (timeStr) => {
+    if (!timeStr) return "";
+    const parts = String(timeStr).split(":");
+    return `${String(parts[0] || "0").padStart(2, "0")}:${String(parts[1] || "0").padStart(2, "0")}`;
+};
 
 const getWorkingHoursWindow = (workingHours = {}) => {
     const checkInTime = workingHours.check_in_time || STANDARD_CHECK_IN_TIME;
@@ -25,116 +59,14 @@ const getWorkingHoursWindow = (workingHours = {}) => {
     };
 };
 
-// Helper: format Date ke yyyy-mm-dd
 function formatDateOnly(date) {
-    const yyyy = date.getFullYear();
-    const mm = String(date.getMonth() + 1).padStart(2, "0");
-    const dd = String(date.getDate()).padStart(2, "0");
+    const d = new Date(date);
+    d.setHours(0, 0, 0, 0);
+    const yyyy = d.getFullYear();
+    const mm = String(d.getMonth() + 1).padStart(2, "0");
+    const dd = String(d.getDate()).padStart(2, "0");
     return `${yyyy}-${mm}-${dd}`;
 }
-
-const express = require("express");
-const router = express.Router();
-const db = require("../config/db");
-require("dotenv").config();
-
-// ============================
-// CRON: AUTO CHECKOUT PEGAWAI YANG BELUM CHECKOUT
-// ============================
-// Endpoint untuk scheduler harian agar pegawai yang belum checkout otomatis diisi jam 23:59
-router.post("/cron/auto-checkout", async (req, res) => {
-    module.exports = router;
-    try {
-        const cronKey = req.headers["x-cron-key"];
-        const expectedCronKey = process.env.CRON_SECRET;
-
-        if (!expectedCronKey || cronKey !== expectedCronKey) {
-            return res.status(401).json({ message: "Unauthorized cron request" });
-        }
-
-        // Default: proses hari kemarin
-        const targetDate = req.body?.date
-            ? new Date(req.body.date)
-            : new Date(Date.now() - 24 * 60 * 60 * 1000);
-        targetDate.setHours(0, 0, 0, 0);
-
-        // Hari Minggu diskip
-        if (targetDate.getDay() === 0) {
-            return res.status(200).json({
-                message: "Skipped. Target date is Sunday",
-                date: formatDateOnly(targetDate),
-                auto_checkout: 0,
-            });
-        }
-
-        // Ambil semua attendance yang belum checkout
-        const dateStr = formatDateOnly(targetDate);
-        const [rows] = await db.promise().query(
-            `SELECT * FROM attendance WHERE date = ? AND check_in IS NOT NULL AND check_out IS NULL`,
-            [dateStr]
-        );
-
-        let updatedCount = 0;
-        for (const att of rows) {
-            // Hitung working_hours dan overtime_hours
-            const checkInSeconds = timeStringToSeconds(att.check_in);
-            const checkOutSeconds = 23 * 3600 + 59 * 60; // 23:59:00
-            const standardWorkingDurationSeconds = 8 * 3600;
-
-            let workingDurationSeconds = checkOutSeconds - checkInSeconds;
-            if (workingDurationSeconds < 0) workingDurationSeconds += 24 * 3600;
-
-            let overtimeDurationSeconds =
-                workingDurationSeconds - standardWorkingDurationSeconds;
-            if (overtimeDurationSeconds < 0) overtimeDurationSeconds = 0;
-
-            const workingHoursDecimal = secondsToHoursDecimal(workingDurationSeconds);
-            const overtimeHoursDecimal = secondsToHoursDecimal(overtimeDurationSeconds);
-
-            await db.promise().query(
-                `UPDATE attendance SET check_out = ?, working_hours = ?, overtime_hours = ? WHERE id = ?`,
-                ["23:59:00", workingHoursDecimal, overtimeHoursDecimal, att.id]
-            );
-            updatedCount++;
-        }
-
-        res.status(200).json({
-            message: "Auto-checkout completed",
-            date: dateStr,
-            auto_checkout: updatedCount,
-        });
-    } catch (error) {
-        console.error(error);
-        res.status(500).json({ message: error.message || "Server error" });
-    }
-});
-const { verifyToken, verifyRole } = require("../middleware/authMiddleware");
-const { resolveManagerScope } = require("../utils/managerScope");
-const multer = require("multer");
-const path = require("path");
-const fs = require("fs");
-const Holidays = require("date-holidays");
-const { logActivity, getIpAddress, getUserAgent } = require("../middleware/activityLogger");
-
-const LATE_TOLERANCE_MINUTES = 60;
-const STANDARD_CHECK_IN_TIME = "08:00:00";
-const STANDARD_CHECK_OUT_TIME = "17:00:00";
-const holidayCalendar = new Holidays("ID");
-const MANAGER_POSITION_NAMES = [
-    "operations manager",
-    "marketing & sales manager",
-    "finance, accounting & tax manager",
-    "hr&ga manager",
-    "hr & ga manager",
-];
-
-const ALPHA_SANCTION_LEVEL = {
-    NONE: "none",
-    SP1: "sp1",
-    SP2: "sp2",
-    SP3: "sp3",
-    EVALUASI_HR: "evaluasi_hr",
-};
 
 // ============================
 // HELPER FUNCTIONS
@@ -222,6 +154,99 @@ const mapLeaveTypeToAttendanceStatus = (leaveType) => {
     return "izin";
 };
 
+const formatServiceRequirement = (months) => {
+    const totalMonths = Number(months) || 0;
+    if (totalMonths % 12 === 0) {
+        return `${totalMonths / 12} tahun`;
+    }
+
+    return `${totalMonths} bulan`;
+};
+
+const calculateServiceMonths = (referenceDate) => {
+    if (!referenceDate) return 0;
+
+    const start = new Date(referenceDate);
+    if (Number.isNaN(start.getTime())) return 0;
+
+    const now = new Date();
+    let months =
+        (now.getFullYear() - start.getFullYear()) * 12 +
+        (now.getMonth() - start.getMonth());
+
+    if (now.getDate() < start.getDate()) {
+        months -= 1;
+    }
+
+    return Math.max(months, 0);
+};
+
+const getLeavePolicyByType = async (leaveType) => {
+    try {
+        const [rows] = await db.promise().query(
+            `SELECT leave_type, label, min_tenure_months, min_days, max_days, require_bukti, require_bukti_if_days_gt, attendance_status, deduct_quota, is_active, meta
+             FROM leave_request_settings
+             WHERE leave_type = ? AND is_active = 1
+             LIMIT 1`,
+            [leaveType]
+        );
+
+        if (rows.length > 0) {
+            const row = rows[0];
+            if (row.meta && typeof row.meta === "string") {
+                try {
+                    row.meta = JSON.parse(row.meta);
+                } catch (e) {
+                    // ignore parse errors
+                }
+            }
+            return row;
+        }
+    } catch (error) {
+        if (error?.code !== "ER_NO_SUCH_TABLE" && error?.errno !== 1146) {
+            throw error;
+        }
+    }
+
+    return null;
+};
+
+const getEffectiveMaxLeaveDays = (policy, leaveType, cutiKhususOptionKey) => {
+    if (!policy) return leaveType === "izin_sakit" ? 20 : 0;
+
+    if (leaveType === "cuti_khusus") {
+        const options = Array.isArray(policy.meta?.options) ? policy.meta.options : [];
+        const selectedOption = options.find((option) => option.key === cutiKhususOptionKey);
+        if (selectedOption && Number(selectedOption.days) > 0) {
+            return Number(selectedOption.days);
+        }
+    }
+
+    const maxDays = Number(policy.max_days || 0);
+    if (maxDays > 0) return maxDays;
+
+    return leaveType === "izin_sakit" ? 20 : 0;
+};
+
+const calculateTotalLeaveDays = (startDate, endDate) => {
+    const startDateObj = new Date(startDate);
+    const endDateObj = new Date(endDate);
+
+    if (
+        Number.isNaN(startDateObj.getTime()) ||
+        Number.isNaN(endDateObj.getTime()) ||
+        endDateObj < startDateObj
+    ) {
+        return -1;
+    }
+
+    const diffTime = endDateObj.getTime() - startDateObj.getTime();
+    return Math.floor(diffTime / (1000 * 60 * 60 * 24)) + 1;
+};
+
+const isQuotaDeductingLeaveType = (leaveType) =>
+    ["cuti_tahunan"].includes(leaveType);
+
 const getCalculatedRemainingLeaveQuota = async (employeeId) => {
     const [quotaResult] = await db
         .promise()
@@ -236,7 +261,7 @@ const getCalculatedRemainingLeaveQuota = async (employeeId) => {
                             FROM leave_requests lr
                             WHERE lr.employee_id = e.id
                               AND lr.status = 'approved'
-                              AND lr.leave_type IN ('cuti_tahunan', 'izin')
+                              AND lr.leave_type IN ('cuti_tahunan')
                         ),
                         0
                     ),
@@ -277,9 +302,9 @@ const getEmployeeCreatedDateOnly = async (employeeId) => {
 const applyApprovedLeaveEffects = async (leaveRequest) => {
     const startDate = new Date(leaveRequest.start_date);
     const endDate = new Date(leaveRequest.end_date);
-    const attendanceStatus = mapLeaveTypeToAttendanceStatus(
-        leaveRequest.leave_type
-    );
+    const attendanceStatus =
+        leaveRequest.attendance_status ||
+        mapLeaveTypeToAttendanceStatus(leaveRequest.leave_type);
 
     for (
         let date = new Date(startDate);
@@ -303,7 +328,7 @@ const applyApprovedLeaveEffects = async (leaveRequest) => {
         );
     }
 
-    if (["cuti_tahunan", "izin"].includes(leaveRequest.leave_type)) {
+    if (isQuotaDeductingLeaveType(leaveRequest.leave_type)) {
         await db.promise().query(
             `UPDATE employees 
             SET remaining_leave_quota = GREATEST(COALESCE(remaining_leave_quota, 0) - ?, 0) 
@@ -561,6 +586,33 @@ const evaluateAlphaDisciplineForEmployee = async (employeeId) => {
     };
 };
 
+const getMonthlyLatePenaltyStatus = async (employeeId, dateStr) => {
+    const d = new Date(dateStr);
+    const month = d.getMonth() + 1;
+    const year = d.getFullYear();
+    const threshold = 5;
+
+    const [rows] = await db.promise().query(
+        `SELECT COUNT(DISTINCT date) AS penalized_count
+         FROM attendance
+         WHERE employee_id = ?
+           AND YEAR(date) = ?
+           AND MONTH(date) = ?
+           AND late_minutes > ?`,
+        [employeeId, year, month, LATE_TOLERANCE_MINUTES]
+    );
+
+    const penalizedCount = Number(rows[0]?.penalized_count || 0);
+    return {
+        month,
+        year,
+        threshold,
+        penalized_late_count: penalizedCount,
+        salary_penalty_triggered: penalizedCount >= threshold,
+        salary_penalty_units: Math.floor(penalizedCount / threshold),
+    };
+};
+
 // ============================
 // MULTER CONFIG (Leave attachment: bukti)
 // ============================
@@ -762,6 +814,10 @@ router.post(
             }
 
             await evaluateAlphaDisciplineForEmployee(employeeId);
+            const monthlyLatePenaltyStatus = await getMonthlyLatePenaltyStatus(
+                employeeId,
+                today
+            );
             // Log activity: check-in
             try {
                 const username = req.user.username || req.user.name || null;
@@ -802,6 +858,7 @@ router.post(
                 is_tolerated_late: latePolicy.is_tolerated_late,
                 is_penalized_late: latePolicy.is_penalized_late,
                 late_penalty_days: latePolicy.late_penalty_days,
+                monthly_late_penalty: monthlyLatePenaltyStatus,
             });
         } catch (error) {
             console.error(error);
@@ -1283,7 +1340,9 @@ router.get(
 
             const summaryData = summary[0] || {};
             const alphaDays = Number(summaryData.absent_days || 0);
+            const lateDays = Number(summaryData.late_days || 0);
             const latePenaltyDays = Number(summaryData.late_penalty_days || 0);
+            const salaryPenaltyThreshold = 5;
             const disciplineSnapshot = await evaluateAlphaDisciplineForEmployee(
                 employeeId
             );
@@ -1296,6 +1355,11 @@ router.get(
                     alpha_days: alphaDays,
                     effective_absent_days: Number(
                         (alphaDays + latePenaltyDays).toFixed(1)
+                    ),
+                    salary_penalty_threshold: salaryPenaltyThreshold,
+                    salary_penalty_triggered: lateDays >= salaryPenaltyThreshold,
+                    salary_penalty_units: Math.floor(
+                        lateDays / salaryPenaltyThreshold
                     ),
                     alpha_discipline: disciplineSnapshot,
                 },
@@ -1503,12 +1567,19 @@ router.get(
 
             const mappedSummaryData = summaryData.map((row) => {
                 const alphaDays = Number(row.absent_days || 0);
+                const lateDays = Number(row.late_days || 0);
                 const latePenaltyDays = Number(row.late_penalty_days || 0);
+                const salaryPenaltyThreshold = 5;
                 return {
                     ...row,
                     alpha_days: alphaDays,
                     effective_absent_days: Number(
                         (alphaDays + latePenaltyDays).toFixed(1)
+                    ),
+                    salary_penalty_threshold: salaryPenaltyThreshold,
+                    salary_penalty_triggered: lateDays >= salaryPenaltyThreshold,
+                    salary_penalty_units: Math.floor(
+                        lateDays / salaryPenaltyThreshold
                     ),
                 };
             });
@@ -1830,7 +1901,7 @@ router.post(
     async (req, res) => {
         try {
             const userId = req.user.id;
-            const { leave_type, start_date, end_date, reason } = req.body;
+            const { leave_type, start_date, end_date, reason, time, cuti_khusus_option } = req.body;
 
             // Validasi input
             if (!leave_type || !start_date || !end_date || !reason) {
@@ -1845,23 +1916,19 @@ router.post(
                     : null;
 
 
-            // Validasi leave_type
-            const validLeaveTypes = [
-                "cuti_tahunan",
-                "cuti_sakit",
-                "cuti_melahirkan",
-                "izin",
-            ];
-            if (!validLeaveTypes.includes(leave_type)) {
+            const policy = await getLeavePolicyByType(leave_type);
+            if (!policy) {
                 return res.status(400).json({
                     message:
-                        "Invalid leave_type. Valid types: cuti_tahunan, cuti_sakit, cuti_melahirkan, izin",
+                        "Invalid leave_type. Valid types: izin, cuti_tahunan, cuti_sakit, cuti_melahirkan, cuti_keguguran, cuti_menikah, cuti_khusus, cuti_besar",
                 });
             }
 
+            const maxDaysForPolicy = getEffectiveMaxLeaveDays(policy, leave_type, cuti_khusus_option);
+
             // Cari employee_id berdasarkan user_id
             const [employeeResult] = await db.promise().query(
-                `SELECT e.id, e.annual_leave_quota, e.remaining_leave_quota, p.name AS position_name
+                `SELECT e.id, e.join_date, e.created_at, e.annual_leave_quota, e.remaining_leave_quota, p.name AS position_name
                  FROM employees e
                  LEFT JOIN positions p ON e.position_id = p.id
                  WHERE e.user_id = ?`,
@@ -1888,10 +1955,103 @@ router.post(
                 requesterRoles.includes("admin") || requesterIsDirector;
 
             // Hitung total hari
-            const startDateObj = new Date(start_date);
-            const endDateObj = new Date(end_date);
-            const diffTime = Math.abs(endDateObj - startDateObj);
-            const totalDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24)) + 1;
+            const totalDays = calculateTotalLeaveDays(start_date, end_date);
+            if (totalDays <= 0) {
+                return res.status(400).json({
+                    message: "Tanggal akhir tidak boleh lebih kecil dari tanggal mulai.",
+                });
+            }
+
+            const serviceDate =
+                employeeResult[0].join_date || employeeResult[0].created_at;
+            const serviceMonths = calculateServiceMonths(serviceDate);
+
+            if (
+                Number(policy.min_tenure_months || 0) > 0 &&
+                serviceMonths < Number(policy.min_tenure_months || 0)
+            ) {
+                return res.status(400).json({
+                    message: `${policy.label || leave_type} hanya bisa diajukan setelah masa kerja ${formatServiceRequirement(policy.min_tenure_months)}.`,
+                    required_tenure_months: Number(policy.min_tenure_months || 0),
+                    current_tenure_months: serviceMonths,
+                });
+            }
+
+            if (Number(policy.min_days || 1) > 0 && totalDays < Number(policy.min_days || 1)) {
+                return res.status(400).json({
+                    message: `${policy.label || leave_type} minimal diajukan selama ${policy.min_days} hari.`,
+                });
+            }
+
+            if (maxDaysForPolicy > 0 && totalDays > maxDaysForPolicy) {
+                return res.status(400).json({
+                    message: `${policy.label || leave_type} maksimal ${maxDaysForPolicy} hari per pengajuan.`,
+                    max_days: Number(maxDaysForPolicy),
+                    requested_days: totalDays,
+                });
+            }
+
+            if (policy.require_bukti && !buktiPath) {
+                return res.status(400).json({
+                    message: `${policy.label || leave_type} wajib melampirkan bukti pendukung.`,
+                });
+            }
+
+            if (
+                Number(policy.require_bukti_if_days_gt || 0) > 0 &&
+                totalDays > Number(policy.require_bukti_if_days_gt) &&
+                !buktiPath
+            ) {
+                return res.status(400).json({
+                    message: `${policy.label || leave_type} untuk lebih dari ${policy.require_bukti_if_days_gt} hari wajib melampirkan bukti pendukung.`,
+                });
+            }
+
+            // Enforce that short sick permits ('izin_sakit') are limited to short durations.
+            // Longer sick leaves should be submitted as 'cuti_sakit'.
+            if (leave_type === 'izin_sakit') {
+                const maxShortSickDays = maxDaysForPolicy || 20;
+                if (totalDays > maxShortSickDays) {
+                    return res.status(400).json({
+                        message: `Izin Sakit hanya untuk pengajuan singkat (maksimal ${maxShortSickDays} hari). Untuk cuti sakit lebih dari ${maxShortSickDays} hari, silakan ajukan 'cuti_sakit'.`,
+                        max_short_sick_days: maxShortSickDays,
+                        suggested_type: 'cuti_sakit',
+                    });
+                }
+            }
+
+            // Additional specific checks for izin_pribadi monthly cap and izin_terlambat single-day
+            if (leave_type === 'izin_pribadi') {
+                const monthlyLimit = (policy.meta && policy.meta.monthly_limit) || 2;
+                const startMonth = startDateObj.getMonth() + 1;
+                const startYear = startDateObj.getFullYear();
+                const [usedRows] = await db.promise().query(
+                    `SELECT COALESCE(SUM(total_days),0) AS used_days
+                     FROM leave_requests
+                     WHERE employee_id = ?
+                       AND status = 'approved'
+                       AND leave_type = 'izin_pribadi'
+                       AND MONTH(start_date) = ? AND YEAR(start_date) = ?`,
+                    [employeeId, startMonth, startYear]
+                );
+                const usedDays = Number((usedRows[0] && usedRows[0].used_days) || 0);
+                if (usedDays + totalDays > Number(monthlyLimit)) {
+                    return res.status(400).json({
+                        message: `Izin Keperluan Pribadi dibatasi ${monthlyLimit} hari per bulan. Anda sudah menggunakan ${usedDays} hari pada bulan ini.`,
+                        monthly_limit: monthlyLimit,
+                        used_days: usedDays,
+                        requested_days: totalDays,
+                    });
+                }
+            }
+
+            if (leave_type === 'izin_terlambat') {
+                if (totalDays !== 1) {
+                    return res.status(400).json({
+                        message: `Izin Terlambat / Pulang Cepat hanya boleh 1 hari per pengajuan.`,
+                    });
+                }
+            }
 
             // Validasi kuota cuti untuk cuti_tahunan
             if (["cuti_tahunan"].includes(leave_type)) {
@@ -1914,18 +2074,20 @@ router.post(
                     : employeeId;
                 [result] = await db.promise().query(
                     `INSERT INTO leave_requests 
-                    (employee_id, leave_type, start_date, end_date, total_days, reason, bukti, status, approved_by, approved_at, created_at) 
-                    VALUES (?, ?, ?, ?, ?, ?, ?, 'approved', ?, NOW(), NOW())`,
+                    (employee_id, leave_type, start_date, end_date, total_days, reason, bukti, time, cuti_khusus_option, status, approved_by, approved_at, created_at) 
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'approved', ?, NOW(), NOW())`,
                     [
-                        employeeId,
-                        leave_type,
-                        start_date,
-                        end_date,
-                        totalDays,
-                        reason,
-                        buktiPath,
-                        autoApprovedBy,
-                    ]
+                            employeeId,
+                            leave_type,
+                            start_date,
+                            end_date,
+                            totalDays,
+                            reason,
+                            buktiPath,
+                            time || null,
+                            cuti_khusus_option || null,
+                            autoApprovedBy,
+                        ]
                 );
 
                 await applyApprovedLeaveEffects({
@@ -1935,6 +2097,7 @@ router.post(
                     end_date,
                     total_days: totalDays,
                     reason,
+                    attendance_status: policy.attendance_status,
                 });
                 // Log activity: auto-approved leave request
                 try {
@@ -1969,17 +2132,19 @@ router.post(
             } else {
                 [result] = await db.promise().query(
                     `INSERT INTO leave_requests 
-                    (employee_id, leave_type, start_date, end_date, total_days, reason, bukti, status, created_at) 
-                    VALUES (?, ?, ?, ?, ?, ?, ?, 'pending', NOW())`,
+                    (employee_id, leave_type, start_date, end_date, total_days, reason, bukti, time, cuti_khusus_option, status, created_at) 
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending', NOW())`,
                     [
-                        employeeId,
-                        leave_type,
-                        start_date,
-                        end_date,
-                        totalDays,
-                        reason,
-                        buktiPath,
-                    ]
+                            employeeId,
+                            leave_type,
+                            start_date,
+                            end_date,
+                            totalDays,
+                            reason,
+                            buktiPath,
+                            time || null,
+                            cuti_khusus_option || null,
+                        ]
                 );
             }
 
@@ -2109,6 +2274,29 @@ router.get(
 // ============================
 // GET ALL LEAVE REQUESTS (HR/Atasan/Admin)
 // ============================
+
+// ============================
+// GET LEAVE POLICY BY TYPE (Pegawai)
+// ============================
+router.get(
+    "/leave-policy/:leave_type",
+    verifyToken,
+    verifyRole(["pegawai", "admin", "hr", "atasan", "direktur"]),
+    async (req, res) => {
+        try {
+            const leaveType = req.params.leave_type;
+            const policy = await getLeavePolicyByType(leaveType);
+            if (!policy) {
+                return res.status(404).json({ message: "Leave policy not found" });
+            }
+
+            return res.status(200).json({ message: "Leave policy retrieved", data: policy });
+        } catch (error) {
+            console.error(error);
+            return res.status(500).json({ message: "Server error" });
+        }
+    }
+);
 // HR/Atasan melihat semua leave request
 router.get(
     "/leave-requests",

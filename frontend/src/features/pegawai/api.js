@@ -166,6 +166,15 @@ export const pegawaiApi = {
         }
     },
 
+    async getLeavePolicy(leaveType) {
+        try {
+            const response = await axios.get(`/api/attendance/leave-policy/${encodeURIComponent(leaveType)}`)
+            return response.data || {}
+        } catch (error) {
+            throw new Error(parseApiError(error, 'Gagal memuat aturan cuti/izin'))
+        }
+    },
+
     async getPayrollByEmployee(employeeId, params = {}) {
         try {
             const response = await axios.get(`/api/payroll/employee/${employeeId}`, { params })
