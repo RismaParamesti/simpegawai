@@ -4,6 +4,23 @@ import { setPageTitle, showNotification } from '../../features/common/headerSlic
 import TitleCard from '../../components/Cards/TitleCard'
 import { atasanApi } from '../../features/atasan/api'
 
+const LEAVE_TYPE_LABEL = {
+    izin: 'Izin',
+    cuti_tahunan: 'Cuti Tahunan',
+    cuti_sakit: 'Cuti Sakit',
+    cuti_melahirkan: 'Cuti Melahirkan',
+    cuti_keguguran: 'Cuti Keguguran',
+    cuti_menikah: 'Cuti Menikah',
+    cuti_khusus: 'Cuti Penting (Cuti Khusus)',
+    izin_sakit: 'Izin Sakit',
+    izin_pribadi: 'Izin Keperluan Pribadi',
+    izin_terlambat: 'Izin Terlambat / Pulang Cepat',
+    izin_lainnya: 'Izin Lainnya',
+    cuti_lainnya: 'Cuti Lainnya',
+}
+
+const getLeaveTypeLabel = (leaveType) => LEAVE_TYPE_LABEL[leaveType] || leaveType || '-'
+
 function AtasanLeaveRequests() {
     const dispatch = useDispatch()
     const [loading, setLoading] = useState(true)
@@ -235,7 +252,7 @@ function AtasanLeaveRequests() {
                                             <div className="font-semibold">{item.employee_name}</div>
                                             <div className="text-xs opacity-70">{item.employee_code}</div>
                                         </td>
-                                        <td>{item.leave_type}</td>
+                                        <td>{getLeaveTypeLabel(item.leave_type)}</td>
                                         <td>{new Date(item.start_date).toLocaleDateString('id-ID')} - {new Date(item.end_date).toLocaleDateString('id-ID')}</td>
                                         <td>{item.total_days || item.duration || 0}</td>
                                         <td>
@@ -333,7 +350,7 @@ function AtasanLeaveRequests() {
                                             <div className="font-semibold">{item.employee_name}</div>
                                             <div className="text-xs opacity-70">{item.employee_code}</div>
                                         </td>
-                                        <td>{item.leave_type}</td>
+                                        <td>{getLeaveTypeLabel(item.leave_type)}</td>
                                         <td>
                                             <span className={`badge ${item.status === 'approved' ? 'badge-success' : 'badge-error'}`}>
                                                 {item.status}
@@ -375,7 +392,7 @@ function AtasanLeaveRequests() {
                             </div>
                             <div>
                                 <p className="opacity-60">Jenis Pengajuan</p>
-                                <p className="font-semibold">{selectedItem.leave_type || '-'}</p>
+                                <p className="font-semibold">{getLeaveTypeLabel(selectedItem.leave_type)}</p>
                             </div>
                             <div>
                                 <p className="opacity-60">Total Hari</p>

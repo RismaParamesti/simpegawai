@@ -312,18 +312,23 @@ const applyApprovedLeaveEffects = async (leaveRequest) => {
         date.setDate(date.getDate() + 1)
     ) {
         const dateStr = formatDateOnly(date);
+        // Persist leave_request_id when available so attendance rows
+        // can be traced back to the originating leave request.
+        const leaveRequestId = leaveRequest.id || leaveRequest.request_id || leaveRequest.requestId || null;
         await db.promise().query(
             `INSERT INTO attendance 
-            (employee_id, date, status, notes, created_at) 
-            VALUES (?, ?, ?, ?, NOW())
+            (employee_id, date, status, notes, leave_request_id, created_at) 
+            VALUES (?, ?, ?, ?, ?, NOW())
             ON DUPLICATE KEY UPDATE
                 status = VALUES(status),
-                notes = VALUES(notes)`,
+                notes = VALUES(notes),
+                leave_request_id = VALUES(leave_request_id)`,
             [
                 leaveRequest.employee_id,
                 dateStr,
                 attendanceStatus,
                 `${leaveRequest.leave_type}: ${leaveRequest.reason}`,
+                leaveRequestId,
             ]
         );
     }
@@ -617,7 +622,7 @@ const getMonthlyLatePenaltyStatus = async (employeeId, dateStr) => {
 // MULTER CONFIG (Leave attachment: bukti)
 // ============================
 const getLeaveUploadSubFolder = (leaveType) => {
-    if (leaveType === "izin") {
+    if (String(leaveType || "").startsWith("izin")) {
         return "izin";
     }
 
@@ -1545,6 +1550,27 @@ router.get(
                     COUNT(DISTINCT CASE WHEN a.status IN ('izin', 'cuti') THEN a.date END) as permission_days,
                     COUNT(DISTINCT CASE WHEN a.status = 'sakit' THEN a.date END) as sick_days,
                     COUNT(DISTINCT CASE WHEN a.status = 'libur' THEN a.date END) as holiday_days,
+                    ${month && year ? `COALESCE((
+                        SELECT SUM(
+                            GREATEST(
+                                DATEDIFF(
+                                    LEAST(lr.end_date, ?),
+                                    GREATEST(lr.start_date, ?)
+                                ) + 1,
+                                0
+                            )
+                        )
+                        FROM leave_requests lr
+                        LEFT JOIN leave_request_settings lrs ON lrs.leave_type = lr.leave_type
+                        WHERE lr.employee_id = e.id
+                          AND lr.status = 'approved'
+                          AND lr.end_date >= ?
+                          AND lr.start_date <= ?
+                          AND (
+                               COALESCE(JSON_UNQUOTE(JSON_EXTRACT(lrs.meta, '$.paid')), '') = '0'
+                               OR (lrs.leave_type IS NULL AND lr.leave_type IN ('cuti_lainnya', 'izin_lainnya', 'izin_pribadi'))
+                          )
+                    ), 0) as unpaid_leave_days,` : `0 as unpaid_leave_days,`}
                     SUM(COALESCE(a.late_minutes, 0)) as total_late_minutes,
                     AVG(a.working_hours) as avg_working_hours,
                     SUM(COALESCE(a.overtime_hours, 0)) as total_overtime_hours,
@@ -1557,7 +1583,12 @@ router.get(
 
             if (month && year) {
                 query += " AND MONTH(a.date) = ? AND YEAR(a.date) = ?";
-                params.push(month, year);
+                const periodStart = `${year}-${String(month).padStart(2, "0")}-01`;
+                const periodEndDate = new Date(Number(year), Number(month), 0);
+                const periodEnd = `${periodEndDate.getFullYear()}-${String(
+                    periodEndDate.getMonth() + 1
+                ).padStart(2, "0")}-${String(periodEndDate.getDate()).padStart(2, "0")}`;
+                params.push(periodEnd, periodStart, periodStart, periodEnd, month, year);
             }
 
             query +=
@@ -1567,14 +1598,16 @@ router.get(
 
             const mappedSummaryData = summaryData.map((row) => {
                 const alphaDays = Number(row.absent_days || 0);
+                const unpaidLeaveDays = Number(row.unpaid_leave_days || 0);
                 const lateDays = Number(row.late_days || 0);
                 const latePenaltyDays = Number(row.late_penalty_days || 0);
                 const salaryPenaltyThreshold = 5;
                 return {
                     ...row,
                     alpha_days: alphaDays,
+                    unpaid_leave_days: unpaidLeaveDays,
                     effective_absent_days: Number(
-                        (alphaDays + latePenaltyDays).toFixed(1)
+                        (alphaDays + unpaidLeaveDays + latePenaltyDays).toFixed(1)
                     ),
                     salary_penalty_threshold: salaryPenaltyThreshold,
                     salary_penalty_triggered: lateDays >= salaryPenaltyThreshold,
@@ -1755,11 +1788,6 @@ router.put(
 
             // Log activity: update attendance status by admin/atasan/hr/finance
             try {
-                console.log('[DEBUG] Attempting activity log for attendance status update', {
-                    reqUser: req.user,
-                    attendanceId: id,
-                    newStatus: status,
-                })
                 const username = req.user.username || req.user.name || null;
                 const role = Array.isArray(req.user.roles)
                     ? req.user.roles[0]
@@ -1916,11 +1944,15 @@ router.post(
                     : null;
 
 
+            const fallbackMaxDays = getEffectiveMaxLeaveDays(null, leave_type, cuti_khusus_option);
             const policy = await getLeavePolicyByType(leave_type);
             if (!policy) {
                 return res.status(400).json({
                     message:
-                        "Invalid leave_type. Valid types: izin, cuti_tahunan, cuti_sakit, cuti_melahirkan, cuti_keguguran, cuti_menikah, cuti_khusus, cuti_besar",
+                        fallbackMaxDays > 0
+                            ? `Maksimal pengajuan untuk jenis cuti/izin tersebut adalah ${fallbackMaxDays} hari.`
+                            : "Maksimal pengajuan untuk jenis cuti/izin tersebut mengikuti aturan database.",
+                    max_days: fallbackMaxDays > 0 ? fallbackMaxDays : null,
                 });
             }
 
@@ -1946,6 +1978,12 @@ router.post(
             const remainingQuota = Number(
                 quotaSummary.calculated_remaining_leave_quota || 0
             );
+            const startDateObj = new Date(start_date);
+            if (Number.isNaN(startDateObj.getTime())) {
+                return res.status(400).json({
+                    message: "Format tanggal mulai tidak valid.",
+                });
+            }
             const requesterPositionName = employeeResult[0].position_name || "";
             const requesterRoles = req.user.roles || [];
             const requesterIsDirector =
@@ -1985,7 +2023,7 @@ router.post(
 
             if (maxDaysForPolicy > 0 && totalDays > maxDaysForPolicy) {
                 return res.status(400).json({
-                    message: `${policy.label || leave_type} maksimal ${maxDaysForPolicy} hari per pengajuan.`,
+                    message: `Maksimal pengajuan untuk jenis cuti/izin tersebut adalah ${maxDaysForPolicy} hari.`,
                     max_days: Number(maxDaysForPolicy),
                     requested_days: totalDays,
                 });
@@ -2091,6 +2129,7 @@ router.post(
                 );
 
                 await applyApprovedLeaveEffects({
+                    id: result.insertId,
                     employee_id: employeeId,
                     leave_type,
                     start_date,
