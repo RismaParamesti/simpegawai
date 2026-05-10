@@ -9,6 +9,24 @@ const normalizePercent = (value, fallback) => {
   return parsed >= 1 ? parsed / 100 : parsed;
 };
 
+const getLatestPayrollSettings = async () => {
+  const [rows] = await db.promise().query(
+    "SELECT id, transport_per_day, meal_per_day, health_percentage, bpjs_percentage, tax, late_deduction_percentage, alpha_deduction_percentage FROM payroll_settings ORDER BY created_at DESC LIMIT 1"
+  );
+
+  return rows[0] || null;
+};
+
+const DEFAULT_PAYROLL_SETTINGS = {
+  transport_per_day: 50000,
+  meal_per_day: 25000,
+  health_percentage: 0.01,
+  bpjs_percentage: 0.01,
+  tax: 0.03,
+  late_deduction_percentage: 0.02,
+  alpha_deduction_percentage: 1,
+};
+
 // Get current payroll settings (Finance/HR/Admin)
 router.get(
   "/",
@@ -17,7 +35,7 @@ router.get(
   async (req, res) => {
     try {
       const [rows] = await db.promise().query(
-        "SELECT id, transport_per_day, meal_per_day, health_percentage, bpjs_percentage, tax, updated_by, updated_at, created_at FROM payroll_settings ORDER BY created_at DESC LIMIT 1"
+        "SELECT id, transport_per_day, meal_per_day, health_percentage, bpjs_percentage, tax, late_deduction_percentage, alpha_deduction_percentage, updated_by, updated_at, created_at FROM payroll_settings ORDER BY created_at DESC LIMIT 1"
       );
       // Exclude Commissioner positions from validation counts
       const [positionValidationRows] = await db.promise().query(
@@ -44,11 +62,7 @@ router.get(
 
       if (rows.length === 0) {
         return res.status(200).json({
-          transport_per_day: 50000,
-          meal_per_day: 25000,
-          health_percentage: 0.01,
-          bpjs_percentage: 0.01,
-          tax: 0.03,
+          ...DEFAULT_PAYROLL_SETTINGS,
           note: "Using defaults; no settings row found",
           validation,
         });
@@ -71,23 +85,93 @@ router.put(
   verifyRole(["finance", "hr", "admin"]),
   async (req, res) => {
     try {
-      const { transport_per_day, meal_per_day, health_percentage, bpjs_percentage, tax } = req.body;
-      const normalizedHealthPercentage = normalizePercent(health_percentage, 0.01);
-      const normalizedBpjsPercentage = normalizePercent(bpjs_percentage, 0.01);
-      const normalizedTax = normalizePercent(tax, 0.03);
+      // Debug: log roles and incoming payload to help investigate missing fields
+      try {
+        console.debug('[DEBUG] PUT /api/payroll-settings - user:', req.user?.id, 'roles:', req.user?.roles, 'body:', req.body);
+      } catch (e) {
+        console.debug('[DEBUG] PUT /api/payroll-settings - failed to stringify debug info');
+      }
+      const roles = new Set((req.user?.roles || []).map((role) => String(role || "").toLowerCase()));
+      const canEditTax = roles.has("finance") || roles.has("admin");
+      const canEditOperational = roles.has("hr") || roles.has("admin");
+
+      if (!canEditTax && !canEditOperational) {
+        return res.status(403).json({ message: "Access denied" });
+      }
+
+      const {
+        transport_per_day,
+        meal_per_day,
+        health_percentage,
+        bpjs_percentage,
+        tax,
+        late_deduction_percentage,
+        alpha_deduction_percentage,
+      } = req.body;
+
+      const latestSettings = await getLatestPayrollSettings();
+      const baseSettings = latestSettings || DEFAULT_PAYROLL_SETTINGS;
+
+      const normalizedTransportPerDay = canEditOperational
+        ? Number(transport_per_day ?? baseSettings.transport_per_day)
+        : Number(baseSettings.transport_per_day);
+      const normalizedMealPerDay = canEditOperational
+        ? Number(meal_per_day ?? baseSettings.meal_per_day)
+        : Number(baseSettings.meal_per_day);
+      const normalizedHealthPercentage = canEditOperational
+        ? normalizePercent(
+            health_percentage,
+            Number(baseSettings.health_percentage ?? DEFAULT_PAYROLL_SETTINGS.health_percentage)
+          )
+        : Number(baseSettings.health_percentage ?? DEFAULT_PAYROLL_SETTINGS.health_percentage);
+      const normalizedBpjsPercentage = canEditOperational
+        ? normalizePercent(
+            bpjs_percentage,
+            Number(baseSettings.bpjs_percentage ?? DEFAULT_PAYROLL_SETTINGS.bpjs_percentage)
+          )
+        : Number(baseSettings.bpjs_percentage ?? DEFAULT_PAYROLL_SETTINGS.bpjs_percentage);
+      const normalizedLateDeductionPercentage = canEditOperational
+        ? normalizePercent(
+            late_deduction_percentage,
+            Number(
+              baseSettings.late_deduction_percentage ??
+                DEFAULT_PAYROLL_SETTINGS.late_deduction_percentage
+            )
+          )
+        : Number(
+            baseSettings.late_deduction_percentage ??
+              DEFAULT_PAYROLL_SETTINGS.late_deduction_percentage
+          );
+      const normalizedAlphaDeductionPercentage = canEditOperational
+        ? normalizePercent(
+            alpha_deduction_percentage,
+            Number(
+              baseSettings.alpha_deduction_percentage ??
+                DEFAULT_PAYROLL_SETTINGS.alpha_deduction_percentage
+            )
+          )
+        : Number(
+            baseSettings.alpha_deduction_percentage ??
+              DEFAULT_PAYROLL_SETTINGS.alpha_deduction_percentage
+          );
+      const normalizedTax = canEditTax
+        ? normalizePercent(tax, Number(baseSettings.tax ?? DEFAULT_PAYROLL_SETTINGS.tax))
+        : Number(baseSettings.tax ?? DEFAULT_PAYROLL_SETTINGS.tax);
 
       const updaterId = req.user.id;
 
       // Always INSERT new record instead of updating
       const [result] = await db.promise().query(
-        `INSERT INTO payroll_settings (transport_per_day, meal_per_day, health_percentage, bpjs_percentage, tax, updated_by)
-         VALUES (?, ?, ?, ?, ?, ?)`,
+        `INSERT INTO payroll_settings (transport_per_day, meal_per_day, health_percentage, bpjs_percentage, tax, late_deduction_percentage, alpha_deduction_percentage, updated_by)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
         [
-          transport_per_day ?? 50000,
-          meal_per_day ?? 25000,
+          normalizedTransportPerDay,
+          normalizedMealPerDay,
           normalizedHealthPercentage,
           normalizedBpjsPercentage,
           normalizedTax,
+          normalizedLateDeductionPercentage,
+          normalizedAlphaDeductionPercentage,
           updaterId,
         ]
       );
@@ -95,7 +179,7 @@ router.put(
       const [inserted] = await db
         .promise()
         .query(
-          "SELECT id, transport_per_day, meal_per_day, health_percentage, bpjs_percentage, tax, updated_by, updated_at, created_at FROM payroll_settings WHERE id = ?",
+          "SELECT id, transport_per_day, meal_per_day, health_percentage, bpjs_percentage, tax, late_deduction_percentage, alpha_deduction_percentage, updated_by, updated_at, created_at FROM payroll_settings WHERE id = ?",
           [result.insertId]
         );
 

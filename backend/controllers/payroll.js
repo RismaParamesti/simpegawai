@@ -10,19 +10,15 @@ const { logActivity, getIpAddress, getUserAgent } = require("../middleware/activ
 // ============================
 // CONFIGURATION
 // ============================
-// Konfigurasi deduction untuk keterlambatan
-const LATE_DEDUCTION_CONFIG = {
-    per_minute: 5000, // Rp 5.000 per menit terlambat
-    // Atau bisa menggunakan persentase dari salary harian
-    per_hour_percentage: 0.02, // 2% dari gaji per jam
-};
-
 // Default nilai (fallback) bila settings di DB tidak tersedia
-const DEFAULT_ALLOWANCE_CONFIG = {
+const DEFAULT_PAYROLL_SETTINGS = {
     transport_per_day: 50000,
     meal_per_day: 25000,
     health_percentage: 0.01,
     bpjs_percentage: 0.01,
+    late_deduction_percentage: 0.02,
+    alpha_deduction_percentage: 1,
+    tax: 0.03,
 };
 
 const getAllowanceSettings = async () => {
@@ -30,17 +26,24 @@ const getAllowanceSettings = async () => {
         const [rows] = await db
             .promise()
             .query(
-                "SELECT transport_per_day, meal_per_day, health_percentage, bpjs_percentage FROM payroll_settings ORDER BY id ASC LIMIT 1"
+                "SELECT transport_per_day, meal_per_day, health_percentage, bpjs_percentage, tax, late_deduction_percentage, alpha_deduction_percentage FROM payroll_settings ORDER BY id DESC LIMIT 1"
             );
-        if (rows.length === 0) return DEFAULT_ALLOWANCE_CONFIG;
+        if (rows.length === 0) return DEFAULT_PAYROLL_SETTINGS;
         return {
             transport_per_day: Number(rows[0].transport_per_day),
             meal_per_day: Number(rows[0].meal_per_day),
             health_percentage: Number(rows[0].health_percentage),
             bpjs_percentage: Number(rows[0].bpjs_percentage),
+            tax: Number(rows[0].tax),
+            late_deduction_percentage: Number(
+                rows[0].late_deduction_percentage
+            ),
+            alpha_deduction_percentage: Number(
+                rows[0].alpha_deduction_percentage
+            ),
         };
     } catch (e) {
-        return DEFAULT_ALLOWANCE_CONFIG;
+        return DEFAULT_PAYROLL_SETTINGS;
     }
 };
 
@@ -52,7 +55,8 @@ const getAllowanceSettings = async () => {
 const calculateLateDeduction = (
     totalLateMinutes,
     baseSalary,
-    workingHoursPerDay = 8
+    workingHoursPerDay = 8,
+    lateDeductionPercentage = DEFAULT_PAYROLL_SETTINGS.late_deduction_percentage
 ) => {
     if (!totalLateMinutes || totalLateMinutes === 0) return 0;
 
@@ -62,17 +66,21 @@ const calculateLateDeduction = (
     const deduction =
         (totalLateMinutes / 60) *
         hourlyRate *
-        LATE_DEDUCTION_CONFIG.per_hour_percentage;
+        lateDeductionPercentage;
 
     return Math.round(deduction);
 };
 
 // Calculate absent deduction
-const calculateAbsentDeduction = (absentDays, baseSalary) => {
+const calculateAbsentDeduction = (
+    absentDays,
+    baseSalary,
+    alphaDeductionPercentage = DEFAULT_PAYROLL_SETTINGS.alpha_deduction_percentage
+) => {
     if (!absentDays || absentDays === 0) return 0;
 
     const dailySalary = baseSalary / 30; // Asumsi 30 hari kerja per bulan
-    const deduction = absentDays * dailySalary;
+    const deduction = absentDays * dailySalary * alphaDeductionPercentage;
 
     return Math.round(deduction);
 };
@@ -632,7 +640,7 @@ router.post(
             const presentDays = presenceResult[0].present_days || 0;
 
             // Get attendance summary untuk periode tersebut
-            // Potongan ketidakhadiran dihitung dari ALPHA saja
+            // Potongan ketidakhadiran dipisah antara alpha dan cuti/izin unpaid
             const [attendanceSummary] = await db.promise().query(
                 `
                     SELECT 
@@ -702,11 +710,23 @@ router.post(
             const lateDeduction = calculateLateDeduction(
                 totalLateMinutes,
                 baseSalary,
-                workingHoursPerDay
+                workingHoursPerDay,
+                SETTINGS.late_deduction_percentage
             );
             const absentDeduction = calculateAbsentDeduction(
                 totalDeductibleAbsentDays,
-                baseSalary
+                baseSalary,
+                SETTINGS.alpha_deduction_percentage
+            );
+            const unpaidLeaveDeduction = calculateAbsentDeduction(
+                totalUnpaidLeaveDays,
+                baseSalary,
+                SETTINGS.alpha_deduction_percentage
+            );
+            const alphaDeduction = calculateAbsentDeduction(
+                totalAlphaDays,
+                baseSalary,
+                SETTINGS.alpha_deduction_percentage
             );
 
                         // Get reimbursements yang siap dimasukkan payroll untuk periode ini
@@ -895,6 +915,8 @@ router.post(
                     },
                     late_deduction: lateDeduction,
                     absent_deduction: absentDeduction,
+                    alpha_deduction: alphaDeduction,
+                    unpaid_leave_deduction: unpaidLeaveDeduction,
                     bpjs_deduction: bpjsDeduction,
                     tax_deduction: parsedTaxDeduction,
                     other_deduction: parsedOtherDeduction,
@@ -1324,7 +1346,16 @@ router.get(
 
             const deductionRows = [
                 ["Potongan Telat", formatCurrency(payroll.late_deduction)],
-                ["Potongan Alpha", formatCurrency(payroll.absent_deduction)],
+                [
+                    "Potongan Alpha",
+                    formatCurrency(
+                        payroll.alpha_deduction ?? payroll.absent_deduction ?? 0
+                    ),
+                ],
+                [
+                    "Potongan Cuti Tidak Dibayar",
+                    formatCurrency(payroll.unpaid_leave_deduction || 0),
+                ],
                 ["Potongan BPJS", formatCurrency(payroll.bpjs_deduction)],
                 ["Potongan Pajak", formatCurrency(payroll.tax_deduction)],
                 ["Potongan Lain", formatCurrency(payroll.other_deduction)],

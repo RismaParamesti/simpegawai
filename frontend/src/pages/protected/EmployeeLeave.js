@@ -5,7 +5,7 @@ import TitleCard from "../../components/Cards/TitleCard";
 import { pegawaiApi } from "../../features/pegawai/api";
 
 const INITIAL_FORM = {
-  leave_type: "izin",
+  leave_type: "",
   start_date: "",
   end_date: "",
   reason: "",
@@ -46,6 +46,8 @@ const LEAVE_MODE_TYPES = {
     "cuti_lainnya",
   ],
 };
+
+const getDefaultLeaveTypeByMode = (mode) => LEAVE_MODE_TYPES[mode]?.[0] || "";
 
 const CUTI_KHUSUS_OPTIONS = [
   { key: "menikahkan_anak", label: "Anggota keluarga menikah", days: 2 },
@@ -306,16 +308,21 @@ function EmployeeLeave() {
     setLeaveMode(mode);
     setForm((prev) => ({
       ...prev,
-      leave_type: mode === "cuti" ? "cuti_tahunan" : "izin",
+      leave_type: getDefaultLeaveTypeByMode(mode),
     }));
   };
 
   const submitForm = async (event) => {
     event.preventDefault();
+    const isSingleDayLeave = form.leave_type === "izin_terlambat";
+    const effectiveEndDate = isSingleDayLeave
+      ? form.start_date || form.end_date
+      : form.end_date;
+
     if (
       !form.leave_type ||
       !form.start_date ||
-      !form.end_date ||
+      !effectiveEndDate ||
       !form.reason
     ) {
       setError(
@@ -330,7 +337,7 @@ function EmployeeLeave() {
         form.start_date,
         form.leave_type,
         form.cuti_khusus_option,
-      ) || form.end_date,
+      ) || effectiveEndDate,
     });
     const requestedDaysForSubmit = calculateRequestedDays(
       submittedForm.start_date,
@@ -414,7 +421,10 @@ function EmployeeLeave() {
       setError("");
       setSuccessMessage("");
       await pegawaiApi.submitLeaveRequest(submittedForm);
-      setForm(INITIAL_FORM);
+      setForm({
+        ...INITIAL_FORM,
+        leave_type: getDefaultLeaveTypeByMode(leaveMode),
+      });
       setSuccessMessage("Pengajuan cuti/izin berhasil dikirim");
       await loadData(statusFilter);
     } catch (err) {
@@ -474,6 +484,17 @@ function EmployeeLeave() {
       setForm((prev) => ({ ...prev, end_date: maxEndDate }));
     }
   }, [form.start_date, form.end_date, maxEndDate]);
+
+  useEffect(() => {
+    if (form.leave_type !== "izin_terlambat") return;
+    if (!form.start_date) return;
+    if (form.end_date === form.start_date) return;
+
+    setForm((prev) => ({
+      ...prev,
+      end_date: prev.start_date,
+    }));
+  }, [form.leave_type, form.start_date, form.end_date]);
 
   return (
     <>
@@ -601,64 +622,94 @@ function EmployeeLeave() {
             className="grid md:grid-cols-2 grid-cols-1 gap-4"
             onSubmit={submitForm}
           >
-            <select
-              className="select select-bordered"
-              value={form.leave_type}
-              onChange={(e) => updateForm("leave_type", e.target.value)}
-            >
-              {LEAVE_MODE_TYPES[leaveMode].map((leaveType) => (
-                <option key={leaveType} value={leaveType}>
-                  {LEAVE_TYPE_LABEL[leaveType] || leaveType}
-                </option>
-              ))}
-            </select>
-            {form.leave_type === "cuti_khusus" ? (
+            <div className="text-sm">
+              <label className="block text-xs opacity-70 mb-1">Jenis pengajuan</label>
               <select
-                className="select select-bordered"
-                value={form.cuti_khusus_option}
-                onChange={(e) => updateForm("cuti_khusus_option", e.target.value)}
+                className="select select-bordered w-full"
+                value={form.leave_type}
+                onChange={(e) => updateForm("leave_type", e.target.value)}
               >
-                <option value="">Pilih alasan cuti khusus</option>
-                {((leavePolicy && leavePolicy.meta && leavePolicy.meta.options) || CUTI_KHUSUS_OPTIONS).map((opt) => (
-                  <option key={opt.key} value={opt.key}>
-                    {opt.label}
+                {LEAVE_MODE_TYPES[leaveMode].map((leaveType) => (
+                  <option key={leaveType} value={leaveType}>
+                    {LEAVE_TYPE_LABEL[leaveType] || leaveType}
                   </option>
                 ))}
               </select>
+            </div>
+            {form.leave_type === "cuti_khusus" ? (
+              <div className="hidden md:block" aria-hidden="true" />
+            ) : (
+              <div className="text-sm opacity-70 flex items-center">
+                Total pengajuan: <b className="ml-1">{requestedDays} hari</b>
+              </div>
+            )}
+            {form.leave_type === "cuti_khusus" ? (
+              <>
+                <div className="text-sm">
+                  <label className="block text-xs opacity-70 mb-1">Alasan cuti khusus</label>
+                  <select
+                    className="select select-bordered w-full"
+                    value={form.cuti_khusus_option}
+                    onChange={(e) => updateForm("cuti_khusus_option", e.target.value)}
+                  >
+                    <option value="">Pilih alasan cuti khusus</option>
+                    {((leavePolicy && leavePolicy.meta && leavePolicy.meta.options) || CUTI_KHUSUS_OPTIONS).map((opt) => (
+                      <option key={opt.key} value={opt.key}>
+                        {opt.label}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <div className="text-sm opacity-70 flex items-center">
+                  Total pengajuan: <b className="ml-1">{requestedDays} hari</b>
+                </div>
+              </>
             ) : null}
             {form.leave_type === "izin_terlambat" ? (
-              <div className="text-sm">
-                <label className="block text-xs opacity-70">Jam terlambat / pulang cepat</label>
+              <>
+                <div className="text-sm">
+                  <label className="block text-xs opacity-70 mb-1">Tanggal izin</label>
+                  <input
+                    className="input input-bordered border-base-300 bg-base-100 focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 w-full"
+                    type="date"
+                    value={form.start_date}
+                    onChange={(e) => updateForm("start_date", e.target.value)}
+                  />
+                </div>
+                <div className="text-sm">
+                  <label className="block text-xs opacity-70 mb-1">Jam terlambat / pulang cepat</label>
+                  <input
+                    type="time"
+                    className="input input-bordered w-full"
+                    value={form.time}
+                    onChange={(e) => updateForm("time", e.target.value)}
+                  />
+                </div>
+              </>
+            ) : (
+              <>
                 <input
-                  type="time"
-                  className="input input-bordered"
-                  value={form.time}
-                  onChange={(e) => updateForm("time", e.target.value)}
+                  className="input input-bordered border-base-300 bg-base-100 focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
+                  type="date"
+                  value={form.start_date}
+                  onChange={(e) => updateForm("start_date", e.target.value)}
                 />
-                <p className="text-xs opacity-60 mt-1">Izin terlambat hanya untuk 1 hari; catat pula jam keterlambatan.</p>
-              </div>
-            ) : null}
-            <div className="text-sm opacity-70 flex items-center">
-              Total pengajuan: <b className="ml-1">{requestedDays} hari</b>
-            </div>
-            <input
-              className="input input-bordered border-base-300 bg-base-100 focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
-              type="date"
-              value={form.start_date}
-              onChange={(e) => updateForm("start_date", e.target.value)}
-            />
-            <input
-              className="input input-bordered border-base-300 bg-base-100 focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
-              type="date"
-              value={form.end_date}
-              min={form.start_date || undefined}
-              max={maxEndDate || undefined}
-              onChange={(e) => updateForm("end_date", e.target.value)}
-            />
+                <input
+                  className="input input-bordered border-base-300 bg-base-100 focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
+                  type="date"
+                  value={form.end_date}
+                  min={form.start_date || undefined}
+                  max={maxEndDate || undefined}
+                  onChange={(e) => updateForm("end_date", e.target.value)}
+                />
+              </>
+            )}
             <div className="md:col-span-2 text-xs opacity-70">
-              {maxDaysForCurrentLeave > 0
-                ? `Rentang tanggal otomatis dibatasi maksimal ${maxDaysForCurrentLeave} hari sesuai leave_request_settings.`
-                : "Rentang tanggal mengikuti aturan leave_request_settings yang aktif."}
+              {form.leave_type === "izin_terlambat"
+                ? "Izin terlambat/pulang cepat hanya untuk 1 tanggal pengajuan."
+                : maxDaysForCurrentLeave > 0
+                ? `Rentang tanggal otomatis dibatasi maksimal ${maxDaysForCurrentLeave} hari sesuai peraturan izin dan cuti.`
+                : "Rentang tanggal mengikuti aturan izin dan cuti yang aktif."}
             </div>
             <textarea
               className="textarea textarea-bordered md:col-span-2"

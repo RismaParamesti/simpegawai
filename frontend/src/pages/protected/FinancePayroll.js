@@ -56,7 +56,6 @@ const statusLabelMap = {
 const getStatusLabel = (status) =>
   statusLabelMap[String(status || "").toLowerCase()] || status || "-";
 
-const LATE_DEDUCTION_HOURLY_PERCENTAGE = 0.02;
 const DEFAULT_WORKING_HOURS_PER_DAY = 8;
 
 const defaultPayrollSettings = {
@@ -65,6 +64,8 @@ const defaultPayrollSettings = {
   health_percentage: 0.01,
   bpjs_percentage: 0.01,
   tax: 0.03,
+  late_deduction_percentage: 0.02,
+  alpha_deduction_percentage: 1,
 };
 
 const resolvePhotoUrl = (photoPath) => {
@@ -128,9 +129,12 @@ function FinancePayroll() {
     if (!row) return null;
 
     const totalAbsentDays = Number(row.total_absent_days || 0);
+    const totalAlphaDays = Number(row.total_alpha_days || 0);
+    const totalUnpaidLeaveDays = Number(row.total_unpaid_leave_days || 0);
     const permissionDays = Number(row.total_izin_days || 0);
     const sickDays = Number(row.total_sakit_days || 0);
-    const alphaDays = totalAbsentDays;
+    const alphaDays = totalAlphaDays || Math.max(0, totalAbsentDays - totalUnpaidLeaveDays);
+    const unpaidLeaveDays = totalUnpaidLeaveDays || Math.max(0, totalAbsentDays - alphaDays);
 
     return {
       mode: "actual",
@@ -146,6 +150,10 @@ function FinancePayroll() {
       totalIncome: Number(row.total_income || 0),
       lateDeduction: Number(row.late_deduction || 0),
       absentDeduction: Number(row.absent_deduction || 0),
+      alphaDeduction: Number(
+        row.alpha_deduction ?? row.absent_deduction ?? 0,
+      ),
+      unpaidLeaveDeduction: Number(row.unpaid_leave_deduction || 0),
       bpjsDeduction: Number(row.bpjs_deduction || 0),
       taxDeduction: Number(row.tax_deduction || 0),
       otherDeduction: Number(row.other_deduction || 0),
@@ -153,6 +161,7 @@ function FinancePayroll() {
       netSalary: Number(row.final_amount || row.net_salary || 0),
       presentDays: Number(row.present_days || 0),
       alphaDays,
+      unpaidLeaveDays,
       permissionDays,
       sickDays,
       deductibleAbsentDays: totalAbsentDays,
@@ -252,6 +261,14 @@ function FinancePayroll() {
           ),
           tax: normalizePercentValue(
             payrollSettingsRow?.tax ?? defaultPayrollSettings.tax,
+          ),
+          late_deduction_percentage: normalizePercentValue(
+            payrollSettingsRow?.late_deduction_percentage ??
+              defaultPayrollSettings.late_deduction_percentage,
+          ),
+          alpha_deduction_percentage: normalizePercentValue(
+            payrollSettingsRow?.alpha_deduction_percentage ??
+              defaultPayrollSettings.alpha_deduction_percentage,
           ),
         });
 
@@ -477,6 +494,20 @@ function FinancePayroll() {
   const autoTaxDeduction = useMemo(() => {
     return Number((selectedBasicSalary * Number(payrollSettings.tax || 0.03)).toFixed(2));
   }, [selectedBasicSalary, payrollSettings.tax]);
+
+  const autoLateDeductionPercentage = useMemo(() => {
+    return Number(
+      payrollSettings.late_deduction_percentage ||
+        defaultPayrollSettings.late_deduction_percentage,
+    );
+  }, [payrollSettings.late_deduction_percentage]);
+
+  const autoAlphaDeductionPercentage = useMemo(() => {
+    return Number(
+      payrollSettings.alpha_deduction_percentage ||
+        defaultPayrollSettings.alpha_deduction_percentage,
+    );
+  }, [payrollSettings.alpha_deduction_percentage]);
 
   const autoPayrollId = useMemo(() => {
     if (
@@ -739,6 +770,10 @@ function FinancePayroll() {
           latestGeneratedForSelected.details?.attendance_summary
             ?.total_alpha_days || 0,
         ),
+        unpaidLeaveDays: Number(
+          latestGeneratedForSelected.details?.attendance_summary
+            ?.total_unpaid_leave_days || 0,
+        ),
         permissionDays: Number(
           latestGeneratedForSelected.details?.attendance_summary
             ?.total_izin_days || 0,
@@ -772,11 +807,14 @@ function FinancePayroll() {
 
     const presentDays = Number(selectedEmployeeSummary?.present_days || 0);
     const alphaDays = Number(selectedEmployeeSummary?.alpha_days || 0);
+    const unpaidLeaveDays = Number(
+      selectedEmployeeSummary?.unpaid_leave_days || 0,
+    );
     const permissionDays = Number(
       selectedEmployeeSummary?.permission_days || 0,
     );
     const sickDays = Number(selectedEmployeeSummary?.sick_days || 0);
-    const deductibleAbsentDays = alphaDays;
+    const deductibleAbsentDays = alphaDays + unpaidLeaveDays;
     const totalLateMinutes = Number(
       selectedEmployeeSummary?.total_late_minutes || 0,
     );
@@ -807,9 +845,17 @@ function FinancePayroll() {
     const dailySalary = basicSalary / 30;
     const hourlyRate = dailySalary / DEFAULT_WORKING_HOURS_PER_DAY;
     const lateDeduction = Math.round(
-      (totalLateMinutes / 60) * hourlyRate * LATE_DEDUCTION_HOURLY_PERCENTAGE,
+      (totalLateMinutes / 60) * hourlyRate * autoLateDeductionPercentage,
     );
-    const absentDeduction = Math.round(deductibleAbsentDays * dailySalary);
+    const alphaDeduction = Math.round(
+      alphaDays * dailySalary * autoAlphaDeductionPercentage,
+    );
+    const unpaidLeaveDeduction = Math.round(
+      unpaidLeaveDays * dailySalary * autoAlphaDeductionPercentage,
+    );
+    const absentDeduction = Math.round(
+      deductibleAbsentDays * dailySalary * autoAlphaDeductionPercentage,
+    );
     const bpjsDeduction = Number(
       (basicSalary * Number(payrollSettings.bpjs_percentage || 0)).toFixed(2),
     );
@@ -839,6 +885,8 @@ function FinancePayroll() {
       totalIncome,
       lateDeduction,
       absentDeduction,
+      alphaDeduction,
+      unpaidLeaveDeduction,
       bpjsDeduction,
       taxDeduction,
       otherDeduction,
@@ -846,6 +894,7 @@ function FinancePayroll() {
       netSalary,
       presentDays,
       alphaDays,
+      unpaidLeaveDays,
       permissionDays,
       sickDays,
       deductibleAbsentDays,
@@ -866,6 +915,8 @@ function FinancePayroll() {
     manualOtherDeduction,
     reimbursementOverview,
     autoTaxDeduction,
+    autoLateDeductionPercentage,
+    autoAlphaDeductionPercentage,
   ]);
 
   const isManualFieldDisabled = () => {
@@ -1400,7 +1451,15 @@ function FinancePayroll() {
                         <tr>
                           <td>Potongan Alpha</td>
                           <td className="text-right">
-                            {formatCurrency(payrollPreview.absentDeduction)}
+                            {formatCurrency(payrollPreview.alphaDeduction)}
+                          </td>
+                        </tr>
+                        <tr>
+                          <td>Potongan Cuti Tidak Dibayar</td>
+                          <td className="text-right">
+                            {formatCurrency(
+                              payrollPreview.unpaidLeaveDeduction,
+                            )}
                           </td>
                         </tr>
                         <tr>
@@ -1554,9 +1613,15 @@ function FinancePayroll() {
                       <tr>
                         <td>Potongan Alpha</td>
                         <td className="text-right">
-                          {formatCurrency(
-                            latestGenerated?.details?.absent_deduction,
-                          )}
+                            {formatCurrency(latestGenerated?.details?.alpha_deduction)}
+                          </td>
+                        </tr>
+                        <tr>
+                          <td>Potongan Cuti Tidak Dibayar</td>
+                          <td className="text-right">
+                            {formatCurrency(
+                              latestGenerated?.details?.unpaid_leave_deduction,
+                            )}
                         </td>
                       </tr>
                       <tr>
@@ -1815,7 +1880,15 @@ function FinancePayroll() {
                 <tr>
                   <td>Potongan Alpha</td>
                   <td className="text-right">
-                    {formatCurrency(latestGenerated?.details?.absent_deduction)}
+                    {formatCurrency(latestGenerated?.details?.alpha_deduction)}
+                  </td>
+                </tr>
+                <tr>
+                  <td>Potongan Cuti Tidak Dibayar</td>
+                  <td className="text-right">
+                    {formatCurrency(
+                      latestGenerated?.details?.unpaid_leave_deduction,
+                    )}
                   </td>
                 </tr>
                 <tr>
