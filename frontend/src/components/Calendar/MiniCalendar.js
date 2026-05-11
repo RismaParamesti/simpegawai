@@ -127,10 +127,13 @@ const MiniCalendar = ({
   const weekDays = ["Min", "Sen", "Sel", "Rab", "Kam", "Jum", "Sab"];
 
   return (
-    <div className="w-full">
+    <div className="w-full rounded-[1.5rem] border border-base-300/70 bg-base-100/90 p-5 shadow-[0_18px_50px_rgba(15,23,42,0.08)] backdrop-blur-xl">
       <div className="grid grid-cols-7 gap-2.5 text-xs mb-6">
         {weekDays.map((day) => (
-          <div key={day} className="text-center font-bold p-2 text-base-content/80">
+          <div
+            key={day}
+            className="text-center font-semibold p-2 text-base-content/60"
+          >
             {day}
           </div>
         ))}
@@ -152,14 +155,14 @@ const MiniCalendar = ({
                 !day
                   ? "bg-transparent"
                   : isCurrentDay
-                    ? "bg-primary text-primary-content border-2 border-primary-focus shadow-md dark:text-white"
+                    ? "bg-primary text-primary-content border-2 border-primary-focus shadow-md"
                     : holiday
-                      ? "bg-error/30 text-error-content border border-error/55 dark:text-white"
+                      ? "bg-error/20 text-error-content border border-error/55"
                       : weekend
-                        ? "bg-info/25 text-info-content border border-info/55 dark:text-white"
+                        ? "bg-info/20 text-info-content border border-info/55"
                         : workday
-                          ? "bg-success/30 text-success-content border border-success/55 dark:text-white"
-                          : "bg-base-200 text-base-content dark:text-white"
+                          ? "bg-success/20 text-success-content border border-success/55"
+                          : "bg-base-200 text-base-content"
               }`}
               title={
                 markerConfig
@@ -183,10 +186,10 @@ const MiniCalendar = ({
         })}
       </div>
 
-      <div className="space-y-2 text-xs border-t border-base-300 pt-4">
-          <p className="text-[11px] uppercase tracking-wide opacity-70 mb-3">
-            Keterangan Kalendar
-          </p>
+      <div className="space-y-2 text-xs border-t border-base-300 pt-4 mt-1">
+        <p className="text-[11px] uppercase tracking-wide opacity-70 mb-3">
+          Keterangan Kalendar
+        </p>
         <div className="flex items-center gap-3">
           <div className="w-4 h-4 rounded bg-primary border-2 border-primary-focus"></div>
           <span className="text-base-content">Hari Ini</span>

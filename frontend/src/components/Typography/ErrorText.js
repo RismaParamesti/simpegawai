@@ -1,7 +1,11 @@
-function ErrorText({styleClass, children}){
-    return(
-        <p className={`text-center  text-error ${styleClass}`}>{children}</p>
-    )
+function ErrorText({ styleClass, children }) {
+  return (
+    <p
+      className={`text-center text-sm font-medium text-error ${styleClass || ""}`}
+    >
+      {children}
+    </p>
+  );
 }
 
-export default ErrorText
+export default ErrorText;

@@ -14,12 +14,12 @@ function LeftSidebar() {
   };
 
   return (
-    <div className="drawer-side  z-30  ">
+    <div className="drawer-side z-30">
       <label htmlFor="left-sidebar-drawer" className="drawer-overlay"></label>
-      <ul className="menu pt-2 w-72 sm:w-80 bg-base-100 min-h-full text-base-content overflow-y-auto">
+      <ul className="menu relative min-h-full w-72 overflow-y-auto border-r border-base-300/70 bg-base-100/95 pt-2 text-base-content shadow-[16px_0_40px_rgba(15,23,42,0.08)] backdrop-blur-xl sm:w-80">
         {/* Logo di awal sidebar */}
-        <li className="mb-6">
-          <div className="flex w-full justify-center">
+        <li className="mb-6 px-3 pt-4">
+          <div className="flex w-full justify-center rounded-3xl border border-base-300/60 bg-base-200/70 px-4 py-4 shadow-sm">
             <Link to={"/app/dashboard"}>
               <img
                 src="/logo1.svg"
@@ -30,14 +30,14 @@ function LeftSidebar() {
           </div>
         </li>
         <button
-          className="btn btn-ghost bg-base-300  btn-circle z-50 top-0 right-0 mt-4 mr-2 absolute lg:hidden"
+          className="btn btn-ghost btn-circle absolute right-3 top-3 z-50 mt-4 bg-base-200 text-base-content shadow-sm hover:bg-primary hover:text-primary-content lg:hidden"
           onClick={() => close()}
         >
           <XMarkIcon className="h-5 inline-block w-5" />
         </button>
         {routes.map((route, k) => {
           return (
-            <li className="" key={k}>
+            <li key={k} className="px-2">
               {route.submenu ? (
                 <SidebarSubmenu {...route} />
               ) : (
@@ -46,13 +46,16 @@ function LeftSidebar() {
                   to={route.path}
                   onClick={() => close()}
                   className={({ isActive }) =>
-                    `${isActive ? "font-semibold  bg-base-200 " : "font-normal"}`
+                    `relative mb-1 rounded-2xl px-4 py-3 font-medium transition-all duration-200 ${isActive ? "bg-primary/10 text-primary shadow-sm ring-1 ring-primary/15" : "text-base-content/80 hover:bg-base-200/80 hover:text-base-content"}`
                   }
                 >
-                  {route.icon} {route.name}
+                  <span className="flex items-center gap-3">
+                    <span className="text-lg">{route.icon}</span>
+                    <span>{route.name}</span>
+                  </span>
                   {location.pathname === route.path ? (
                     <span
-                      className="absolute inset-y-0 left-0 w-1 rounded-tr-md rounded-br-md bg-primary "
+                      className="absolute inset-y-2 left-2 w-1 rounded-full bg-primary shadow-[0_0_0_4px_rgba(234,107,47,0.12)]"
                       aria-hidden="true"
                     ></span>
                   ) : null}

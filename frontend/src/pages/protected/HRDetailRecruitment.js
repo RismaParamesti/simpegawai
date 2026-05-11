@@ -1,6 +1,9 @@
 import { useState, useMemo, useEffect } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
-import documentRequirements from "../../utils/documentRequirements";
+import {
+  getRequiredDocuments,
+  DOCUMENT_FIELD_METADATA,
+} from "../../utils/documentRequirements";
 import { useDispatch } from "react-redux";
 import TitleCard from "../../components/Cards/TitleCard";
 import { setPageTitle } from "../../features/common/headerSlice";
@@ -185,12 +188,11 @@ export default function HRCandidate() {
   // Untuk tabel riwayat, jika lowongan sudah closed & completed, tampilkan SEMUA aplikasi kecuali yang diterima
   // Jika belum completed, hanya tampilkan yang ditolak saja
   const historyApplications = useMemo(() => {
-    const isClosedCompleted = job && job.status === "closed" && job.hiring_status === "completed";
+    const isClosedCompleted =
+      job && job.status === "closed" && job.hiring_status === "completed";
     if (isClosedCompleted) {
       // Tampilkan semua aplikasi kecuali yang statusnya 'diterima'
-      return applications.filter(
-        (app) => app.status !== "diterima"
-      );
+      return applications.filter((app) => app.status !== "diterima");
     } else {
       // Default: hanya yang ditolak
       return applications.filter((app) => app.status === "ditolak");
@@ -217,9 +219,10 @@ export default function HRCandidate() {
   return (
     <>
       {/* ===================== LIST ===================== */}
-      {view === "list" && (
+      {view === "list" &&
         (() => {
-          const isClosedCompleted = job && job.status === "closed" && job.hiring_status === "completed";
+          const isClosedCompleted =
+            job && job.status === "closed" && job.hiring_status === "completed";
           if (isClosedCompleted) {
             // Hanya tampilkan riwayat pelamar
             return (
@@ -354,7 +357,9 @@ export default function HRCandidate() {
                               <td className="text-center">
                                 {item.graduation_year || "-"}
                               </td>
-                              <td className="text-center">{item.npwp || "-"}</td>
+                              <td className="text-center">
+                                {item.npwp || "-"}
+                              </td>
                               <td className="text-center">
                                 <button
                                   className="btn btn-ghost btn-xs"
@@ -371,7 +376,10 @@ export default function HRCandidate() {
 
                           {filteredApplications.length === 0 && (
                             <tr>
-                              <td colSpan={6} className="text-center opacity-70">
+                              <td
+                                colSpan={6}
+                                className="text-center opacity-70"
+                              >
                                 Tidak ada data
                               </td>
                             </tr>
@@ -446,12 +454,17 @@ export default function HRCandidate() {
                                 <td className="text-center">
                                   {item.graduation_year || "-"}
                                 </td>
-                                <td className="text-center">{item.npwp || "-"}</td>
+                                <td className="text-center">
+                                  {item.npwp || "-"}
+                                </td>
                                 <td className="text-center">
                                   <button
                                     className="btn btn-ghost btn-xs"
                                     onClick={() => {
-                                      setSelected({ ...item, isHistory: false });
+                                      setSelected({
+                                        ...item,
+                                        isHistory: false,
+                                      });
                                       setView("detail");
                                     }}
                                   >
@@ -488,7 +501,9 @@ export default function HRCandidate() {
                           <tbody>
                             {historyApplications.map((item) => (
                               <tr key={item.application_id}>
-                                <td>{item.candidate_name || item.name || "-"}</td>
+                                <td>
+                                  {item.candidate_name || item.name || "-"}
+                                </td>
                                 <td className="text-center">
                                   {item.education_level
                                     ? `${item.education_level} - ${item.major || "-"}`
@@ -497,7 +512,9 @@ export default function HRCandidate() {
                                 <td className="text-center">
                                   {item.graduation_year || "-"}
                                 </td>
-                                <td className="text-center">{item.npwp || "-"}</td>
+                                <td className="text-center">
+                                  {item.npwp || "-"}
+                                </td>
                                 <td className="text-center">
                                   <span
                                     className={`badge 
@@ -532,8 +549,7 @@ export default function HRCandidate() {
               </>
             );
           }
-        })()
-      )}
+        })()}
 
       {/* ===================== DETAIL ===================== */}
       {view === "detail" && selected && (
@@ -563,7 +579,11 @@ export default function HRCandidate() {
                             ? selected.photo_file.startsWith("http")
                               ? selected.photo_file
                               : `http://localhost:5000/${selected.photo_file.replace(/^\//, "")}`
-                            : "https://ui-avatars.com/api/?name=" + encodeURIComponent(selected.candidate_name || selected.name || "-") + "&background=random"
+                            : "https://ui-avatars.com/api/?name=" +
+                              encodeURIComponent(
+                                selected.candidate_name || selected.name || "-",
+                              ) +
+                              "&background=random"
                         }
                         alt="Foto Kandidat"
                         className="object-cover"
@@ -631,10 +651,11 @@ export default function HRCandidate() {
                   <div className="divide-y border rounded-lg overflow-hidden">
                     {(() => {
                       // Ambil dokumen requirements sesuai posisi dan base_position LANGSUNG
-                      const pos = selected.position_name || selected.position || "";
+                      const pos =
+                        selected.position_name || selected.position || "";
                       const basePos = selected.base_position || "";
-                      const req = documentRequirements.getRequiredDocuments(pos, basePos);
-                      const meta = documentRequirements.DOCUMENT_FIELD_METADATA;
+                      const req = getRequiredDocuments(pos, basePos);
+                      const meta = DOCUMENT_FIELD_METADATA;
                       const shownFields = [
                         ...(req.required || []),
                         ...(req.optional || []),
