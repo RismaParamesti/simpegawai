@@ -1,45 +1,47 @@
-import TitleCard from "../../../components/Cards/TitleCard"
+import TitleCard from "../../../components/Cards/TitleCard";
 
 const userSourceData = [
-    {source : "Facebook Ads", count : "26,345", conversionPercent : 10.2},
-    {source : "Google Ads", count : "21,341", conversionPercent : 11.7},
-    {source : "Instagram Ads", count : "34,379", conversionPercent : 12.4},
-    {source : "Affiliates", count : "12,359", conversionPercent : 20.9},
-    {source : "Organic", count : "10,345", conversionPercent : 10.3},
-]
+  { source: "Facebook Ads", count: "26,345", conversionPercent: 10.2 },
+  { source: "Google Ads", count: "21,341", conversionPercent: 11.7 },
+  { source: "Instagram Ads", count: "34,379", conversionPercent: 12.4 },
+  { source: "Affiliates", count: "12,359", conversionPercent: 20.9 },
+  { source: "Organic", count: "10,345", conversionPercent: 10.3 },
+];
 
-function UserChannels(){
-    return(
-        <TitleCard title={"User Signup Source"}>
-             {/** Table Data */}
-             <div className="overflow-x-auto">
-                <table className="table w-full">
-                    <thead>
-                    <tr>
-                        <th></th>
-                        <th className="normal-case">Source</th>
-                        <th className="normal-case">No of Users</th>
-                        <th className="normal-case">Conversion</th>
-                    </tr>
-                    </thead>
-                    <tbody>
-                        {
-                            userSourceData.map((u, k) => {
-                                return(
-                                    <tr key={k}>
-                                        <th>{k+1}</th>
-                                        <td>{u.source}</td>
-                                        <td>{u.count}</td>
-                                        <td>{`${u.conversionPercent}%`}</td>
-                                    </tr>
-                                )
-                            })
-                        }
-                    </tbody>
-                </table>
-            </div>
-        </TitleCard>
-    )
+function UserChannels() {
+  return (
+    <TitleCard title={"User Signup Source"}>
+      {/** Table Data */}
+      <div className="overflow-x-auto">
+        <table className="table w-full">
+          <thead>
+            <tr className="border-b border-base-300/70 text-base-content/60">
+              <th className="w-12"></th>
+              <th className="normal-case font-medium">Source</th>
+              <th className="normal-case font-medium">No of Users</th>
+              <th className="normal-case font-medium">Conversion</th>
+            </tr>
+          </thead>
+          <tbody className="[&>tr]:border-b [&>tr]:border-base-300/50">
+            {userSourceData.map((u, k) => {
+              return (
+                <tr key={k} className="hover:bg-base-200/60 transition-colors">
+                  <th className="text-base-content/60">{k + 1}</th>
+                  <td className="font-medium">{u.source}</td>
+                  <td>{u.count}</td>
+                  <td>
+                    <span className="badge badge-ghost rounded-full border border-base-300/70 bg-primary/5 text-primary">
+                      {`${u.conversionPercent}%`}
+                    </span>
+                  </td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      </div>
+    </TitleCard>
+  );
 }
 
-export default UserChannels
+export default UserChannels;

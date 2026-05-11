@@ -2,7 +2,7 @@
 module.exports = {
   content: [
     "./src/**/*.{js,jsx,ts,tsx}",
-    "./node_modules/react-tailwindcss-datepicker/dist/index.esm.js"
+    "./node_modules/react-tailwindcss-datepicker/dist/index.esm.js",
   ],
   darkMode: ["class", '[data-theme="dark"]'],
   theme: {
@@ -13,26 +13,26 @@ module.exports = {
     themes: [
       {
         light: {
-          primary: "#F58220",
-          "primary-focus": "#FF9F40",
+          primary: "#EA6B2F",
+          "primary-focus": "#D85A17",
           "primary-content": "#FFFFFF",
 
-          secondary: "#4F4F4F",
-          "secondary-focus": "#333333",
+          secondary: "#0F766E",
+          "secondary-focus": "#115E59",
           "secondary-content": "#FFFFFF",
 
-          accent: "#FFB066",
-          "accent-focus": "#FF9F40",
-          "accent-content": "#333333",
+          accent: "#14B8A6",
+          "accent-focus": "#0F766E",
+          "accent-content": "#FFFFFF",
 
-          neutral: "#333333",
-          "neutral-focus": "#4F4F4F",
+          neutral: "#0F172A",
+          "neutral-focus": "#1E293B",
           "neutral-content": "#FFFFFF",
 
           "base-100": "#FFFFFF",
-          "base-200": "#F5F5F5",
-          "base-300": "#FAFAFA",
-          "base-content": "#333333",
+          "base-200": "#F8FAFC",
+          "base-300": "#E2E8F0",
+          "base-content": "#0F172A",
 
           info: "#3498DB",
           success: "#2ECC71",
@@ -42,26 +42,26 @@ module.exports = {
       },
       {
         dark: {
-          primary: "#F58220",
-          "primary-focus": "#FF9F40",
+          primary: "#FB923C",
+          "primary-focus": "#EA6B2F",
           "primary-content": "#FFFFFF",
 
-          secondary: "#E0E0E0",
-          "secondary-focus": "#FFFFFF",
-          "secondary-content": "#1E1E1E",
+          secondary: "#2DD4BF",
+          "secondary-focus": "#14B8A6",
+          "secondary-content": "#0F172A",
 
-          accent: "#FFB066",
-          "accent-focus": "#FF9F40",
-          "accent-content": "#1E1E1E",
+          accent: "#38BDF8",
+          "accent-focus": "#0EA5E9",
+          "accent-content": "#0F172A",
 
-          neutral: "#4F4F4F",
-          "neutral-focus": "#333333",
+          neutral: "#1E293B",
+          "neutral-focus": "#0F172A",
           "neutral-content": "#FFFFFF",
 
-          "base-100": "#1E1E1E",
-          "base-200": "#2D2D2D",
-          "base-300": "#333333",
-          "base-content": "#FFFFFF",
+          "base-100": "#0F172A",
+          "base-200": "#111827",
+          "base-300": "#1E293B",
+          "base-content": "#E2E8F0",
 
           info: "#2980B9",
           success: "#27AE60",
@@ -71,5 +71,4 @@ module.exports = {
       },
     ],
   },
-
-}
+};

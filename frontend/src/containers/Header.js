@@ -84,8 +84,12 @@ function Header() {
       try {
         let newSrc = getStoredUserAvatar();
         // Keep a short-lived refresh marker for browsers that reuse the same image URL
-        if (newSrc && newSrc !== DEFAULT_AVATAR && (e?.type === 'user-profile-updated' || e?.type === 'storage')) {
-          const sep = newSrc.includes('?') ? '&' : '?';
+        if (
+          newSrc &&
+          newSrc !== DEFAULT_AVATAR &&
+          (e?.type === "user-profile-updated" || e?.type === "storage")
+        ) {
+          const sep = newSrc.includes("?") ? "&" : "?";
           newSrc = `${newSrc}${sep}_=${Date.now()}`;
         }
         setAvatarSrc(newSrc);
@@ -119,18 +123,20 @@ function Header() {
     // navbar fixed  flex-none justify-between bg-base-300  z-10 shadow-md
 
     <>
-      <div className="navbar sticky top-0 bg-base-100 z-10 shadow-md px-2 sm:px-3">
+      <div className="navbar sticky top-0 z-20 mx-3 mt-3 rounded-3xl border border-base-300/70 bg-base-100/85 px-3 shadow-[0_12px_40px_rgba(15,23,42,0.08)] backdrop-blur-xl sm:px-4">
         {/* Menu toogle for mobile view or small screen */}
         <div className="flex-1 min-w-0">
           <label
             htmlFor="left-sidebar-drawer"
-            className="btn btn-primary btn-sm sm:btn-md drawer-button lg:hidden"
+            className="btn btn-primary btn-sm sm:btn-md drawer-button lg:hidden shadow-lg shadow-primary/20"
           >
             <Bars3Icon className="h-5 inline-block w-5" />
           </label>
-          <h1 className="text-base sm:text-xl lg:text-2xl font-semibold ml-2 truncate">
-            {pageTitle}
-          </h1>
+          <div className="ml-2 min-w-0">
+            <h1 className="font-display truncate text-base font-semibold sm:text-xl lg:text-2xl">
+              {pageTitle}
+            </h1>
+          </div>
         </div>
 
         <div className="flex-none flex items-center gap-2 sm:gap-3">
@@ -138,13 +144,13 @@ function Header() {
             <div className="dropdown dropdown-end">
               <label
                 tabIndex={0}
-                className="btn btn-outline btn-xs sm:btn-sm normal-case"
+                className="btn btn-outline btn-xs sm:btn-sm normal-case rounded-full border-base-300 bg-base-100/90 text-base-content hover:border-primary hover:bg-primary/5"
               >
                 {ROLE_LABELS[activeRole] || activeRole || "-"}
               </label>
               <ul
                 tabIndex={0}
-                className="menu menu-compact dropdown-content mt-2 p-2 shadow bg-base-100 rounded-box w-44"
+                className="menu menu-compact dropdown-content mt-3 w-44 rounded-2xl border border-base-300/70 bg-base-100/95 p-2 shadow-[0_16px_44px_rgba(15,23,42,0.12)] backdrop-blur-xl"
               >
                 {(roles || []).map((role) => (
                   <li key={role}>
@@ -172,7 +178,7 @@ function Header() {
                 </select> */}
 
           {/* Light and dark theme selection toogle **/}
-          <label className="swap">
+          <label className="swap rounded-full p-2 transition hover:bg-base-200/80">
             <input type="checkbox" />
             <SunIcon
               data-set-theme="light"
@@ -196,9 +202,9 @@ function Header() {
           <div className="dropdown dropdown-end ml-1 sm:ml-2">
             <label
               tabIndex={0}
-              className="btn btn-ghost btn-circle avatar btn-sm sm:btn-md"
+              className="btn btn-ghost btn-circle avatar btn-sm sm:btn-md ring-1 ring-base-300/70 hover:ring-primary/30"
             >
-              <div className="w-8 sm:w-10 rounded-full">
+              <div className="w-8 sm:w-10 rounded-full ring-2 ring-base-100 shadow-md">
                 <img
                   src={avatarSrc}
                   alt="profile"
@@ -208,7 +214,7 @@ function Header() {
             </label>
             <ul
               tabIndex={0}
-              className="menu menu-compact dropdown-content mt-3 p-2 shadow bg-base-100 rounded-box w-52"
+              className="menu menu-compact dropdown-content mt-3 w-52 rounded-2xl border border-base-300/70 bg-base-100/95 p-2 shadow-[0_16px_44px_rgba(15,23,42,0.12)] backdrop-blur-xl"
             >
               {activeRole !== "kandidat" && (
                 <>
@@ -218,7 +224,7 @@ function Header() {
                   <div className="divider mt-0 mb-0"></div>
                 </>
               )}
-              
+
               {activeRole === "kandidat" && (
                 <>
                   <li>
