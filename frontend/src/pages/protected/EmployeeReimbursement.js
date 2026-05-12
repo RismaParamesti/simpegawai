@@ -181,7 +181,15 @@ function EmployeeReimbursement() {
                                                     href={`${process.env.REACT_APP_API_URL || 'http://localhost:5000'}/${item.attachment}`}
                                                     target="_blank"
                                                     rel="noreferrer"
-                                                    className="link link-primary"
+                                                   className="
+        px-3 py-1 text-xs
+        bg-gradient-to-b from-blue-400 to-blue-600
+        text-white rounded-full
+        shadow-md hover:shadow-lg
+        border border-blue-600
+        hover:from-blue-500 hover:to-blue-700
+        transition-all duration-200
+      "
                                                 >
                                                     Lihat
                                                 </a>

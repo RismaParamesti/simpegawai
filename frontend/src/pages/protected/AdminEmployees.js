@@ -477,6 +477,35 @@ function AdminEmployees() {
             setSubmitting(false)
         }
     }
+    const getStatusBadgeClass = (status) => {
+    const s = String(status || '').toLowerCase().trim()
+
+    switch (s) {
+        case 'active':
+        case 'aktif':
+            return 'badge badge-success text-white'
+
+        case 'inactive':
+        case 'nonactive':
+        case 'tidak aktif':
+            return 'badge badge-error text-white'
+
+        case 'permanent':
+        case 'tetap':
+            return 'badge badge-primary text-white'
+
+        case 'contract':
+        case 'kontrak':
+            return 'badge badge-warning text-black'
+
+        case 'intern':
+        case 'magang':
+            return 'badge badge-info text-white'
+
+        default:
+            return 'badge badge-outline'
+    }
+}
 
     return (
         <>
@@ -512,13 +541,32 @@ function AdminEmployees() {
                                         <td>{employee.employee_code}</td>
                                         <td>{employee.full_name || employee.name}</td>
                                         <td>{employee.position_name || '-'}</td>
-                                        <td><span className="badge">{employee.employment_status}</span></td>
+                                       <td>
+  <span className={getStatusBadgeClass(employee.employment_status)}>
+    {employee.employment_status}
+  </span>
+</td>
                                         <td className="text-right pr-6 tabular-nums whitespace-nowrap">{formatRupiah(employee.basic_salary)}</td>
                                         <td>
                                             <div className="flex items-center gap-2 whitespace-nowrap">
-                                                <button className="btn btn-xs btn-outline btn-info min-w-[52px]" onClick={() => openViewModal(employee)}>View</button>
-                                                <button className="btn btn-xs btn-warning text-base-content min-w-[52px]" onClick={() => openEditModal(employee)}>Edit</button>
-                                                <button className="btn btn-xs btn-outline btn-error min-w-[52px]" onClick={() => setDeleteTarget(employee)}>Delete</button>
+                                                <button className="
+        px-3 py-1 text-xs
+        bg-gradient-to-b from-blue-400 to-blue-600
+        text-white rounded-full
+        shadow-md hover:shadow-lg
+        border border-blue-600
+        hover:from-blue-500 hover:to-blue-700
+        transition-all duration-200" onClick={() => openViewModal(employee)}>Lihat</button>
+                                                <button  className="
+    px-3 py-1 text-xs
+    bg-gradient-to-b from-yellow-300 to-yellow-500
+    text-black rounded-full
+    shadow-md hover:shadow-lg
+    border border-yellow-500
+    hover:from-yellow-400 hover:to-yellow-600
+    transition-all duration-200
+  " onClick={() => openEditModal(employee)}>Edit</button>
+                                                <button className="btn btn-xs btn-error text-white rounded-full"onClick={() => setDeleteTarget(employee)}>Hapus</button>
                                             </div>
                                         </td>
                                     </tr>
@@ -785,7 +833,7 @@ function AdminEmployees() {
                         </div>
                     ) : null}
                     <div className="modal-action">
-                        <button className="btn" onClick={() => setViewingEmployee(null)}>Tutup</button>
+                        <button className="btn btn-primary" onClick={() => setViewingEmployee(null)}>Tutup</button>
                     </div>
                 </div>
             </div>

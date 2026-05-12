@@ -204,6 +204,43 @@ function FinanceSalaryAppeals() {
     if (loading) {
         return <div className="text-center py-10">Memuat data banding gaji...</div>
     }
+    const getPayrollStatusBadge = (status) => {
+    const normalized = String(status || '').toLowerCase().trim()
+
+    switch (normalized) {
+        case 'draft':
+            return 'badge-info'       // biru
+        case 'claimed':
+            return 'badge-warning'    // kuning
+        case 'submitted':
+            return 'badge-warning'
+        case 'approved':
+            return 'badge-success'
+        case 'rejected':
+            return 'badge-error'
+        case 'included_in_payroll':
+            return 'badge-success'
+        case 'done':
+            return 'badge-primary'
+        default:
+            return 'badge-neutral'
+    }
+}
+const payrollStatusLabel = (status) => {
+    const normalized = String(status || '').toLowerCase().trim()
+
+    const map = {
+        draft: 'Draft',
+        claimed: 'Claimed',
+        submitted: 'Siap Diproses',
+        approved: 'Disetujui',
+        rejected: 'Ditolak',
+        included_in_payroll: 'Masuk Payroll',
+        done: 'Selesai',
+    }
+
+    return map[normalized] || status || '-'
+}
 
     return (
         <>
@@ -281,7 +318,14 @@ function FinanceSalaryAppeals() {
                                     <td>
                                         <button
                                             type="button"
-                                            className="link link-neutral text-xs"
+                                            className="
+        px-3 py-1 text-xs
+        bg-gradient-to-b from-blue-400 to-blue-600
+        text-white rounded-full
+        shadow-md hover:shadow-lg
+        border border-blue-600
+        hover:from-blue-500 hover:to-blue-700
+        transition-all duration-200"
                                             onClick={() => openDetailModal(item)}
                                         >
                                             Lihat
@@ -319,7 +363,11 @@ function FinanceSalaryAppeals() {
                                     <td>{item.period_month}/{item.period_year}</td>
                                     <td>{formatCurrency(item.expected_amount || 0)}</td>
                                     <td>{formatCurrency(item.final_amount || 0)}</td>
-                                    <td>{safeText(item.payroll_status)}</td>
+                                    <td>
+    <span className={`badge badge-sm ${getPayrollStatusBadge(item.payroll_status)}`}>
+        {payrollStatusLabel(item.payroll_status)}
+    </span>
+</td>
                                     <td>{item.reviewed_at ? new Date(item.reviewed_at).toLocaleString('id-ID') : '-'}</td>
                                 </tr>
                             ))}

@@ -127,7 +127,7 @@ export default function InterviewModal({
             {/* HEADER */}
             <div className="sticky top-0 z-10 bg-base-100 border-b px-6 py-4 flex justify-between items-center rounded-t-2xl">
               <h3 className="font-bold text-lg">Detail Pelamar</h3>
-              <button className="btn btn-sm btn-outline" onClick={onCloseForm}>
+              <button className="btn btn-sm btn-primary" onClick={onCloseForm}>
                 Tutup
               </button>
             </div>

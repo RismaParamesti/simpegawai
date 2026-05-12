@@ -694,25 +694,42 @@ export default function HRJobOpenings() {
                       <td className="text-center">
                         <div className="flex items-center justify-center gap-2">
                           <button
-                            className="btn btn-xs btn-info text-white"
-                            type="button"
-                            onClick={() => handleView(j.id)}
-                          >
-                            View
-                          </button>
-                          <button
-                            className="btn btn-xs btn-warning"
-                            type="button"
-                            onClick={() => handleEdit(j.id)}
-                          >
-                            Edit
-                          </button>
+  className="
+    px-3 py-1 text-xs
+    bg-gradient-to-b from-blue-400 to-blue-600
+    text-white rounded-full
+    shadow-md hover:shadow-lg
+    border border-blue-600
+    hover:from-blue-500 hover:to-blue-700
+    transition-all duration-200
+  "
+  type="button"
+  onClick={() => handleView(j.id)}
+>
+  Lihat
+</button>
+
+<button
+  className="
+    px-3 py-1 text-xs
+    bg-gradient-to-b from-yellow-300 to-yellow-500
+    text-black rounded-full
+    shadow-md hover:shadow-lg
+    border border-yellow-500
+    hover:from-yellow-400 hover:to-yellow-600
+    transition-all duration-200
+  "
+  type="button"
+  onClick={() => handleEdit(j.id)}
+>
+  Edit
+</button>
                           <button
                             className="btn btn-xs btn-error text-white"
                             type="button"
                             onClick={() => handleCancelJob(j.id)}
                           >
-                            Cancel
+                            Hapus
                           </button>
                         </div>
                       </td>
@@ -781,24 +798,40 @@ export default function HRJobOpenings() {
                     </td>
                     <td className="text-center">
                       <div className="flex items-center justify-center gap-2">
-                        <button
-                          className="btn btn-xs btn-info text-white"
-                          type="button"
-                          onClick={() => {
-                            setDetailData(j);
-                            setShowDetail(true);
-                          }}
-                        >
-                          View
-                        </button>
-                        <button
-                          className="btn btn-xs btn-warning"
-                          type="button"
-                          onClick={() => handleEdit(j.id)}
-                        >
-                          Edit
-                        </button>
-                      </div>
+  <button
+    className="
+      px-3 py-1 text-xs
+      bg-gradient-to-b from-blue-400 to-blue-600
+      text-white rounded-full
+      shadow-md hover:shadow-lg
+      border border-blue-600
+      hover:from-blue-500 hover:to-blue-700
+      transition-all duration-200
+    "
+    type="button"
+    onClick={() => {
+      setDetailData(j);
+      setShowDetail(true);
+    }}
+  >
+    Lihat
+  </button>
+  <button
+    className="
+      px-3 py-1 text-xs
+      bg-gradient-to-b from-yellow-300 to-yellow-500
+      text-black rounded-full
+      shadow-md hover:shadow-lg
+      border border-yellow-500
+      hover:from-yellow-400 hover:to-yellow-600
+      transition-all duration-200
+    "
+    type="button"
+    onClick={() => handleEdit(j.id)}
+  >
+    Edit
+  </button>
+</div>
                     </td>
                   </tr>
                 ))

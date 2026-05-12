@@ -259,6 +259,43 @@ function FinancePayrollTransfers() {
             setError(err.message)
         }
     }
+    const getPayrollStatusBadge = (status) => {
+    const normalized = String(status || '').toLowerCase().trim()
+
+    switch (normalized) {
+        case 'draft':
+            return 'badge-info'        // biru
+        case 'claimed':
+            return 'badge-warning'     // kuning
+        case 'submitted':
+            return 'badge-warning'
+        case 'published':
+            return 'badge-success'    // hijau
+        case 'transferred':
+            return 'badge-primary'    // biru tua / stabil
+        case 'approved':
+            return 'badge-success'
+        case 'rejected':
+            return 'badge-error'      // merah
+        default:
+            return 'badge-neutral'
+    }
+}
+const getPayrollStatusLabel = (status) => {
+    const normalized = String(status || '').toLowerCase().trim()
+
+    const map = {
+        draft: 'Draft',
+        claimed: 'Claimed',
+        submitted: 'Siap Diproses',
+        published: 'Published',
+        transferred: 'Transferred',
+        approved: 'Disetujui',
+        rejected: 'Ditolak',
+    }
+
+    return map[normalized] || status || '-'
+}
 
     return (
         <>
@@ -349,7 +386,11 @@ function FinancePayrollTransfers() {
                                     <td>{item.employee_code || '-'}</td>
                                     <td>{item.period_month}/{item.period_year}</td>
                                     <td>{formatCurrency(item.final_amount || item.net_salary)}</td>
-                                    <td>{getEffectiveStatus(item) || '-'}</td>
+                                    <td>
+    <span className={`badge badge-sm ${getPayrollStatusBadge(getEffectiveStatus(item))}`}>
+        {getPayrollStatusLabel(getEffectiveStatus(item))}
+    </span>
+</td>
                                     <td>
                                         <div className="flex flex-wrap items-center gap-2">
                                             <button

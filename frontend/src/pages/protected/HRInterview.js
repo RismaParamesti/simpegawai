@@ -452,7 +452,15 @@ export default function HRInterview() {
                     <span className="font-semibold">{job}</span>
                     <div className="flex gap-2">
                       <button
-                        className="btn btn-ghost btn-xs flex items-center gap-1"
+                        className="
+      px-3 py-1 text-xs
+      bg-gradient-to-b from-blue-400 to-blue-600
+      text-white rounded-full
+      shadow-md hover:shadow-lg
+      border border-blue-600
+      hover:from-blue-500 hover:to-blue-700
+      transition-all duration-200
+    "
                         onClick={() => {
                           // Cari kandidat pertama pada list untuk ambil id
                           const firstCandidate = list[0];
@@ -683,7 +691,15 @@ export default function HRInterview() {
 
                     <div className="flex gap-2">
                       <button
-                        className="btn btn-ghost btn-xs"
+                        className="
+     px-3 py-1 text-xs
+      bg-gradient-to-b from-blue-400 to-blue-600
+      text-white rounded-full
+      shadow-md hover:shadow-lg
+      border border-blue-600
+      hover:from-blue-500 hover:to-blue-700
+      transition-all duration-200
+    "
                         onClick={() => {
                           // Cari kandidat pertama pada groupedData[job] untuk ambil id
                           const first = groupedData[job]?.[0];
@@ -795,7 +811,15 @@ export default function HRInterview() {
                             <button></button>
 
                             <button
-                              className="btn btn-info btn-xs w-full text-sm normal-case"
+                              className="
+      btn-xs w-full text-sm normal-case
+      bg-gradient-to-b from-blue-400 to-blue-600
+      text-white rounded-full
+      shadow-md hover:shadow-lg
+      border border-blue-600
+      hover:from-blue-500 hover:to-blue-700
+      transition-all duration-200
+    "
                               onClick={() => {
                                 setSelectedCandidate(d);
                                 setIsDetailOpen(true);
@@ -805,7 +829,15 @@ export default function HRInterview() {
                             </button>
 
                             <button
-                              className="btn btn-warning btn-xs w-full text-sm normal-case"
+                              className="
+       btn-xs w-full text-sm normal-case
+      bg-gradient-to-b from-yellow-300 to-yellow-500
+      text-black rounded-full
+      shadow-md hover:shadow-lg
+      border border-yellow-500
+      hover:from-yellow-400 hover:to-yellow-600
+      transition-all duration-200
+    "
                               onClick={() => {
                                 setMode("update");
                                 setSelectedCandidate(d);
@@ -957,7 +989,15 @@ export default function HRInterview() {
                         <span className="font-semibold">{job}</span>
                         <div className="flex gap-2">
                           <button
-                            className="btn btn-ghost btn-xs"
+                            className="
+      px-3 py-1 text-xs
+      bg-gradient-to-b from-blue-400 to-blue-600
+      text-white rounded-full
+      shadow-md hover:shadow-lg
+      border border-blue-600
+      hover:from-blue-500 hover:to-blue-700
+      transition-all duration-200
+    "
                             onClick={() => {
                               const first = filteredHistory[job]?.[0];
                               navigate("/app/DetailInterview-process", {
@@ -1090,7 +1130,15 @@ export default function HRInterview() {
                                     </span>
                                   ) : null}
                                   <button
-                                    className="btn btn-info btn-xs"
+                                    className="
+      px-3 py-1 text-xs
+      bg-gradient-to-b from-blue-400 to-blue-600
+      text-white rounded-full
+      shadow-md hover:shadow-lg
+      border border-blue-600
+      hover:from-blue-500 hover:to-blue-700
+      transition-all duration-200
+    "
                                     onClick={() => {
                                       setSelectedCandidate(d);
                                       setIsDetailOpen(true);

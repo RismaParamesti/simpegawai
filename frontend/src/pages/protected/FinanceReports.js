@@ -199,6 +199,52 @@ function FinanceReports() {
     return <div className="text-center py-10">Memuat laporan finance...</div>;
   }
   const totals = calculateTotals();
+
+  const getStatusBadgeClass = (status) => {
+  const s = String(status || '').toLowerCase()
+
+  switch (s) {
+    case 'draft':
+      return 'badge-info' // biru
+    case 'claimed':
+    case 'submitted':
+      return 'badge-warning' // kuning
+    case 'approved':
+    case 'published':
+    case 'transferred':
+    case 'done':
+      return 'badge-success' // hijau
+    case 'rejected':
+      return 'badge-error' // merah
+    default:
+      return 'badge-neutral'
+  }
+}
+
+const getStatusLabel = (status) => {
+  const s = String(status || '').toLowerCase()
+
+  switch (s) {
+    case 'draft':
+      return 'Draft'
+    case 'claimed':
+      return 'Claimed'
+    case 'submitted':
+      return 'Submitted'
+    case 'approved':
+      return 'Disetujui'
+    case 'published':
+      return 'Published'
+    case 'transferred':
+      return 'Transferred'
+    case 'done':
+      return 'Done'
+    case 'rejected':
+      return 'Ditolak'
+    default:
+      return status || '-'
+  }
+}
   return (
     <>
       {error ? <div className="alert alert-error mb-4">{error}</div> : null}
@@ -333,7 +379,11 @@ function FinanceReports() {
                       {formatRupiah(item.net_salary)}
                     </td>
 
-                    <td>{item.status}</td>
+                    <td>
+  <span className={`badge badge-sm ${getStatusBadgeClass(item.status)}`}>
+    {getStatusLabel(item.status)}
+  </span>
+</td>
 
                     <td>
                       {formatRupiah(item.final_amount || item.net_salary)}

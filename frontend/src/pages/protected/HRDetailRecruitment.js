@@ -231,7 +231,7 @@ export default function HRCandidate() {
                   <div className="flex justify-between items-center">
                     <span>Riwayat Pelamar</span>
                     <button
-                      className="btn btn-outline btn-sm"
+                      className="btn btn-primary btn-sm"
                       onClick={() => window.history.back()}
                     >
                       Kembali
@@ -283,7 +283,15 @@ export default function HRCandidate() {
                             </td>
                             <td className="text-center">
                               <button
-                                className="btn btn-ghost btn-xs"
+                                className="
+      px-3 py-1 text-xs
+      bg-gradient-to-b from-blue-400 to-blue-600
+      text-white rounded-full
+      shadow-md hover:shadow-lg
+      border border-blue-600
+      hover:from-blue-500 hover:to-blue-700
+      transition-all duration-200
+    "
                                 onClick={() => {
                                   setSelected({ ...item, isHistory: true });
                                   setView("detail");
@@ -313,7 +321,7 @@ export default function HRCandidate() {
                           : "Data Pelamar"}
                       </span>
                       <button
-                        className="btn btn-outline btn-sm"
+                        className="btn btn-primary btn-sm"
                         onClick={() => window.history.back()}
                       >
                         Kembali
@@ -559,7 +567,7 @@ export default function HRCandidate() {
               <div className="flex justify-between items-center">
                 <span>Detail Pelamar</span>
                 <button
-                  className="btn btn-sm btn-outline"
+                  className="btn btn-sm btn-primary"
                   onClick={() => setView("list")}
                 >
                   Kembali

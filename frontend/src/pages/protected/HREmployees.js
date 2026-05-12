@@ -914,28 +914,56 @@ function HREmployees() {
                       </span>
                     </td>
                     <td>
-                      <div className="flex items-center gap-3 whitespace-nowrap">
-                        <button
-                          className="link link-info text-xs"
-                          onClick={() => openViewModal(employee)}
-                        >
-                          Lihat
-                        </button>
-                        <button
-                          className="link link-primary text-xs"
-                          onClick={() => openEditModal(employee)}
-                        >
-                          Edit
-                        </button>
-                        <button
-                          className="link link-error text-xs"
-                          onClick={() => setDeleteTarget(employee)}
-                          disabled={submitting}
-                        >
-                          Hapus
-                        </button>
-                      </div>
-                    </td>
+  <div className="flex items-center gap-3 whitespace-nowrap">
+    
+    <button
+      className="
+        px-3 py-1 text-xs
+        bg-gradient-to-b from-blue-400 to-blue-600
+        text-white rounded-full
+        shadow-md hover:shadow-lg
+        border border-blue-600
+        hover:from-blue-500 hover:to-blue-700
+        transition-all duration-200
+      "
+      onClick={() => openViewModal(employee)}
+    >
+      Lihat
+    </button>
+
+    <button
+      className="
+        px-3 py-1 text-xs
+        bg-gradient-to-b from-yellow-300 to-yellow-500
+        text-black rounded-full
+        shadow-md hover:shadow-lg
+        border border-yellow-500
+        hover:from-yellow-400 hover:to-yellow-600
+        transition-all duration-200
+      "
+      onClick={() => openEditModal(employee)}
+    >
+      Edit
+    </button>
+
+    <button
+      className="
+        px-3 py-1 text-xs
+        bg-gradient-to-b from-red-400 to-red-600
+        text-white rounded-full
+        shadow-md hover:shadow-lg
+        border border-red-600
+        hover:from-red-500 hover:to-red-700
+        transition-all duration-200
+      "
+      onClick={() => setDeleteTarget(employee)}
+      disabled={submitting}
+    >
+      Hapus
+    </button>
+
+  </div>
+</td>
                   </tr>
                 ))}
               </tbody>
@@ -1504,7 +1532,7 @@ function HREmployees() {
             </div>
           ) : null}
           <div className="modal-action">
-            <button className="btn" onClick={() => setViewingEmployee(null)}>
+            <button className=" btn btn-primary rounded-fullpx-5" onClick={() => setViewingEmployee(null)}>
               Tutup
             </button>
           </div>

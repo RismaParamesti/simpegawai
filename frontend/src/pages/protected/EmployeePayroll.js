@@ -14,6 +14,19 @@ const getPayrollStatusLabel = (status) => {
   return normalizedStatus || "-";
 };
 
+const PAYROLL_BADGE_CLASS = {
+  draft: "badge-warning",
+  transferred: "badge-info",
+  published: "badge-success",
+  
+};
+
+const APPEAL_BADGE_CLASS = {
+  pending: "badge-warning",
+  approved: "badge-success",
+  rejected: "badge-error",
+};
+
 const getPayrollStatusValue = (item) =>
   String(item?.payment_status || item?.status || "").toLowerCase();
 
@@ -399,17 +412,28 @@ function EmployeePayroll() {
                           : "-"}
                       </td>
                       <td>
-                        <span className="badge">
-                          {getPayrollStatusLabel(
-                            item.payment_status || item.status,
-                          )}
-                        </span>
-                      </td>
-                      <td>
-                        <span className="badge badge-outline">
-                          {item.appeal_status || "-"}
-                        </span>
-                      </td>
+  <span
+    className={`badge ${
+      PAYROLL_BADGE_CLASS[
+        String(item.payment_status || item.status).toLowerCase()
+      ] || "badge-ghost"
+    }`}
+  >
+    {getPayrollStatusLabel(item.payment_status || item.status)}
+  </span>
+</td>
+
+<td>
+  <span
+    className={`badge ${
+      APPEAL_BADGE_CLASS[
+        String(item.appeal_status || "").toLowerCase()
+      ] || "badge-outline"
+    }`}
+  >
+    {item.appeal_status || "-"}
+  </span>
+</td>
                       <td>
                         <div className="flex flex-wrap items-center gap-2">
                           <button
