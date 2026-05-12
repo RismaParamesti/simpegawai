@@ -517,7 +517,7 @@ function AdminEmployees() {
                                         <td>
                                             <div className="flex items-center gap-2 whitespace-nowrap">
                                                 <button className="btn btn-xs btn-outline btn-info min-w-[52px]" onClick={() => openViewModal(employee)}>View</button>
-                                                <button className="btn btn-xs btn-outline min-w-[52px]" onClick={() => openEditModal(employee)}>Edit</button>
+                                                <button className="btn btn-xs btn-warning text-base-content min-w-[52px]" onClick={() => openEditModal(employee)}>Edit</button>
                                                 <button className="btn btn-xs btn-outline btn-error min-w-[52px]" onClick={() => setDeleteTarget(employee)}>Delete</button>
                                             </div>
                                         </td>
