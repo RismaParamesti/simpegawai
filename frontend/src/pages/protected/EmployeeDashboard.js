@@ -423,35 +423,50 @@ function EmployeeDashboard() {
                             ? "Hari ini kamu belum absen pulang."
                             : "Hari ini kamu sudah absen pulang."}
             </p>
+              <div className="flex flex-wrap gap-3 mt-5">
+  <button
+    className="
+      btn btn-primary
+      disabled:bg-gray-300
+      disabled:text-gray-600
+      disabled:border-0
+      disabled:opacity-80
+      disabled:cursor-not-allowed
+    "
+    disabled={
+      hasCheckedIn ||
+      isLeaveIntegratedToday ||
+      isApprovedLeaveToday ||
+      isSundayToday ||
+      isOutsideWorkingHours
+    }
+    onClick={handleCheckIn}
+  >
+    Absen Masuk
+  </button>
 
-            <div className="flex flex-wrap gap-3 mt-5">
-              <button
-                className="btn btn-primary"
-                disabled={
-                  hasCheckedIn ||
-                  isLeaveIntegratedToday ||
-                  isApprovedLeaveToday ||
-                  isSundayToday ||
-                  isOutsideWorkingHours
-                }
-                onClick={handleCheckIn}
-              >
-                Absen Masuk
-              </button>
-              <button
-                className="btn btn-secondary"
-                disabled={
-                  !hasCheckedIn ||
-                  hasCheckedOut ||
-                  isLeaveIntegratedToday ||
-                  isApprovedLeaveToday ||
-                  isSundayToday ||
-                  isOutsideWorkingHours
-                }
-                onClick={handleCheckOut}
-              >
-                Absen Pulang
-              </button>
+  <button
+    className="
+      btn btn-secondary
+      disabled:bg-gray-300
+      disabled:text-gray-600
+      disabled:border-0
+      disabled:opacity-80
+      disabled:cursor-not-allowed
+    "
+    disabled={
+      !hasCheckedIn ||
+      hasCheckedOut ||
+      isLeaveIntegratedToday ||
+      isApprovedLeaveToday ||
+      isSundayToday ||
+      isOutsideWorkingHours
+    }
+    onClick={handleCheckOut}
+  >
+    Absen Pulang
+  </button>
+
             </div>
           </TitleCard>
           <div

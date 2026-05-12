@@ -1516,7 +1516,7 @@ function FinancePayroll() {
                 </button>
 
                 <button
-                  className="btn btn-outline w-full"
+                  className="btn btn-error w-full"
                   type="button"
                   onClick={handleCancelSelection}
                 >
@@ -1753,21 +1753,36 @@ function FinancePayroll() {
                       <div className="flex gap-2">
                         <button
                           type="button"
-                          className="btn btn-xs btn-outline"
+                          className="
+        px-3 py-1 text-xs
+        bg-gradient-to-b from-blue-400 to-blue-600
+        text-white rounded-full
+        shadow-md hover:shadow-lg
+        border border-blue-600
+        hover:from-blue-500 hover:to-blue-700
+        transition-all duration-200"
                           onClick={() => handleViewRow(item)}
                         >
                           Lihat
                         </button>
                         <button
                           type="button"
-                          className="btn btn-xs btn-outline btn-info"
+                          className="
+    px-3 py-1 text-xs
+    bg-gradient-to-b from-yellow-300 to-yellow-500
+    text-black rounded-full
+    shadow-md hover:shadow-lg
+    border border-yellow-500
+    hover:from-yellow-400 hover:to-yellow-600
+    transition-all duration-200
+  "
                           onClick={() => handleEditRow(item)}
                         >
-                          Ubah
+                          Edit
                         </button>
                         <button
                           type="button"
-                          className="btn btn-xs btn-outline btn-error"
+                          className="btn btn-xs btn-error text-white rounded-full"
                           onClick={() => handleDeleteRow(item)}
                           disabled={item.status !== "draft"}
                         >

@@ -14,8 +14,8 @@ const statusLabelMap = {
     approved: 'Disetujui',
     rejected: 'Ditolak',
     included_in_payroll: 'Masuk Payroll',
+    done: 'Selesai',
 }
-
 const getStatusBadgeColor = (status) => {
     switch (status) {
         case 'draft':
@@ -28,6 +28,8 @@ const getStatusBadgeColor = (status) => {
             return 'badge-error'
         case 'included_in_payroll':
             return 'badge-success'
+        case 'done':
+            return 'badge-primary' // atau badge-success kalau mau konsisten hijau
         default:
             return 'badge-neutral'
     }
@@ -96,7 +98,7 @@ function HRPayrollDirectorAdjustments() {
 
     const backButton = (
         <button
-            className="btn btn-sm btn-ghost"
+            className="btn btn-sm btn-primary rounded-full "
             title={isFinanceHistoryOnlyView ? 'Kembali ke Manajemen Payroll' : 'Kembali ke Manajemen Tunjangan'}
             onClick={() => navigate(backPath)}
         >
@@ -434,7 +436,7 @@ function HRPayrollDirectorAdjustments() {
                         <button className={`btn btn-primary ${saving ? 'loading' : ''}`} onClick={handleSaveAdjustment} disabled={saving}>
                             Simpan Tunjangan
                         </button>
-                        <button className="btn btn-ghost" onClick={loadData} disabled={loading}>
+                        <button className="btn btn-secondary" onClick={loadData} disabled={loading}>
                             Refresh
                         </button>
                     </div>

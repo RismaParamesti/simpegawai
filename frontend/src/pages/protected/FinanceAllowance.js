@@ -21,7 +21,7 @@ function FinanceAllowance() {
         </p>
 
         <button
-          className="btn btn-secondary w-full"
+          className="btn btn-success w-full"
           onClick={() => navigate("/app/payroll/settings")}
         >
           Ubah Komponen Global

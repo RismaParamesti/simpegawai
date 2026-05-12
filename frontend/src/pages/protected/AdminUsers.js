@@ -277,6 +277,23 @@ function AdminUsers() {
             setSubmitting(false)
         }
     }
+    const getStatusBadgeClass = (status) => {
+    const s = String(status || '').toLowerCase()
+
+    switch (s) {
+        case 'active':
+        case 'aktif':
+            return 'badge badge-success text-white'
+
+        case 'inactive':
+        case 'nonactive':
+        case 'tidak aktif':
+            return 'badge badge-error text-white'
+
+        default:
+            return 'badge badge-outline'
+    }
+}
 
     return (
         <>
@@ -312,11 +329,31 @@ function AdminUsers() {
                                             <td>{linkedEmployee?.department_name || '-'}</td>
                                             <td>{linkedEmployee?.position_name || '-'}</td>
                                             <td>{(user.roles || []).join(', ')}</td>
-                                            <td><span className="badge">{user.status}</span></td>
+                                            <td>
+    <span className={getStatusBadgeClass(user.status)}>
+        {user.status}
+    </span>
+</td>
                                             <td>
                                                 <div className="flex items-center gap-2 whitespace-nowrap">
-                                                    <button className="btn btn-xs btn-outline btn-info" onClick={() => openViewUser(user)}>View</button>
-                                                    <button className="btn btn-xs btn-warning text-base-content" onClick={() => openEditUser(user)}>Edit</button>
+                                                    <button className="
+      px-3 py-1 text-xs
+      bg-gradient-to-b from-blue-400 to-blue-600
+      text-white rounded-full
+      shadow-md hover:shadow-lg
+      border border-blue-600
+      hover:from-blue-500 hover:to-blue-700
+      transition-all duration-200
+    " onClick={() => openViewUser(user)}>Lihat</button>
+                                                    <button className="
+    px-3 py-1 text-xs
+    bg-gradient-to-b from-yellow-300 to-yellow-500
+    text-black rounded-full
+    shadow-md hover:shadow-lg
+    border border-yellow-500
+    hover:from-yellow-400 hover:to-yellow-600
+    transition-all duration-200
+  " onClick={() => openEditUser(user)}>Edit</button>
                                                 </div>
                                             </td>
                                         </tr>
@@ -487,7 +524,7 @@ function AdminUsers() {
                         </div>
                     ) : null}
                     <div className="modal-action">
-                        <button className="btn" onClick={() => setViewingUser(null)}>Tutup</button>
+                        <button className=" btn btn-primary rounded-full" onClick={() => setViewingUser(null)}>Tutup</button>
                     </div>
                 </div>
             </div>

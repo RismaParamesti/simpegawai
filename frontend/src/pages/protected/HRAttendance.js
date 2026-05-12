@@ -143,6 +143,29 @@ function HRAttendance() {
         return acc
     }, {})
 
+    const getStatusBadgeClass = (status) => {
+    const s = String(status || '').toLowerCase()
+
+    switch (s) {
+        case 'hadir':
+            return 'badge badge-success text-white'
+        case 'izin':
+            return 'badge badge-warning text-white'
+        case 'sakit':
+            return 'badge badge-info text-white'
+        case 'alpha':
+        case 'absent':
+            return 'badge badge-error text-white'
+        case 'libur':
+            return 'badge badge-neutral'
+        case 'late':
+        case 'terlambat':
+            return 'badge badge-secondary text-white'
+        default:
+            return 'badge badge-outline'
+    }
+}
+
     return (
         <TitleCard title="Laporan Kehadiran Pegawai" topMargin="mt-0">
             <div className="grid md:grid-cols-5 grid-cols-1 gap-4 mb-6">
@@ -249,7 +272,11 @@ function HRAttendance() {
                                     </td>
                                     <td>{item.check_in || '-'}</td>
                                     <td>{item.check_out || '-'}</td>
-                                    <td><span className="badge badge-outline">{item.status}</span></td>
+                                    <td>
+    <span className={getStatusBadgeClass(item.status)}>
+        {item.status}
+    </span>
+</td>
                                     <td>
                                         {(() => {
                                             const status = String(item.status || '').toLowerCase()

@@ -571,57 +571,56 @@ function EmployeeLeave() {
           </div>
         </div>
 
-        {!leaveMode ? (
-          <div className="mb-5 rounded-2xl border border-base-300 bg-base-100 p-5 shadow-sm">
-            <div className="mb-4">
-              <h3 className="text-base font-semibold text-base-content">
-                Jenis Pengajuan
-              </h3>
+        {!leaveMode && (
+  <div className="mb-5 rounded-2xl border border-base-300 bg-base-100 p-5 shadow-sm transition-all duration-300">
+    <div className="mb-4">
+      <h3 className="text-base font-semibold text-base-content">
+        Jenis Pengajuan
+      </h3>
 
-              <p className="mt-1 text-sm text-base-content/70">
-                Silakan pilih <b>Izin</b> atau <b>Cuti</b> untuk membuka form
-                pengajuan.
-              </p>
-            </div>
-            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-              <button
-                type="button"
-                onClick={() => selectLeaveMode("izin")}
-                className={`
-        rounded-xl px-4 py-3 text-sm font-semibold transition-all duration-200
-        ${
-          leaveMode === "izin"
-            ? "bg-primary text-primary-content shadow-md hover:bg-primary-focus"
-            : "bg-base-200 text-base-content hover:bg-accent hover:text-accent-content"
-        }
-      `}
-              >
-                {LEAVE_MODE_LABEL.izin}
-              </button>
+      <div className="mt-3 rounded-xl bg-base-200 px-4 py-3 text-sm text-base-content/80">
+        Silakan pilih <b>Izin</b> atau <b>Cuti</b> untuk membuka form
+        pengajuan.
+      </div>
+    </div>
 
-              <button
-                type="button"
-                onClick={() => selectLeaveMode("cuti")}
-                className={`
-        rounded-xl px-4 py-3 text-sm font-semibold transition-all duration-200
-        ${
-          leaveMode === "cuti"
-            ? "bg-primary text-primary-content shadow-md hover:bg-primary-focus"
-            : "bg-base-200 text-base-content hover:bg-accent hover:text-accent-content"
-        }
-      `}
-              >
-                {LEAVE_MODE_LABEL.cuti}
-              </button>
-            </div>
-          </div>
-        ) : null}
+    <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+      <button
+  type="button"
+  onClick={() => selectLeaveMode("izin")}
+  className={`
+    btn btn-primary w-full rounded-2xl
+    py-3 text-sm font-semibold
+    transition-all duration-200
+    ${leaveMode === "izin" ? "shadow-lg scale-[1.02]" : ""}
+  `}
+>
+  {LEAVE_MODE_LABEL.izin}
+</button>
+      <button
+  type="button"
+  onClick={() => selectLeaveMode("cuti")}
+  className={`
+    btn btn-secondary w-full rounded-2xl py-3 text-sm font-semibold
+    transition-all duration-200
+    ${
+      leaveMode === "cuti"
+        ? "shadow-lg scale-[1.02]"
+        : ""
+    }
+  `}
+>
+  {LEAVE_MODE_LABEL.cuti}
+</button>
+    </div>
+  </div>
+)}
 
-        {leaveMode ? (
-          <form
-            className="grid md:grid-cols-2 grid-cols-1 gap-4"
-            onSubmit={submitForm}
-          >
+{leaveMode && (
+  <form
+    className="grid grid-cols-1 gap-4 md:grid-cols-2 animate-fadeIn"
+    onSubmit={submitForm}
+  >
             <div className="text-sm">
               <label className="block text-xs opacity-70 mb-1">Jenis pengajuan</label>
               <select
@@ -771,9 +770,7 @@ function EmployeeLeave() {
                 Ulangi Pilihan
               </button>
             </div>
-          </form>
-        ) : (
-          <></>
+                    </form>
         )}
       </TitleCard>
 

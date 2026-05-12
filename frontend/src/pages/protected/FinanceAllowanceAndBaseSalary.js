@@ -110,7 +110,7 @@ function PositionSalary() {
         TopSideButtons={
           <button
             type="button"
-            className="btn btn-ghost btn-sm"
+            className="btn btn-primary btn-sm"
             onClick={() => navigate(-1)}
           >
             Kembali
@@ -208,7 +208,7 @@ function PositionSalary() {
                         }`}
                         onClick={() => handleSave(pos.id)}
                       >
-                        {loadingId === pos.id ? "Saving..." : "Save"}
+                        {loadingId === pos.id ? "Saving..." : "Simpan"}
                       </button>
                     )}
                     {isReadOnly && (

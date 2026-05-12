@@ -21,7 +21,7 @@ function Allowance() {
         </p>
 
         <button
-          className="btn btn-accent w-full"
+          className="btn btn-success w-full"
           onClick={() => navigate("/app/hr/settings")}
         >
           Ubah Komponen Global

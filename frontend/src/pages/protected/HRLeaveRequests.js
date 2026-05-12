@@ -335,14 +335,22 @@ function HRLeaveRequests() {
                                         <td>
                                             <div className="flex gap-2">
                                                 <button
-                                                    className="btn btn-ghost btn-xs"
+                                                    className="
+        px-3 py-1 text-xs
+        bg-gradient-to-b from-blue-400 to-blue-600
+        text-white rounded-full
+        shadow-md hover:shadow-lg
+        border border-blue-600
+        hover:from-blue-500 hover:to-blue-700
+        transition-all duration-200
+      "
                                                     onClick={() => {
                                                         setSelectedItem(item)
                                                         setActionType('view')
                                                         setShowModal(true)
                                                     }}
                                                 >
-                                                    View
+                                                    Lihat
                                                 </button>
                                             </div>
                                         </td>
@@ -452,7 +460,7 @@ function HRLeaveRequests() {
 
                         <div className="modal-action">
                             <button 
-                                className="btn btn-ghost" 
+                                className="btn btn-primary rounded-full" 
                                 onClick={() => setShowModal(false)}
                                 disabled={processing}
                             >

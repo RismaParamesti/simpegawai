@@ -165,7 +165,7 @@ function FinancePayrollSettings() {
     const loadingButtons = (
       <button
         type="button"
-        className="btn btn-ghost btn-sm"
+        className="btn btn-primary btn-sm"
         onClick={() => navigate(-1)}
       >
         Kembali
@@ -225,7 +225,7 @@ function FinancePayrollSettings() {
         TopSideButtons={
           <button
             type="button"
-            className="btn btn-ghost btn-sm"
+            className="btn btn-primary btn-sm"
             onClick={() => navigate(-1)}
           >
             Kembali

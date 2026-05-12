@@ -53,7 +53,7 @@ const HRHiredCandidateDetail = () => {
       title={
         <div className="flex justify-between items-center w-full">
           <span className="text-2xl font-bold">Detail Calon Pegawai</span>
-          <button className="btn btn-outline" onClick={() => navigate(-1)}>
+          <button className="btn btn-primary" onClick={() => navigate(-1)}>
             Kembali
           </button>
         </div>
