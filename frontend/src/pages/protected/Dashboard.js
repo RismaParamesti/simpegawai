@@ -12,6 +12,20 @@ function InternalPage(){
     const [error, setError] = useState('')
     const [dashboard, setDashboard] = useState(null)
 
+    const getStatusBadgeClass = (status) => {
+        const normalizedStatus = String(status || '').trim().toLowerCase()
+
+        if (normalizedStatus === 'active' || normalizedStatus === 'aktif') {
+            return 'badge badge-success'
+        }
+
+        if (normalizedStatus === 'inactive' || normalizedStatus === 'nonaktif' || normalizedStatus === 'non-active') {
+            return 'badge badge-error'
+        }
+
+        return 'badge badge-neutral'
+    }
+
     const loadDashboard = async () => {
         try {
             setLoading(true)
@@ -179,7 +193,7 @@ function InternalPage(){
                                     <tr key={user.id}>
                                         <td>{user.name}</td>
                                         <td>{user.email}</td>
-                                        <td><span className="badge">{user.status}</span></td>
+                                        <td><span className={getStatusBadgeClass(user.status)}>{user.status}</span></td>
                                     </tr>
                                 ))}
                                 {recentUsers.length === 0 && (
@@ -207,7 +221,7 @@ function InternalPage(){
                                     <tr key={employee.employee_code}>
                                         <td>{employee.employee_code}</td>
                                         <td>{employee.name}</td>
-                                        <td><span className="badge">{employee.employment_status}</span></td>
+                                        <td><span className={getStatusBadgeClass(employee.employment_status)}>{employee.employment_status}</span></td>
                                     </tr>
                                 ))}
                                 {recentEmployees.length === 0 && (

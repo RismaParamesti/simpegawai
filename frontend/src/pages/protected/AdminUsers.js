@@ -316,7 +316,7 @@ function AdminUsers() {
                                             <td>
                                                 <div className="flex items-center gap-2 whitespace-nowrap">
                                                     <button className="btn btn-xs btn-outline btn-info" onClick={() => openViewUser(user)}>View</button>
-                                                    <button className="btn btn-xs" onClick={() => openEditUser(user)}>Edit</button>
+                                                    <button className="btn btn-xs btn-warning text-base-content" onClick={() => openEditUser(user)}>Edit</button>
                                                 </div>
                                             </td>
                                         </tr>
