@@ -10,6 +10,7 @@ const EmployeeDashboard = lazy(
 const EmployeeAttendance = lazy(
   () => import("../pages/protected/EmployeeAttendance"),
 );
+const EmployeeWarningLetters = lazy(() => import("../pages/protected/EmployeeWarningLetters"));
 const EmployeeLeave = lazy(() => import("../pages/protected/EmployeeLeave"));
 const EmployeePayroll = lazy(
   () => import("../pages/protected/EmployeePayroll"),
@@ -90,9 +91,6 @@ const AtasanReimbursements = lazy(
 const AtasanAttendance = lazy(
   () => import("../pages/protected/AtasanAttendance"),
 );
-const AtasanWarningLetters = lazy(
-  () => import("../pages/protected/AtasanWarningLetters"),
-);
 
 // Finance Pages
 const FinanceDashboard = lazy(
@@ -161,6 +159,10 @@ const pegawaiRoutes = [
   {
     path: "/attendance",
     component: EmployeeAttendance,
+  },
+  {
+    path: "/warning-letters",
+    component: EmployeeWarningLetters,
   },
   {
     path: "/leave-requests",
@@ -290,10 +292,6 @@ const atasanRoutes = [
   {
     path: "/team-attendance",
     component: AtasanAttendance,
-  },
-  {
-    path: "/team-warning-letters",
-    component: AtasanWarningLetters,
   },
   {
     path: "/settings-profile",

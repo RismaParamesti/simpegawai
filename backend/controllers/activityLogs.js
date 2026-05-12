@@ -123,9 +123,8 @@ router.get("/", verifyToken, verifyRole(["admin"]), async (req, res) => {
         const page = Math.max(1, parseInt(req.query.page) || 1);
         const limit = Math.min(
             100,
-            Math.max(1, parseInt(req.query.limit) || 20),
+            Math.max(1, parseInt(req.query.limit) || 10),
         );
-        const offset = (page - 1) * limit;
 
         let whereConditions = [];
         let params = [];
@@ -174,6 +173,12 @@ router.get("/", verifyToken, verifyRole(["admin"]), async (req, res) => {
             params.push(searchTerm, searchTerm);
         }
 
+        // Filter out kandidat login/logout logs when viewing auth module
+        if (req.query.module === "auth") {
+            whereConditions.push("role != ?");
+            params.push("kandidat");
+        }
+
         const whereClause =
             whereConditions.length > 0
                 ? "WHERE " + whereConditions.join(" AND ")
@@ -181,6 +186,10 @@ router.get("/", verifyToken, verifyRole(["admin"]), async (req, res) => {
 
         const countQuery = `SELECT COUNT(*) as total FROM activity_logs ${whereClause}`;
         const [[{ total }]] = await db.promise().query(countQuery, params);
+
+        const totalPages = Math.ceil(total / limit);
+        const validPage = Math.min(Math.max(1, page), Math.max(1, totalPages));
+        const offset = (validPage - 1) * limit;
 
         const dataQuery = `
             SELECT * FROM activity_logs
@@ -197,10 +206,10 @@ router.get("/", verifyToken, verifyRole(["admin"]), async (req, res) => {
             message: "Activity logs retrieved successfully",
             data: logs,
             pagination: {
-                page,
+                page: validPage,
                 limit,
                 total,
-                totalPages: Math.ceil(total / limit),
+                totalPages: totalPages,
             },
         });
     } catch (error) {

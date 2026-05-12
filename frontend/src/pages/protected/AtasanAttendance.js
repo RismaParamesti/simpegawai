@@ -8,6 +8,7 @@ function AtasanAttendance() {
     const dispatch = useDispatch()
     const [loading, setLoading] = useState(true)
     const [updatingId, setUpdatingId] = useState(null)
+    const [activeEditId, setActiveEditId] = useState(null)
     const [filters, setFilters] = useState({
         month: new Date().getMonth() + 1,
         year: new Date().getFullYear(),
@@ -17,6 +18,7 @@ function AtasanAttendance() {
     const [records, setRecords] = useState([])
     const [allRecords, setAllRecords] = useState([])
     const [teamMembers, setTeamMembers] = useState([])
+    const [editableRecords, setEditableRecords] = useState({})
 
     const formatLateDuration = (lateMinutes) => {
         const minutes = Number(lateMinutes)
@@ -34,6 +36,19 @@ function AtasanAttendance() {
         return `${hh} jam ${mm} menit ${ss} detik`
     }
 
+    const formatWorkDuration = (hoursValue) => {
+        const hours = Number(hoursValue)
+        if (!Number.isFinite(hours) || hours <= 0) {
+            return '00 jam 00 menit'
+        }
+
+        const totalMinutes = Math.round(hours * 60)
+        const hh = Math.floor(totalMinutes / 60)
+        const mm = totalMinutes % 60
+
+        return `${String(hh).padStart(2, '0')} jam ${String(mm).padStart(2, '0')} menit`
+    }
+
     const loadTeamMembers = useCallback(async () => {
         try {
             const result = await atasanApi.getTeamMembers()
@@ -49,6 +64,16 @@ function AtasanAttendance() {
             const result = await atasanApi.getAttendanceRecords({ month: filters.month, year: filters.year })
             const source = result?.data || []
             setAllRecords(source)
+            setEditableRecords(
+                source.reduce((acc, item) => {
+                    acc[item.id] = {
+                        check_in: item.check_in || '',
+                        check_out: item.check_out || '',
+                        status: item.status || 'hadir',
+                    }
+                    return acc
+                }, {})
+            )
         } catch (err) {
             dispatch(showNotification({ message: err.message, status: 0 }))
         } finally {
@@ -86,12 +111,52 @@ function AtasanAttendance() {
         setRecords(filteredRecords)
     }, [allRecords, filters.employeeId, filters.status])
 
-    const updateStatus = async (id, status) => {
+    useEffect(() => {
+        if (!activeEditId) return
+        const activeStillVisible = records.some((item) => String(item.id) === String(activeEditId))
+        if (!activeStillVisible) {
+            setActiveEditId(null)
+        }
+    }, [activeEditId, records])
+
+    const updateRecordField = (id, field, value) => {
+        setEditableRecords((prev) => ({
+            ...prev,
+            [id]: {
+                ...(prev[id] || {}),
+                [field]: value,
+            },
+        }))
+    }
+
+    const openEditRow = (item) => {
+        setActiveEditId(item.id)
+        setEditableRecords((prev) => ({
+            ...prev,
+            [item.id]: {
+                check_in: prev[item.id]?.check_in ?? item.check_in ?? '',
+                check_out: prev[item.id]?.check_out ?? item.check_out ?? '',
+                status: prev[item.id]?.status ?? item.status ?? 'hadir',
+            },
+        }))
+    }
+
+    const closeEditRow = () => {
+        setActiveEditId(null)
+    }
+
+    const saveRecord = async (item) => {
         try {
-            setUpdatingId(id)
-            await atasanApi.updateAttendanceStatus(id, status)
-            dispatch(showNotification({ message: 'Status kehadiran berhasil diperbarui', status: 1 }))
-            loadData()
+            setUpdatingId(item.id)
+            const draft = editableRecords[item.id] || {}
+            await atasanApi.updateAttendanceRecord(item.id, {
+                check_in: draft.check_in ?? item.check_in ?? '',
+                check_out: draft.check_out ?? item.check_out ?? '',
+                status: draft.status ?? item.status ?? 'hadir',
+            })
+            dispatch(showNotification({ message: 'Data kehadiran berhasil diperbarui', status: 1 }))
+            await loadData()
+            setActiveEditId(null)
         } catch (err) {
             dispatch(showNotification({ message: err.message, status: 0 }))
         } finally {
@@ -191,7 +256,7 @@ function AtasanAttendance() {
                 {loading ? (
                     <div className="text-center py-10">Memuat data kehadiran...</div>
                 ) : (
-                    <div className="overflow-x-auto">
+                    <div className="relative overflow-x-auto">
                         <table className="table table-zebra">
                             <thead>
                                 <tr>
@@ -199,14 +264,19 @@ function AtasanAttendance() {
                                     <th>Pegawai</th>
                                     <th>Check In</th>
                                     <th>Check Out</th>
+                                    <th>Jam Kerja</th>
+                                    <th>Jam Lembur</th>
                                     <th>Status</th>
                                     <th>Terlambat</th>
-                                    <th>Ubah Status</th>
                                 </tr>
                             </thead>
                             <tbody>
                                 {records.map((item) => (
-                                    <tr key={item.id}>
+                                    <tr
+                                        key={item.id}
+                                        className="cursor-pointer hover:bg-base-300/60"
+                                        onClick={() => openEditRow(item)}
+                                    >
                                         <td>{new Date(item.date).toLocaleDateString('id-ID')}</td>
                                         <td>
                                             <div className="font-semibold">{item.employee_name}</div>
@@ -214,31 +284,100 @@ function AtasanAttendance() {
                                         </td>
                                         <td>{item.check_in || '-'}</td>
                                         <td>{item.check_out || '-'}</td>
+                                        <td>{formatWorkDuration(item.working_hours)}</td>
+                                        <td>{formatWorkDuration(item.overtime_hours)}</td>
                                         <td><span className="badge badge-outline">{item.status}</span></td>
                                         <td>{['izin', 'sakit', 'libur', 'alpha'].includes(String(item.status || '').toLowerCase()) ? '-' : (item.is_late ? formatLateDuration(item.late_minutes || 0) : 'Tidak')}</td>
-                                        <td>
-                                            <select
-                                                className={`select select-bordered select-xs ${updatingId === item.id ? 'loading' : ''}`}
-                                                value={item.status}
-                                                onChange={(e) => updateStatus(item.id, e.target.value)}
-                                                disabled={updatingId === item.id}
-                                            >
-                                                <option value="hadir">hadir</option>
-                                                <option value="izin">izin</option>
-                                                <option value="sakit">sakit</option>
-                                                <option value="alpha">alpha</option>
-                                                <option value="libur">libur</option>
-                                            </select>
-                                        </td>
                                     </tr>
                                 ))}
                                 {records.length === 0 && (
                                     <tr>
-                                        <td colSpan={7} className="text-center opacity-70">Tidak ada data kehadiran</td>
+                                        <td colSpan={9} className="text-center opacity-70">Tidak ada data kehadiran</td>
                                     </tr>
                                 )}
                             </tbody>
                         </table>
+
+                        {activeEditId ? (() => {
+                            const activeItem = records.find((item) => String(item.id) === String(activeEditId))
+                            const draft = editableRecords[activeEditId] || {}
+
+                            if (!activeItem) return null
+
+                            return (
+                                <div className="fixed inset-0 z-50 flex items-center justify-center bg-base-300/40 backdrop-blur-sm px-4">
+                                    <div className="w-full max-w-4xl rounded-2xl border border-base-300 bg-base-100 shadow-2xl overflow-hidden scale-100 animate-[fadeIn_.15s_ease-out]">
+                                        <div className="flex items-center justify-between border-b border-base-300 px-5 py-4">
+                                            <div>
+                                                <div className="text-sm opacity-70">
+                                                    Edit baris kehadiran - {new Date(activeItem.date).toLocaleDateString('id-ID')}
+                                                </div>
+                                                <div className="text-lg font-semibold">{activeItem.employee_name} {activeItem.employee_code ? `(${activeItem.employee_code})` : ''}</div>
+                                            </div>
+                                            <button className="btn btn-sm btn-ghost" onClick={closeEditRow}>Tutup</button>
+                                        </div>
+
+                                        <div className="p-5">
+                                            <div className="grid gap-4 md:grid-cols-2">
+                                                <label className="form-control w-full">
+                                                    <div className="label"><span className="label-text">Check In</span></div>
+                                                    <input
+                                                        type="time"
+                                                        className="input input-bordered w-full"
+                                                        value={draft.check_in ?? activeItem.check_in ?? ''}
+                                                        onChange={(e) => updateRecordField(activeEditId, 'check_in', e.target.value)}
+                                                    />
+                                                </label>
+                                                <label className="form-control w-full">
+                                                    <div className="label"><span className="label-text">Check Out</span></div>
+                                                    <input
+                                                        type="time"
+                                                        className="input input-bordered w-full"
+                                                        value={draft.check_out ?? activeItem.check_out ?? ''}
+                                                        onChange={(e) => updateRecordField(activeEditId, 'check_out', e.target.value)}
+                                                    />
+                                                </label>
+                                                <label className="form-control w-full md:col-span-2">
+                                                    <div className="label"><span className="label-text">Status</span></div>
+                                                    <select
+                                                        className="select select-bordered w-full"
+                                                        value={draft.status ?? activeItem.status ?? 'hadir'}
+                                                        onChange={(e) => updateRecordField(activeEditId, 'status', e.target.value)}
+                                                    >
+                                                        <option value="hadir">hadir</option>
+                                                        <option value="izin">izin</option>
+                                                        <option value="sakit">sakit</option>
+                                                        <option value="alpha">alpha</option>
+                                                        <option value="libur">libur</option>
+                                                    </select>
+                                                </label>
+                                                <div className="rounded-xl bg-base-200 p-4 md:col-span-2 grid gap-2 md:grid-cols-2">
+                                                    <div>
+                                                        <div className="text-xs uppercase opacity-70">Jam Kerja</div>
+                                                        <div className="text-lg font-semibold">{formatWorkDuration(activeItem.working_hours)}</div>
+                                                    </div>
+                                                    <div>
+                                                        <div className="text-xs uppercase opacity-70">Jam Lembur</div>
+                                                        <div className="text-lg font-semibold">{formatWorkDuration(activeItem.overtime_hours)}</div>
+                                                    </div>
+                                                </div>
+                                            </div>
+
+                                            <div className="mt-5 flex items-center justify-end gap-3">
+                                                <button className="btn btn-ghost" onClick={closeEditRow}>Batal</button>
+                                                <button
+                                                    className={`btn btn-primary ${updatingId === activeItem.id ? 'loading' : ''}`}
+                                                    onClick={() => saveRecord(activeItem)}
+                                                    disabled={updatingId === activeItem.id}
+                                                >
+                                                    Simpan
+                                                </button>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            )
+                        })() : null}
                     </div>
                 )}
             </TitleCard>

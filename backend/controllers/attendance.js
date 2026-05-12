@@ -92,6 +92,24 @@ const calculateLateMinutes = (checkInTime, standardCheckInTime) => {
     return Math.ceil(diffSeconds / 60);
 };
 
+const getApprovedLatePermissionForDate = async (employeeId, dateValue) => {
+    const [rows] = await db.promise().query(
+        `SELECT lr.id, lr.time, lr.cuti_khusus_option, lr.leave_type
+         FROM leave_requests lr
+         WHERE lr.employee_id = ?
+           AND lr.status = 'approved'
+           AND lr.leave_type = 'izin_terlambat'
+           AND lr.cuti_khusus_option = 'terlambat'
+           AND lr.start_date <= ?
+           AND lr.end_date >= ?
+         ORDER BY lr.approved_at DESC, lr.id DESC
+         LIMIT 1`,
+        [employeeId, dateValue, dateValue]
+    );
+
+    return rows[0] || null;
+};
+
 const getLatePolicy = (lateMinutes) => {
     const normalizedLateMinutes = Math.max(0, Number(lateMinutes) || 0);
     const isPenalizedLate = normalizedLateMinutes > LATE_TOLERANCE_MINUTES;
@@ -721,6 +739,10 @@ router.post(
             const employeeId = employeeResult[0].id;
             const workingHours = await getWorkingHoursByEmployee(employeeId);
             const workingHoursWindow = getWorkingHoursWindow(workingHours);
+            const approvedLatePermission = await getApprovedLatePermissionForDate(
+                employeeId,
+                today
+            );
 
             // Cek apakah sudah ada record attendance hari ini
             const [existingAttendance] = await db
@@ -732,7 +754,10 @@ router.post(
 
             if (existingAttendance.length > 0) {
                 // Jika status hari ini sudah cuti/izin/sakit, check-in tidak diperbolehkan
-                if (["izin", "sakit", "libur"].includes(existingAttendance[0].status)) {
+                if (
+                    ["izin", "sakit", "libur"].includes(existingAttendance[0].status) &&
+                    !approvedLatePermission
+                ) {
                     return res.status(400).json({
                         message:
                             "Status absensi hari ini sudah cuti/izin/sakit/libur. Check-in tidak diperlukan.",
@@ -781,11 +806,13 @@ router.post(
                 });
             }
 
-            // Aturan telat berdasarkan jam kerja dari working_hours
-            const lateMinutes = calculateLateMinutes(
-                checkInTime,
-                workingHoursWindow.check_in_time
-            );
+            // Aturan telat berdasarkan jam kerja dari working_hours,
+            // atau jam izin terlambat yang sudah di-approve pada tanggal yang sama.
+            const lateThresholdTime =
+                approvedLatePermission && approvedLatePermission.time
+                    ? approvedLatePermission.time
+                    : workingHoursWindow.check_in_time;
+            const lateMinutes = calculateLateMinutes(checkInTime, lateThresholdTime);
             const latePolicy = getLatePolicy(lateMinutes);
             const isLate = latePolicy.is_penalized_late;
 
@@ -1834,6 +1861,221 @@ router.put(
                 console.error("Failed to log failed attendance status update:", e);
             }
             res.status(500).json({ message: "Server error" });
+        }
+    }
+);
+
+router.put(
+    "/:id/manager-edit",
+    verifyToken,
+    verifyRole(["atasan"]),
+    async (req, res) => {
+        try {
+            const managerScope = await resolveManagerScope(db, req.user.id);
+
+            if (!shouldScopeAsAtasan(req)) {
+                return res.status(403).json({
+                    message: "Atasan hanya dapat mengedit absensi tim saat role atasan sedang aktif",
+                });
+            }
+
+            const { id } = req.params;
+            const { check_in, check_out, status } = req.body;
+
+            let attendanceScopeClause = "p.department_id = ? AND e.id <> ?";
+            let attendanceScopeParams = [managerScope.departmentId, managerScope.managerEmployeeId];
+            if (managerScope.isDirector) {
+                attendanceScopeClause = "p.level = 'manager' AND e.id <> ?";
+                attendanceScopeParams = [managerScope.managerEmployeeId];
+            }
+
+            const [existingAttendance] = await db.promise().query(
+                `SELECT a.*, e.employee_code, e.id AS employee_id, u.name AS employee_name
+                 FROM attendance a
+                 JOIN employees e ON a.employee_id = e.id
+                 JOIN positions p ON e.position_id = p.id
+                 JOIN users u ON e.user_id = u.id
+                 WHERE a.id = ?
+                   AND ${attendanceScopeClause}`,
+                [id, ...attendanceScopeParams]
+            );
+
+            if (!existingAttendance.length) {
+                return res.status(404).json({ message: "Attendance record not found" });
+            }
+
+            const validStatuses = ["hadir", "izin", "sakit", "alpha", "libur"];
+            const nextStatus = String(status || existingAttendance[0].status || "").toLowerCase().trim();
+            if (!validStatuses.includes(nextStatus)) {
+                return res.status(400).json({
+                    message: "Invalid status. Valid statuses: hadir, izin, sakit, alpha, libur",
+                });
+            }
+
+            const normalizeTimeInput = (value) => {
+                if (value === undefined) return undefined;
+                const normalizedValue = String(value || "").trim();
+                if (!normalizedValue) return null;
+                if (!/^\d{2}:\d{2}(:\d{2})?$/.test(normalizedValue)) {
+                    const error = new Error("Format waktu harus HH:MM atau HH:MM:SS");
+                    error.statusCode = 400;
+                    throw error;
+                }
+                return normalizedValue.length === 5 ? `${normalizedValue}:00` : normalizedValue;
+            };
+
+            const nextCheckIn = normalizeTimeInput(check_in);
+            const nextCheckOut = normalizeTimeInput(check_out);
+            const attendanceRow = existingAttendance[0];
+            let effectiveCheckIn =
+                nextCheckIn !== undefined ? nextCheckIn : attendanceRow.check_in;
+            let effectiveCheckOut =
+                nextCheckOut !== undefined ? nextCheckOut : attendanceRow.check_out;
+
+            let nextWorkingHours = null;
+            let nextOvertimeHours = null;
+            let nextIsLate = 0;
+            let nextLateMinutes = 0;
+            let nextCheckInValue = null;
+            let nextCheckOutValue = null;
+
+            const leaveStatuses = ["izin", "sakit", "alpha", "libur"];
+            const isLeaveStatus = leaveStatuses.includes(nextStatus);
+
+            if (isLeaveStatus) {
+                nextCheckInValue = null;
+                nextCheckOutValue = null;
+            } else {
+                const workingHours = await getWorkingHoursByEmployee(
+                    attendanceRow.employee_id
+                );
+                const workingHoursWindow = getWorkingHoursWindow(workingHours);
+
+                if (!effectiveCheckIn) {
+                    effectiveCheckIn = workingHoursWindow.check_in_time;
+                }
+
+                if (!effectiveCheckOut) {
+                    effectiveCheckOut = workingHoursWindow.check_out_time;
+                }
+
+                nextCheckInValue = effectiveCheckIn;
+                nextCheckOutValue = effectiveCheckOut;
+
+                const [approvedLeaves] = await db.promise().query(
+                    `SELECT id
+                     FROM leave_requests
+                     WHERE employee_id = ?
+                       AND status = 'approved'
+                       AND ? BETWEEN start_date AND end_date
+                     LIMIT 1`,
+                    [attendanceRow.employee_id, attendanceRow.date]
+                );
+
+                const hasApprovedLeaveOnDate = approvedLeaves.length > 0;
+
+                if (hasApprovedLeaveOnDate) {
+                    nextLateMinutes = 0;
+                    nextIsLate = 0;
+                } else {
+                    nextLateMinutes = calculateLateMinutes(
+                        nextCheckInValue,
+                        workingHoursWindow.check_in_time
+                    );
+                    nextIsLate = nextLateMinutes > 0 ? 1 : 0;
+                }
+
+                const checkInSeconds = timeStringToSeconds(nextCheckInValue);
+                const checkOutSeconds = timeStringToSeconds(nextCheckOutValue);
+                let workingDurationSeconds = checkOutSeconds - checkInSeconds;
+                if (workingDurationSeconds < 0) {
+                    workingDurationSeconds += 24 * 3600;
+                }
+
+                const standardWorkingDurationSeconds = Math.max(
+                    0,
+                    workingHoursWindow.check_out_seconds -
+                        workingHoursWindow.check_in_seconds
+                );
+
+                nextWorkingHours = secondsToHoursDecimal(workingDurationSeconds);
+                nextOvertimeHours = secondsToHoursDecimal(
+                    Math.max(0, workingDurationSeconds - standardWorkingDurationSeconds)
+                );
+            }
+
+            await db.promise().query(
+                `UPDATE attendance
+                 SET status = ?,
+                     check_in = ?,
+                     check_out = ?,
+                     working_hours = ?,
+                     overtime_hours = ?,
+                     is_late = ?,
+                     late_minutes = ?
+                 WHERE id = ?`,
+                [
+                    nextStatus,
+                    nextCheckInValue,
+                    nextCheckOutValue,
+                    nextWorkingHours,
+                    nextOvertimeHours,
+                    nextIsLate,
+                    nextLateMinutes,
+                    id,
+                ]
+            );
+
+            await evaluateAlphaDisciplineForEmployee(attendanceRow.employee_id);
+
+            try {
+                const username = req.user.username || req.user.name || null;
+                const role = Array.isArray(req.user.roles)
+                    ? req.user.roles[0]
+                    : req.user.role || null;
+
+                await logActivity({
+                    userId: req.user.id,
+                    username,
+                    role,
+                    action: "UPDATE",
+                    module: "attendance",
+                    description: "Attendance record edited by atasan",
+                    oldValues: attendanceRow,
+                    newValues: {
+                        id,
+                        status: nextStatus,
+                        check_in: nextCheckInValue,
+                        check_out: nextCheckOutValue,
+                        working_hours: nextWorkingHours,
+                        overtime_hours: nextOvertimeHours,
+                        is_late: nextIsLate,
+                        late_minutes: nextLateMinutes,
+                    },
+                    ipAddress: getIpAddress(req),
+                    userAgent: getUserAgent(req),
+                    status: "success",
+                });
+            } catch (e) {
+                console.error("Failed to log attendance edit activity:", e);
+            }
+
+            return res.status(200).json({
+                message: "Attendance record updated successfully",
+                id,
+                status: nextStatus,
+                check_in: nextCheckInValue,
+                check_out: nextCheckOutValue,
+                working_hours: nextWorkingHours,
+                overtime_hours: nextOvertimeHours,
+                is_late: nextIsLate,
+                late_minutes: nextLateMinutes,
+            });
+        } catch (error) {
+            console.error(error);
+            return res.status(error.statusCode || 500).json({
+                message: error.message || "Server error",
+            });
         }
     }
 );

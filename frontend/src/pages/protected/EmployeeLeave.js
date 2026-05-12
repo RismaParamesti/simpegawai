@@ -389,9 +389,15 @@ function EmployeeLeave() {
       return;
     }
 
-    if (form.leave_type === "izin_terlambat" && !form.time) {
-      setError("Masukkan jam terlambat / pulang cepat untuk Izin Terlambat.");
-      return;
+    if (form.leave_type === "izin_terlambat") {
+      if (!form.time) {
+        setError("Masukkan jam masuk / pulang cepat untuk Izin Terlambat.");
+        return;
+      }
+      if (!form.cuti_khusus_option) {
+        setError("Pilih tipe izin: Terlambat atau Pulang Cepat.");
+        return;
+      }
     }
 
     if (form.leave_type === "izin_pribadi") {
@@ -676,13 +682,25 @@ function EmployeeLeave() {
                   />
                 </div>
                 <div className="text-sm">
-                  <label className="block text-xs opacity-70 mb-1">Jam terlambat / pulang cepat</label>
+                  <label className="block text-xs opacity-70 mb-1">Jam masuk / pulang cepat</label>
                   <input
                     type="time"
                     className="input input-bordered w-full"
                     value={form.time}
                     onChange={(e) => updateForm("time", e.target.value)}
                   />
+                </div>
+                <div className="text-sm">
+                  <label className="block text-xs opacity-70 mb-1">Tipe izin</label>
+                  <select
+                    className="select select-bordered w-full"
+                    value={form.cuti_khusus_option || ""}
+                    onChange={(e) => updateForm("cuti_khusus_option", e.target.value)}
+                  >
+                    <option value="">Pilih tipe izin</option>
+                    <option value="terlambat">Terlambat (masuk terlambat)</option>
+                    <option value="pulang_cepat">Pulang Cepat</option>
+                  </select>
                 </div>
               </>
             ) : (
