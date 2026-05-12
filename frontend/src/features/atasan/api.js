@@ -101,6 +101,15 @@ export const atasanApi = {
         }
     },
 
+    async updateAttendanceRecord(id, payload) {
+        try {
+            const response = await axios.put(`/api/attendance/${id}/manager-edit`, payload)
+            return response.data || {}
+        } catch (error) {
+            throw new Error(parseApiError(error, 'Gagal memperbarui data kehadiran'))
+        }
+    },
+
     async getPayrollManagerAdjustments(params = {}) {
         try {
             const response = await axios.get('/api/payroll/manager-adjustments', { params })

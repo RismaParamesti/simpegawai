@@ -45,7 +45,12 @@ const pegawaiRoutes = [
   {
     path: '/app/attendance',
     icon: <CalendarDaysIcon className={iconClasses}/>,
-    name: 'Absensi',
+    name: 'Kehadiran',
+  },
+  {
+    path: '/app/warning-letters',
+    icon: <CalendarDaysIcon className={iconClasses}/>,
+    name: 'Disiplin Kehadiran',
   },
   {
     path: '/app/leave-requests',
@@ -162,11 +167,6 @@ const atasanRoutes = [
     path: '/app/team-attendance',
     icon: <CalendarDaysIcon className={iconClasses}/> ,
     name: 'Kehadiran Tim',
-  },
-  {
-    path: '/app/team-warning-letters',
-    icon: <DocumentTextIcon className={iconClasses}/> ,
-    name: 'Surat Peringatan Tim',
   },
 ]
 

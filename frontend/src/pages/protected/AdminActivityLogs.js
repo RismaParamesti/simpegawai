@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { useDispatch } from 'react-redux'
 import { setPageTitle } from '../../features/common/headerSlice'
 import TitleCard from '../../components/Cards/TitleCard'
+import Pagination from '../../components/Pagination/Pagination'
 import { adminApi } from '../../features/admin/api'
 
 const INITIAL_FILTERS = {
@@ -10,7 +11,7 @@ const INITIAL_FILTERS = {
     module: '',
     status: '',
     page: 1,
-    limit: 20,
+    limit: 10,
 }
 
 const MODULE_OPTIONS = [
@@ -21,6 +22,7 @@ const MODULE_OPTIONS = [
     { value: 'salary_appeals', label: 'Banding Gaji' },
     { value: 'employees', label: 'Pegawai' },
     { value: 'job_openings', label: 'Lowongan' },
+    { value: 'auth', label: 'Login / Logout' },
 ]
 
 // 🎯 Badge helpers
@@ -61,6 +63,10 @@ const getModuleBadge = (module) => {
         case 'salary_appeals':
         case 'banding gaji':
             return 'badge-error'
+        case 'auth':
+        case 'login':
+        case 'logout':
+            return 'badge-primary'
         default:
             return 'badge-ghost'
     }
@@ -114,13 +120,14 @@ function AdminActivityLogs() {
     }
 
     const handleApplyFilter = () => {
-        const nextFilters = { ...filters, page: 1 }
+        const nextFilters = { ...filters, page: 1, limit: 10 }
         setFilters(nextFilters)
         loadData(nextFilters)
     }
 
     const changePage = (nextPage) => {
-        const nextFilters = { ...filters, page: nextPage }
+        const validPage = Math.max(1, Math.min(nextPage, pagination.totalPages || 1))
+        const nextFilters = { ...filters, page: validPage, limit: 10 }
         setFilters(nextFilters)
         loadData(nextFilters)
     }
@@ -262,7 +269,6 @@ function AdminActivityLogs() {
                                         <th>Aksi</th>
                                         <th>Status</th>
                                         <th>Deskripsi</th>
-                                        <th></th>
                                     </tr>
                                 </thead>
                                 <tbody>
@@ -299,23 +305,7 @@ function AdminActivityLogs() {
                                                 {log.description}
                                             </td>
 
-                                            <td>
-                                                {canRestoreLog(log) && !restoredLogIds.has(log.id) ? (
-                                                    <button
-                                                        className="btn btn-xs btn-warning btn-outline"
-                                                        onClick={() => handleRestore(log)}
-                                                        disabled={restoringLogId === log.id}
-                                                    >
-                                                        {restoringLogId === log.id ? 'Memulihkan...' : 'Pulihkan'}
-                                                    </button>
-                                                ) : restoredLogIds.has(log.id) ? (
-                                                    <span className="text-xs text-success">
-                                                        Sudah dipulihkan
-                                                    </span>
-                                                ) : (
-                                                    <span className="text-xs opacity-50">-</span>
-                                                )}
-                                            </td>
+                                            
                                         </tr>
                                     ))}
                                 </tbody>
@@ -323,25 +313,12 @@ function AdminActivityLogs() {
                         </div>
 
                         {/* 🔄 PAGINATION */}
-                        <div className="join mt-4">
-                            <button
-                                className="join-item btn"
-                                disabled={pagination.page <= 1}
-                                onClick={() => changePage(pagination.page - 1)}
-                            >
-                                Prev
-                            </button>
-                            <button className="join-item btn btn-disabled">
-                                Page {pagination.page} / {pagination.totalPages}
-                            </button>
-                            <button
-                                className="join-item btn"
-                                disabled={pagination.page >= pagination.totalPages}
-                                onClick={() => changePage(pagination.page + 1)}
-                            >
-                                Next
-                            </button>
-                        </div>
+                        <Pagination 
+                          page={pagination.page}
+                          totalPages={pagination.totalPages}
+                          onChangePage={changePage}
+                          itemsPerPage={10}
+                        />
                     </>
                 )}
             </TitleCard>
