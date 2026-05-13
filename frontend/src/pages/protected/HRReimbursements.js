@@ -230,6 +230,34 @@ function HRReimbursements() {
                     </select>
                 </div>
 
+                {/* Summary Stats */}
+                <div className="grid lg:grid-cols-4 md:grid-cols-2 gap-4 mb-6">
+                    <div className="stat bg-warning text-warning-content rounded-lg">
+                        <div className="stat-title text-warning-content">Menunggu Validasi</div>
+                        <div className="stat-value text-2xl">
+                            {items.filter(a => a.status === 'approved' && Number(a.submitter_user_id || 0) !== currentUserId).length}
+                        </div>
+                    </div>
+                    <div className="stat bg-success text-success-content rounded-lg">
+                        <div className="stat-title text-success-content">Sudah Masuk Payroll</div>
+                        <div className="stat-value text-2xl">
+                            {items.filter(a => a.status === 'included_in_payroll').length}
+                        </div>
+                    </div>
+                    <div className="stat bg-error text-error-content rounded-lg">
+                        <div className="stat-title text-error-content">Ditolak</div>
+                        <div className="stat-value text-2xl">
+                            {items.filter(a => a.status === 'rejected').length}
+                        </div>
+                    </div>
+                    <div className="stat bg-info text-info-content rounded-lg">
+                        <div className="stat-title text-info-content">Total Nominal</div>
+                        <div className="stat-value text-xl">
+                            Rp {items.reduce((sum, a) => sum + (Number(a.amount) || 0), 0).toLocaleString('id-ID')}
+                        </div>
+                    </div>
+                </div>
+
                 {loading ? (
                     <div className="text-center py-10">Memuat data reimbursement...</div>
                 ) : (
@@ -348,6 +376,34 @@ function HRReimbursements() {
                             return <option key={`history-year-${year}`} value={year}>{year}</option>
                         })}
                     </select>
+                </div>
+
+                {/* Summary Stats */}
+                <div className="grid lg:grid-cols-4 md:grid-cols-2 gap-4 mb-6">
+                    <div className="stat bg-success text-success-content rounded-lg">
+                        <div className="stat-title text-success-content">Sudah Masuk Payroll</div>
+                        <div className="stat-value text-2xl">
+                            {items.filter(a => a.status === 'included_in_payroll').length}
+                        </div>
+                    </div>
+                    <div className="stat bg-error text-error-content rounded-lg">
+                        <div className="stat-title text-error-content">Ditolak</div>
+                        <div className="stat-value text-2xl">
+                            {items.filter(a => a.status === 'rejected').length}
+                        </div>
+                    </div>
+                    <div className="stat bg-info text-info-content rounded-lg">
+                        <div className="stat-title text-info-content">Total Disetujui</div>
+                        <div className="stat-value text-xl">
+                            Rp {items.filter(a => a.status === 'included_in_payroll').reduce((sum, a) => sum + (Number(a.amount) || 0), 0).toLocaleString('id-ID')}
+                        </div>
+                    </div>
+                    <div className="stat bg-error/20 text-error-content rounded-lg">
+                        <div className="stat-title text-error-content">Total Ditolak</div>
+                        <div className="stat-value text-xl">
+                            Rp {items.filter(a => a.status === 'rejected').reduce((sum, a) => sum + (Number(a.amount) || 0), 0).toLocaleString('id-ID')}
+                        </div>
+                    </div>
                 </div>
 
                 {loading ? (

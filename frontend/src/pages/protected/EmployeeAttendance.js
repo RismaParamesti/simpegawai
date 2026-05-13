@@ -3,6 +3,7 @@ import { useDispatch } from "react-redux";
 import { useLocation } from "react-router-dom";
 import { setPageTitle } from "../../features/common/headerSlice";
 import TitleCard from "../../components/Cards/TitleCard";
+import Pagination from "../../components/Pagination/Pagination";
 import { pegawaiApi } from "../../features/pegawai/api";
 import { calculateWorkdaysInMonth } from "../../utils/attendanceUtils";
 
@@ -197,6 +198,7 @@ function EmployeeAttendance() {
   const [selectedMonth, setSelectedMonth] = useState(now.getMonth() + 1);
   const [selectedYear, setSelectedYear] = useState(now.getFullYear());
   const [statusFilter, setStatusFilter] = useState("");
+  const [historyPage, setHistoryPage] = useState(1);
   const totalWorkdays = calculateWorkdaysInMonth(selectedMonth, selectedYear);
 
   const availableYears = Array.from(
@@ -240,17 +242,34 @@ function EmployeeAttendance() {
   const effectiveAbsentDays = Number(
     summary.effective_absent_days ?? alphaDays + latePenaltyDays,
   );
-  const discipline = summary.alpha_discipline || {};
-  const sanctionLevel = String(
-    discipline.alpha_sanction_level || "none",
+
+  const approvedSpecialPermission = today?.approved_special_permission || null;
+  const specialPermissionOption = String(
+    today?.cuti_khusus_option ||
+      approvedSpecialPermission?.cuti_khusus_option ||
+      "",
   ).toLowerCase();
-  const sanctionLabel = alphaSanctionLabelMap[sanctionLevel] || sanctionLevel;
-  const sanctionBadgeClass =
-    alphaSanctionBadgeMap[sanctionLevel] || "badge-ghost";
-  const latestWarningLetter = warningLetters?.[0] || null;
-  const isLeaveIntegratedToday = ["izin", "sakit", "libur"].includes(
-    String(today?.status || "").toLowerCase(),
-  );
+  // Backend indicates whether attendance is allowed for today (can_attendance).
+  // Treat it as authoritative (covers half-day and izin_terlambat even without special time).
+  const hasApprovedSpecialPermission = Boolean(today?.can_attendance);
+  const isLatePermission =
+    Boolean(today?.special_permission_time) ||
+    String(today?.leave_type) === "izin_terlambat";
+  const isEarlyPermission =
+    String(specialPermissionOption) === "pulang_cepat" ||
+    String(today?.leave_type) === "pulang_cepat_khusus";
+  const specialPermissionSeconds = today?.special_permission_time
+    ? (() => {
+        const [hours = "0", minutes = "0", seconds = "0"] = String(
+          today.special_permission_time,
+        ).split(":");
+        return Number(hours) * 3600 + Number(minutes) * 60 + Number(seconds);
+      })()
+    : null;
+  const isLeaveIntegratedToday =
+    ["izin", "sakit", "libur"].includes(
+      String(today?.status || "").toLowerCase(),
+    ) && !hasApprovedSpecialPermission;
   const attendanceDate = today?.date ? new Date(today.date) : new Date();
   const isSundayToday = attendanceDate.getDay() === 0;
   const attendanceWindow = getAttendanceWorkingHoursWindow(today);
@@ -268,6 +287,39 @@ function EmployeeAttendance() {
   const isOutsideWorkingHours =
     currentSeconds < checkInStartSeconds ||
     currentSeconds > checkInCutoffSeconds;
+  const isAfterCutoff = currentSeconds > checkInCutoffSeconds;
+
+  const canCheckInNow =
+    !actionLoading &&
+    !today.check_in &&
+    !isSundayToday &&
+    !isLeaveIntegratedToday &&
+    !isAfterCutoff &&
+    (!isOutsideWorkingHours ||
+      (isLatePermission &&
+        specialPermissionSeconds !== null &&
+        currentSeconds >= specialPermissionSeconds));
+  const canCheckOutNow =
+    !actionLoading &&
+    !!today.check_in &&
+    !today.check_out &&
+    !isSundayToday &&
+    !isLeaveIntegratedToday &&
+    (!isOutsideWorkingHours ||
+      (isEarlyPermission &&
+        specialPermissionSeconds !== null &&
+        currentSeconds >= specialPermissionSeconds));
+
+  const isAfterCutoffOut = currentSeconds > checkInCutoffSeconds;
+  // ensure check-out is also disabled after cutoff
+  const canCheckOutNowFinal = canCheckOutNow && !isAfterCutoffOut;
+
+  // Pagination logic
+  const itemsPerPage = 10;
+  const totalHistoryPages = Math.ceil(history.length / itemsPerPage);
+  const startIndex = (historyPage - 1) * itemsPerPage;
+  const endIndex = startIndex + itemsPerPage;
+  const paginatedHistory = history.slice(startIndex, endIndex);
 
   useEffect(() => {
     dispatch(setPageTitle({ title: "Absensi Pegawai" }));
@@ -339,90 +391,9 @@ function EmployeeAttendance() {
         </div>
         <div className="stat bg-base-100 rounded-box shadow">
           <div className="stat-title">Tidak Hadir</div>
-          <div className="stat-value text-error">{effectiveAbsentDays}</div>
-          <div className="stat-desc">
-            alpha {alphaDays} + penalti telat {latePenaltyDays}
-          </div>
+          <div className="stat-value text-error">{alphaDays}</div>
         </div>
       </div>
-
-      <TitleCard title="Status SP Alpha" topMargin="mt-6">
-        <div className="grid md:grid-cols-4 grid-cols-1 gap-4">
-          <div className="p-4 rounded-lg bg-base-200">
-            <p className="text-sm opacity-70">Sanksi Saat Ini</p>
-            <p className="text-lg font-semibold mt-1">
-              <span className={`badge ${sanctionBadgeClass}`}>
-                {sanctionLabel}
-              </span>
-            </p>
-          </div>
-          <div className="p-4 rounded-lg bg-base-200">
-            <p className="text-sm opacity-70">Alpha Berturut-turut</p>
-            <p className="text-lg font-semibold">
-              {Number(discipline.alpha_consecutive_days || 0)} hari
-            </p>
-          </div>
-          <div className="p-4 rounded-lg bg-base-200">
-            <p className="text-sm opacity-70">Alpha Akumulasi</p>
-            <p className="text-lg font-semibold">
-              {Number(discipline.alpha_accumulated_days || 0)} hari
-            </p>
-          </div>
-          <div className="p-4 rounded-lg bg-base-200">
-            <p className="text-sm opacity-70">Dokumen</p>
-            <div className="mt-2 flex flex-col gap-2">
-              <p className="text-sm opacity-80">
-                {latestWarningLetter
-                  ? `SP terbaru: ${latestWarningLetter.letter_number || "-"} (${String(latestWarningLetter.sp_level || "").toUpperCase()})`
-                  : "Belum ada dokumen SP"}
-              </p>
-              <button
-                className="btn btn-sm btn-outline w-fit"
-                disabled={!latestWarningLetter}
-                onClick={() => openWarningLetterPdf(latestWarningLetter)}
-              >
-                Lihat PDF
-              </button>
-            </div>
-          </div>
-        </div>
-
-        <div className="mt-4 p-4 rounded-lg bg-base-200 border border-base-300">
-          <p className="text-sm opacity-70 mb-2">Aturan SP Alpha</p>
-          <div className="overflow-x-auto">
-            <table className="table table-xs">
-              <thead>
-                <tr>
-                  <th>Kondisi</th>
-                  <th>Tindak Lanjut</th>
-                </tr>
-              </thead>
-              <tbody>
-                <tr>
-                  <td>Alpha berturut-turut 3 hari</td>
-                  <td>SP1</td>
-                </tr>
-                <tr>
-                  <td>Alpha berturut-turut 5 hari</td>
-                  <td>SP2</td>
-                </tr>
-                <tr>
-                  <td>Alpha berturut-turut 6 hari</td>
-                  <td>SP3</td>
-                </tr>
-                <tr>
-                  <td>Alpha berturut-turut 7 hari</td>
-                  <td>Evaluasi HR</td>
-                </tr>
-                <tr>
-                  <td>Alpha akumulasi 7+ hari</td>
-                  <td>Evaluasi HR</td>
-                </tr>
-              </tbody>
-            </table>
-          </div>
-        </div>
-      </TitleCard>
 
       <div ref={attendanceTodayCardRef}>
         <TitleCard title="Absensi Hari Ini" topMargin="mt-6">
@@ -432,11 +403,27 @@ function EmployeeAttendance() {
             </div>
           ) : null}
 
-          {isLeaveIntegratedToday ? (
+          {isLeaveIntegratedToday && !isCheckInCutoffPassed ? (
             <div className="alert alert-info mb-4">
               <span>
                 Hari ini status kamu <b>{today.status}</b>. Anda tidak perlu
                 absen.
+              </span>
+            </div>
+          ) : hasApprovedSpecialPermission && !isCheckInCutoffPassed ? (
+            <div className="alert alert-success mb-4">
+              <span>
+                Hari ini status kamu <b>{today.status || "izin"}</b>. Kamu dapat
+                melakukan absensi.
+                {today?.special_permission_time ? (
+                  <>
+                    {" "}
+                    Lakukan absensi sebelum pukul{" "}
+                    <b>{formatTimeLabel(today.special_permission_time)}</b>.
+                  </>
+                ) : (
+                  " Lakukan absensi sesuai jadwal yang disetujui."
+                )}
               </span>
             </div>
           ) : null}
@@ -450,20 +437,12 @@ function EmployeeAttendance() {
             </div>
           ) : null}
 
-          {!isSundayToday &&
-          !isLeaveIntegratedToday &&
-          isCheckInCutoffPassed ? (
+          {!isSundayToday && isCheckInCutoffPassed ? (
             <div className="alert alert-warning mb-4">
               <span>
                 Jam absensi sudah berakhir pada pukul{" "}
                 {formatTimeLabel(attendanceWindow.checkOutTime)}.
               </span>
-            </div>
-          ) : null}
-
-          {!isSundayToday && !isLeaveIntegratedToday ? (
-            <div className="alert alert-info mb-4">
-              <span>Jam kerja pegawai hari ini: {attendanceWindow.label}.</span>
             </div>
           ) : null}
 
@@ -487,11 +466,11 @@ function EmployeeAttendance() {
               </p>
             </div>
             <div className="p-4 rounded-lg bg-base-200">
-              <p className="text-sm opacity-70">Check In</p>
+              <p className="text-sm opacity-70">Absen Masuk</p>
               <p className="text-lg font-semibold">{today.check_in || "-"}</p>
             </div>
             <div className="p-4 rounded-lg bg-base-200">
-              <p className="text-sm opacity-70">Check Out</p>
+              <p className="text-sm opacity-70">Absen Pulang</p>
               <p className="text-lg font-semibold">{today.check_out || "-"}</p>
             </div>
             <div className="p-4 rounded-lg bg-base-200">
@@ -527,13 +506,7 @@ function EmployeeAttendance() {
       ${actionLoading ? "loading" : ""}
     `}
               onClick={runCheckin}
-              disabled={
-                actionLoading ||
-                !!today.check_in ||
-                isLeaveIntegratedToday ||
-                isSundayToday ||
-                isOutsideWorkingHours
-              }
+              disabled={!canCheckInNow}
             >
               Absen Masuk
             </button>
@@ -549,14 +522,7 @@ function EmployeeAttendance() {
       ${actionLoading ? "loading" : ""}
     `}
               onClick={runCheckout}
-              disabled={
-                actionLoading ||
-                !today.check_in ||
-                !!today.check_out ||
-                isLeaveIntegratedToday ||
-                isSundayToday ||
-                isOutsideWorkingHours
-              }
+              disabled={!canCheckOutNowFinal}
             >
               Absen Pulang
             </button>
@@ -615,6 +581,7 @@ function EmployeeAttendance() {
               <tr>
                 <th>Tanggal</th>
                 <th>Status</th>
+                <th>Keterangan</th>
                 <th>Masuk</th>
                 <th>Pulang</th>
                 <th>Durasi Kerja</th>
@@ -625,23 +592,29 @@ function EmployeeAttendance() {
             <tbody>
               {history.length === 0 ? (
                 <tr>
-                  <td colSpan={7} className="text-center opacity-60">
+                  <td colSpan={8} className="text-center opacity-60">
                     Tidak ada data absensi pada filter yang dipilih
                   </td>
                 </tr>
               ) : (
-                history.map((item) => (
+                paginatedHistory.map((item) => (
                   <tr key={item.id}>
                     <td>{formatDate(item.date)}</td>
-                  <td>
-  <span
-    className={`badge ${
-      ATTENDANCE_BADGE_CLASS[item.status?.toLowerCase()] || "badge-ghost"
-    }`}
-  >
-    {item.status?.toUpperCase() || "-"}
-  </span>
-</td>
+                    <td>
+                      <span
+                        className={`badge ${
+                          ATTENDANCE_BADGE_CLASS[item.status?.toLowerCase()] ||
+                          "badge-ghost"
+                        }`}
+                      >
+                        {item.status?.toUpperCase() || "-"}
+                      </span>
+                    </td>
+                    <td>
+                      {isLeaveOrPermissionStatus(item.status)
+                        ? item.note || `Status ${item.status}`
+                        : "-"}
+                    </td>
                     <td>{item.check_in || "-"}</td>
                     <td>{item.check_out || "-"}</td>
                     <td>
@@ -671,6 +644,15 @@ function EmployeeAttendance() {
             </tbody>
           </table>
         </div>
+
+        {history.length > 0 && (
+          <Pagination
+            page={historyPage}
+            totalPages={totalHistoryPages}
+            onChangePage={setHistoryPage}
+            itemsPerPage={itemsPerPage}
+          />
+        )}
       </TitleCard>
     </>
   );
