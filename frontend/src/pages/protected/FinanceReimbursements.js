@@ -7,13 +7,41 @@ import { financeApi } from '../../features/finance/api'
 const formatCurrency = (value) => `Rp ${Number(value || 0).toLocaleString('id-ID')}`
 const isIncludedInPayroll = (item) => item.status === 'included_in_payroll' && Number(item.payroll_id || 0) > 0
 const isReadyForPayroll = (item) => item.status === 'approved' || (item.status === 'included_in_payroll' && !isIncludedInPayroll(item))
-
 const getFinanceStatusLabel = (item) => {
     if (isIncludedInPayroll(item)) return 'Included in Payroll'
     if (isReadyForPayroll(item)) return 'Siap Masuk Payroll'
     return item.status || '-'
 }
 
+const getFinanceStatusBadge = (item) => {
+    if (isIncludedInPayroll(item)) {
+        return "badge badge-success text-white"
+    }
+
+    if (isReadyForPayroll(item)) {
+        return "badge badge-info text-white"
+    }
+
+    switch ((item.status || "").toLowerCase()) {
+        case "pending":
+            return "badge badge-warning text-white"
+
+        case "approved":
+            return "badge badge-success text-white"
+
+        case "rejected":
+            return "badge badge-error text-white"
+
+        case "paid":
+            return "badge badge-primary text-white"
+
+        case "cancelled":
+            return "badge badge-neutral text-white"
+
+        default:
+            return "badge badge-outline"
+    }
+}
 function FinanceReimbursements() {
     const dispatch = useDispatch()
     const [loading, setLoading] = useState(true)
@@ -149,7 +177,11 @@ function FinanceReimbursements() {
                                 <td>{item.employee_code}</td>
                                 <td>{item.reimbursement_type}</td>
                                 <td className="font-semibold">{formatCurrency(item.amount)}</td>
-                                <td>{getFinanceStatusLabel(item)}</td>
+                               <td>
+    <span className={getFinanceStatusBadge(item)}>
+        {getFinanceStatusLabel(item)}
+    </span>
+</td>
                                 <td>{item.created_at ? new Date(item.created_at).toLocaleDateString('id-ID') : '-'}</td>
                             </tr>
                         ))}

@@ -215,7 +215,7 @@ function EmployeeWarningLetters() {
                     <td>{item.check_out || '-'}</td>
                     <td>
                       <button
-                        className="btn btn-xs btn-outline"
+                        className=" px-3 py-1 text-xs bg-gradient-to-b from-blue-400 to-blue-600 text-white rounded-full shadow-md hover:shadow-lg border border-blue-600 hover:from-blue-500 hover:to-blue-700 transition-all duration-200 "
                         onClick={() => window.alert('Detail absensi: ' + JSON.stringify(item))}
                       >
                         Detail

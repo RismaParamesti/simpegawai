@@ -102,6 +102,13 @@ const INITIAL_DOCUMENTS = {
   employment_contract_document: null,
 };
 
+const getStatusLabel = (status) => {
+  const labelConfig = {
+    active: "Active",
+    inactive: "Inactive",
+  };
+  return labelConfig[status] || status;
+};
 const getStatusBadge = (status) => {
   const statusConfig = {
     active: "badge-success",
@@ -112,9 +119,9 @@ const getStatusBadge = (status) => {
 
 const getEmploymentStatusLabel = (status) => {
   const labelConfig = {
-    permanent: "Tetap",
-    contract: "Kontrak",
-    intern: "Magang",
+    permanent: "Permanent",
+    contract: "Contract",
+    intern: "Intern",
   };
   return labelConfig[status] || status;
 };
@@ -797,9 +804,9 @@ function HREmployees() {
               }
             >
               <option value="">Semua</option>
-              <option value="permanent">Tetap</option>
-              <option value="contract">Kontrak</option>
-              <option value="intern">Magang</option>
+              <option value="permanent">Permanent</option>
+              <option value="contract">Contract</option>
+              <option value="intern">Intern</option>
             </select>
           </div>
 
@@ -813,8 +820,8 @@ function HREmployees() {
               onChange={(e) => handleFilterChange("status", e.target.value)}
             >
               <option value="">Semua</option>
-              <option value="active">Aktif</option>
-              <option value="inactive">Tidak Aktif</option>
+              <option value="active">Active</option>
+              <option value="inactive">Inactive</option>
             </select>
           </div>
         </div>
@@ -904,13 +911,9 @@ function HREmployees() {
                     </td>
                     <td className="text-center">
                       <span
-                        className={`
-      ${getStatusBadge(employee.status)}
-      px-3 py-1 inline-flex items-center justify-center
-      ${employee.status !== "active" ? "min-w-[110px] whitespace-nowrap" : ""}
-    `}
+                        className={getStatusBadge(employee.status)}
                       >
-                        {employee.status === "active" ? "Aktif" : "Tidak Aktif"}
+                        {getStatusLabel(employee.status)}
                       </span>
                     </td>
                     <td>

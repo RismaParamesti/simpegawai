@@ -4,18 +4,34 @@ import { setPageTitle, showNotification } from '../../features/common/headerSlic
 import TitleCard from '../../components/Cards/TitleCard'
 import { atasanApi } from '../../features/atasan/api'
 
-const getStatusBadge = (status) => {
-    if (status === 'included_in_payroll') return 'badge-success'
-    if (status === 'approved') return 'badge-info'
-    if (status === 'rejected') return 'badge-error'
-    return 'badge-warning'
+const getStatusLabel = (status) => {
+    const labels = {
+        pending: 'pending',
+        approved: 'approved',
+        included_in_payroll: 'included payroll',
+        rejected: 'rejected',
+    }
+
+    return labels[status] || status
 }
 
-const getStatusLabel = (status) => {
-    if (status === 'approved') return 'Disetujui Atasan (Menunggu Validasi HR)'
-    if (status === 'included_in_payroll') return 'Masuk Payroll'
-    if (status === 'rejected') return 'Ditolak'
-    return 'Menunggu Persetujuan Atasan'
+const getStatusBadge = (status) => {
+    switch ((status || "").toLowerCase()) {
+        case "pending":
+            return "badge badge-warning text-white"
+
+        case "approved":
+            return "badge badge-info text-white"
+
+        case "included_in_payroll":
+            return "badge badge-success text-white"
+
+        case "rejected":
+            return "badge badge-error text-white"
+
+        default:
+            return "badge badge-outline"
+    }
 }
 
 function AtasanReimbursements() {
@@ -99,7 +115,7 @@ function AtasanReimbursements() {
                         <option value="rejected">Rejected</option>
                         <option value="included_in_payroll">Included in Payroll</option>
                     </select>
-                    <button className="btn" onClick={loadData}>Refresh</button>
+                    <button className="btn-secondary rounded-full" onClick={loadData}>Refresh</button>
                 </div>
 
                 {loading ? (
@@ -133,10 +149,14 @@ function AtasanReimbursements() {
                                             <td>{item.reimbursement_type || '-'}</td>
                                             <td className="font-semibold">Rp {(Number(item.amount) || 0).toLocaleString('id-ID')}</td>
                                             <td>{item.created_at ? new Date(item.created_at).toLocaleDateString('id-ID') : '-'}</td>
-                                            <td>{getStatusLabel(item.status)}</td>
+                                           <td>
+                                                <span className={`badge ${getStatusBadge(item.status)}`}>
+                                                    {getStatusLabel(item.status)}
+                                                </span>
+                                            </td>
                                             <td>
                                                 {item.attachment ? (
-                                                    <a href={attachmentUrl} target="_blank" rel="noreferrer" className="link link-primary text-sm">Lihat</a>
+                                                    <a href={attachmentUrl} target="_blank" rel="noreferrer" className=" px-3 py-1 text-xs bg-gradient-to-b from-blue-400 to-blue-600 text-white rounded-full shadow-md hover:shadow-lg border border-blue-600 hover:from-blue-500 hover:to-blue-700 transition-all duration-200 ">Lihat</a>
                                                 ) : (
                                                     <span className="text-xs opacity-60">-</span>
                                                 )}
@@ -144,7 +164,7 @@ function AtasanReimbursements() {
                                             <td>
                                                 <div className="flex gap-2">
                                                     <button
-                                                        className={`btn btn-success btn-xs ${processingId === item.id ? 'loading' : ''}`}
+                                                        className=" px-3 py-1 text-xs bg-gradient-to-b from-green-400 to-green-600 text-white rounded-full shadow-md hover:shadow-lg border border-green-600 hover:from-green-500 hover:to-green-700 transition-all duration-200 "
                                                         onClick={() => handleReview(item.id, 'approve')}
                                                         disabled={processingId === item.id}
                                                     >
@@ -211,7 +231,9 @@ function AtasanReimbursements() {
                                             </td>
                                             <td>
                                                 {item.attachment ? (
-                                                    <a href={attachmentUrl} target="_blank" rel="noreferrer" className="link link-primary text-sm">Lihat</a>
+                                                    <a href={attachmentUrl} target="_blank" rel="noreferrer">
+                                                        <button className=" px-3 py-1 text-xs bg-gradient-to-b from-blue-400 to-blue-600 text-white rounded-full shadow-md hover:shadow-lg border border-blue-600 hover:from-blue-500 hover:to-blue-700 transition-all duration-200 ">Lihat</button>
+                                                    </a>
                                                 ) : (
                                                     <span className="text-xs opacity-60">-</span>
                                                 )}
