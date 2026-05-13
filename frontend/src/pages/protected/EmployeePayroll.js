@@ -3,6 +3,22 @@ import { useDispatch } from "react-redux";
 import { setPageTitle } from "../../features/common/headerSlice";
 import TitleCard from "../../components/Cards/TitleCard";
 import { pegawaiApi } from "../../features/pegawai/api";
+import Pagination from "../../components/Pagination/Pagination";
+
+const getFileTypeFromPath = (filePath) => {
+  if (!filePath) return "unknown";
+  const lowerPath = String(filePath).toLowerCase();
+  if (lowerPath.endsWith(".pdf")) return "pdf";
+  if (
+    lowerPath.endsWith(".jpg") ||
+    lowerPath.endsWith(".jpeg") ||
+    lowerPath.endsWith(".png") ||
+    lowerPath.endsWith(".webp")
+  ) {
+    return "image";
+  }
+  return "unknown";
+};
 
 const getPayrollStatusLabel = (status) => {
   const normalizedStatus = String(status || "").toLowerCase();
@@ -111,6 +127,9 @@ function EmployeePayroll() {
   const [yearFilter, setYearFilter] = useState("all");
   const [statusFilter, setStatusFilter] = useState("all");
   const [appealStatusFilter, setAppealStatusFilter] = useState("all");
+  const [selectedPayroll, setSelectedPayroll] = useState(null);
+  const [currentPage, setCurrentPage] = useState(1);
+  const itemsPerPage = 10;
 
   const yearOptions = useMemo(() => {
     const nowYear = new Date().getFullYear();
@@ -180,6 +199,19 @@ function EmployeePayroll() {
     });
   }, [payrolls, yearFilter, statusFilter, appealStatusFilter]);
 
+  const totalPages = Math.ceil(filteredPayrolls.length / itemsPerPage);
+  const startIndex = (currentPage - 1) * itemsPerPage;
+  const endIndex = startIndex + itemsPerPage;
+  const paginatedPayrolls = filteredPayrolls.slice(startIndex, endIndex);
+
+  const handleChangePage = (page) => {
+    setCurrentPage(page);
+  };
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [filteredPayrolls]);
+
   const loadData = async () => {
     try {
       setLoading(true);
@@ -224,7 +256,6 @@ function EmployeePayroll() {
 
   const openPayrollPdf = async (payrollItem) => {
     const payrollId = payrollItem?.id;
-    const previewWindow = window.open("about:blank", "_blank");
 
     try {
       setError("");
@@ -232,26 +263,23 @@ function EmployeePayroll() {
       const url = window.URL.createObjectURL(blob);
       const { day, month, year } = getSlipDateParts(payrollItem);
 
-      // Trigger direct download while keeping PDF preview behavior.
-      const downloadLink = document.createElement("a");
-      downloadLink.href = url;
-      downloadLink.download = `slip-gaji-${payrollId}_${day}-${month}-${year}.pdf`;
-      document.body.appendChild(downloadLink);
-      downloadLink.click();
-      document.body.removeChild(downloadLink);
-
-      if (previewWindow) {
-        previewWindow.location.href = url;
-      } else {
-        window.open(url, "_blank");
-      }
-      setTimeout(() => window.URL.revokeObjectURL(url), 60000);
+      setSelectedPayroll({
+        url,
+        payrollId,
+        period: `${payrollItem.period_month}/${payrollItem.period_year}`,
+        date: `${day}-${month}-${year}`,
+        type: "pdf",
+      });
     } catch (err) {
-      if (previewWindow && !previewWindow.closed) {
-        previewWindow.close();
-      }
       setError(err.message);
     }
+  };
+
+  const closePayrollModal = () => {
+    if (selectedPayroll?.url) {
+      window.URL.revokeObjectURL(selectedPayroll.url);
+    }
+    setSelectedPayroll(null);
   };
 
   return (
@@ -323,20 +351,21 @@ function EmployeePayroll() {
               </label>
             </div>
 
-            <div className="overflow-x-auto">
-              <table className="table table-zebra">
-                <thead>
-                  <tr>
-                    <th>Periode</th>
-                    <th>Total Gaji</th>
-                    <th>Final Amount</th>
-                    <th>Status</th>
-                    <th>Status Banding</th>
-                    <th>Aksi</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {filteredPayrolls.map((item) => (
+            <>
+              <div className="overflow-x-auto">
+                <table className="table table-zebra">
+                  <thead>
+                    <tr>
+                      <th>Periode</th>
+                      <th>Total Gaji</th>
+                      <th>Final Amount</th>
+                      <th>Status</th>
+                      <th>Status Banding</th>
+                      <th>Aksi</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {paginatedPayrolls.map((item) => (
                     <tr key={item.id}>
                       <td>
                         {item.period_month}/{item.period_year}
@@ -413,35 +442,39 @@ function EmployeePayroll() {
                           : "-"}
                       </td>
                       <td>
-  <span
-    className={`badge ${
-      PAYROLL_BADGE_CLASS[
-        String(item.payment_status || item.status).toLowerCase()
-      ] || "badge-ghost"
-    }`}
-  >
-    {getPayrollStatusLabel(item.payment_status || item.status)}
-  </span>
-</td>
+                        <span
+                          className={`badge ${
+                            PAYROLL_BADGE_CLASS[
+                              String(
+                                item.payment_status || item.status,
+                              ).toLowerCase()
+                            ] || "badge-ghost"
+                          }`}
+                        >
+                          {getPayrollStatusLabel(
+                            item.payment_status || item.status,
+                          )}
+                        </span>
+                      </td>
 
-<td>
-  <span
-    className={`badge ${
-      APPEAL_BADGE_CLASS[
-        String(item.appeal_status || "").toLowerCase()
-      ] || "badge-outline"
-    }`}
-  >
-    {item.appeal_status || "-"}
-  </span>
-</td>
+                      <td>
+                        <span
+                          className={`badge ${
+                            APPEAL_BADGE_CLASS[
+                              String(item.appeal_status || "").toLowerCase()
+                            ] || "badge-outline"
+                          }`}
+                        >
+                          {item.appeal_status || "-"}
+                        </span>
+                      </td>
                       <td>
                         <div className="flex flex-wrap items-center gap-2">
                           <button
-                            className="btn btn-xs btn-outline whitespace-nowrap"
+                            className="px-3 py-1 text-xs bg-gradient-to-b from-blue-400 to-blue-600 text-white rounded-full shadow-md hover:shadow-lg border border-blue-600 hover:from-blue-500 hover:to-blue-700 transition-all duration-200 whitespace-nowrap"
                             onClick={() => openPayrollPdf(item)}
                           >
-                            Unduh slip gaji
+                            Lihat
                           </button>
                           <button
                             className={`btn btn-xs btn-primary whitespace-nowrap ${actionLoadingId === item.id ? "loading" : ""}`}
@@ -458,19 +491,70 @@ function EmployeePayroll() {
                       </td>
                     </tr>
                   ))}
-                  {filteredPayrolls.length === 0 && (
-                    <tr>
-                      <td colSpan={6} className="text-center opacity-70">
-                        Belum ada slip gaji
-                      </td>
-                    </tr>
-                  )}
-                </tbody>
-              </table>
-            </div>
+                    {filteredPayrolls.length === 0 && (
+                      <tr>
+                        <td colSpan={6} className="text-center opacity-70">
+                          Belum ada slip gaji
+                        </td>
+                      </tr>
+                    )}
+                  </tbody>
+                </table>
+              </div>
+              {filteredPayrolls.length > 0 && (
+                <Pagination
+                  page={currentPage}
+                  totalPages={totalPages}
+                  onChangePage={handleChangePage}
+                  itemsPerPage={itemsPerPage}
+                />
+              )}
+            </>
           </>
         )}
       </TitleCard>
+
+      <input
+        type="checkbox"
+        id="payroll-modal"
+        className="modal-toggle"
+        checked={!!selectedPayroll}
+        onChange={closePayrollModal}
+      />
+      <div className="modal">
+        <div className="modal-box max-w-4xl">
+          <button
+            type="button"
+            className="btn btn-sm btn-circle absolute right-2 top-2"
+            onClick={closePayrollModal}
+          >
+            ✕
+          </button>
+          <h3 className="font-semibold text-xl mb-1">Slip Gaji</h3>
+          <p className="text-sm opacity-70 mb-4">
+            Periode: {selectedPayroll?.period || "-"}
+          </p>
+
+          <div className="w-full min-h-[420px] bg-base-200 rounded-lg overflow-hidden flex items-center justify-center">
+            {selectedPayroll?.type === "pdf" ? (
+              <iframe
+                title="Slip Gaji PDF"
+                src={selectedPayroll.url}
+                className="w-full h-[70vh] border-0"
+              />
+            ) : (
+              <p className="opacity-70">Tidak ada file slip gaji.</p>
+            )}
+          </div>
+        </div>
+        <label
+          className="modal-backdrop"
+          htmlFor="payroll-modal"
+          onClick={closePayrollModal}
+        >
+          Close
+        </label>
+      </div>
     </>
   );
 }

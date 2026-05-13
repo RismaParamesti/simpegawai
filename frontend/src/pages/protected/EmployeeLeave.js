@@ -3,6 +3,8 @@ import { useDispatch } from "react-redux";
 import { setPageTitle } from "../../features/common/headerSlice";
 import TitleCard from "../../components/Cards/TitleCard";
 import { pegawaiApi } from "../../features/pegawai/api";
+import Holidays from "date-holidays";
+import Pagination from "../../components/Pagination/Pagination";
 
 const INITIAL_FORM = {
   leave_type: "",
@@ -46,15 +48,6 @@ const LEAVE_MODE_TYPES = {
     "cuti_lainnya",
   ],
 };
-
-const getDefaultLeaveTypeByMode = (mode) => LEAVE_MODE_TYPES[mode]?.[0] || "";
-
-const CUTI_KHUSUS_OPTIONS = [
-  { key: "menikahkan_anak", label: "Anggota keluarga menikah", days: 2 },
-  { key: "istri_melahirkan", label: "Istri melahirkan/keguguran", days: 2 },
-  { key: "pasangan_orangtua_anak_meninggal", label: "Keluarga meninggal", days: 2 },
-  { key: "anggota_keluarga_serumah_meninggal", label: "Saudara meninggal", days: 1 },
-];
 
 const STATUS_BADGE_CLASS = {
   pending: "badge-warning",
@@ -146,6 +139,101 @@ const getAssetUrl = (filePath) => {
   return `${baseUrl}/${normalizedPath}`;
 };
 
+// Initialize holiday detector for Indonesia
+const holidayCalendar = new Holidays("ID");
+
+// Get holiday info from date-holidays library
+const getHolidayInfo = (dateValue) => {
+  try {
+    const result = holidayCalendar.isHoliday(new Date(dateValue));
+    if (!result) return null;
+    if (Array.isArray(result)) return result[0] || null;
+    return result;
+  } catch (error) {
+    return null;
+  }
+};
+
+// Check if date is public holiday
+const isPublicHoliday = (dateString) => {
+  if (!dateString) return false;
+  try {
+    return !!getHolidayInfo(dateString);
+  } catch (error) {
+    return false;
+  }
+};
+
+// Get holiday name from date-holidays library
+const getHolidayName = (dateString) => {
+  try {
+    return getHolidayInfo(dateString)?.name || "Hari Libur";
+  } catch (error) {
+    return "Hari Libur";
+  }
+};
+
+const getWeekendDaysInRange = (startDate, endDate) => {
+  if (!startDate || !endDate) return [];
+  
+  const holidays = [];
+  const current = new Date(`${startDate}T00:00:00`);
+  const end = new Date(`${endDate}T00:00:00`);
+  
+  while (current <= end) {
+    const dateKey = current.toISOString().split('T')[0];
+    const dayOfWeek = current.getDay();
+    let type = null;
+    let name = null;
+    
+    // Check if weekend
+    if (dayOfWeek === 0) {
+      type = 'weekend';
+      name = 'Minggu';
+    } else if (dayOfWeek === 6) {
+      type = 'weekend';
+      name = 'Sabtu';
+    }
+    
+    // Check if public holiday
+    if (isPublicHoliday(dateKey)) {
+      type = 'holiday';
+      name = getHolidayName(dateKey);
+    }
+    
+    if (type) {
+      holidays.push({
+        date: dateKey,
+        type: type,
+        dayName: name,
+        displayDate: current.toLocaleDateString('id-ID', {
+          day: '2-digit',
+          month: 'long',
+          year: 'numeric'
+        })
+      });
+    }
+    
+    current.setDate(current.getDate() + 1);
+  }
+  
+  return holidays;
+};
+
+const getLeaveTypeLabel = (key, leaveTypeOptions) => {
+  if (leaveTypeOptions?.labelMap?.[key]) {
+    return leaveTypeOptions.labelMap[key];
+  }
+  return LEAVE_TYPE_LABEL[key] || key;
+};
+
+const getLeaveTypesByMode = (mode, leaveTypeOptions) => {
+  if (leaveTypeOptions?.modeGroups?.[mode]) {
+    return leaveTypeOptions.modeGroups[mode];
+  }
+  return LEAVE_MODE_TYPES[mode] || [];
+};
+
 function EmployeeLeave() {
   const dispatch = useDispatch();
   const [form, setForm] = useState(INITIAL_FORM);
@@ -161,6 +249,9 @@ function EmployeeLeave() {
   const [todayAttendance, setTodayAttendance] = useState({});
   const [selectedProof, setSelectedProof] = useState(null);
   const [leavePolicy, setLeavePolicy] = useState(null);
+  const [currentPage, setCurrentPage] = useState(1);
+  const itemsPerPage = 10;
+  const [leaveTypeOptions, setLeaveTypeOptions] = useState({});
 
   useEffect(() => {
     let mounted = true;
@@ -185,6 +276,42 @@ function EmployeeLeave() {
     };
   }, [form.leave_type]);
 
+  // Fetch leave types from database
+  useEffect(() => {
+    let mounted = true;
+    const fetchLeaveTypes = async () => {
+      try {
+        const res = await pegawaiApi.getLeaveTypes?.();
+        if (!res) return;
+        
+        const data = res.data || res;
+        if (mounted && Array.isArray(data)) {
+          // Build label map from database
+          const labelMap = {};
+          const modeGroups = { izin: [], cuti: [] };
+          
+          data.forEach((item) => {
+            labelMap[item.key] = item.label || item.name;
+            const mode = item.mode || 'cuti';
+            if (modeGroups[mode]) {
+              modeGroups[mode].push(item.key);
+            }
+          });
+          
+          setLeaveTypeOptions({ labelMap, modeGroups });
+        }
+      } catch (e) {
+        // Fall back to hardcoded if API fails
+        console.warn('Failed to fetch leave types from database:', e);
+      }
+    };
+
+    fetchLeaveTypes();
+    return () => {
+      mounted = false;
+    };
+  }, []);
+
   const getEffectiveMaxDays = (leaveType, cutiKhususOptionKey) => {
     if (leavePolicy && leavePolicy.leave_type === leaveType) {
       if (leaveType === "cuti_khusus") {
@@ -192,7 +319,8 @@ function EmployeeLeave() {
         const opt = opts.find((o) => o.key === cutiKhususOptionKey);
         if (opt && Number(opt.days)) return Number(opt.days);
       }
-      if (Number(leavePolicy.max_days || 0) > 0) return Number(leavePolicy.max_days);
+      if (Number(leavePolicy.max_days || 0) > 0)
+        return Number(leavePolicy.max_days);
     }
 
     return getMaxDaysForLeaveType(leaveType, cutiKhususOptionKey);
@@ -220,7 +348,11 @@ function EmployeeLeave() {
       nextForm.cuti_khusus_option,
     );
 
-    if (allowedEndDate && nextForm.end_date && nextForm.end_date > allowedEndDate) {
+    if (
+      allowedEndDate &&
+      nextForm.end_date &&
+      nextForm.end_date > allowedEndDate
+    ) {
       nextForm.end_date = allowedEndDate;
     }
 
@@ -296,7 +428,8 @@ function EmployeeLeave() {
       };
 
       if (field === "leave_type") {
-        nextForm.cuti_khusus_option = value === "cuti_khusus" ? prev.cuti_khusus_option : "";
+        nextForm.cuti_khusus_option =
+          value === "cuti_khusus" ? prev.cuti_khusus_option : "";
         nextForm.time = value === "izin_terlambat" ? prev.time : "";
       }
 
@@ -306,9 +439,10 @@ function EmployeeLeave() {
 
   const selectLeaveMode = (mode) => {
     setLeaveMode(mode);
+    const defaultType = getLeaveTypesByMode(mode, leaveTypeOptions)?.[0] || "";
     setForm((prev) => ({
       ...prev,
-      leave_type: getDefaultLeaveTypeByMode(mode),
+      leave_type: defaultType,
     }));
   };
 
@@ -331,13 +465,26 @@ function EmployeeLeave() {
       return;
     }
 
+    // Cek hari libur dalam rentang tanggal
+    const weekendDays = getWeekendDaysInRange(form.start_date, effectiveEndDate);
+    if (weekendDays.length > 0) {
+      const weekendList = weekendDays
+        .map(w => `${w.dayName} (${w.displayDate})`)
+        .join(', ');
+      setError(
+        `Pengajuan cuti/izin tidak dapat dilakukan pada hari libur. Rentang tanggal Anda mencakup: ${weekendList}. Silakan pilih tanggal lain yang hanya hari kerja.`
+      );
+      return;
+    }
+
     const submittedForm = normalizeLeaveDates({
       ...form,
-      end_date: getAllowedEndDate(
-        form.start_date,
-        form.leave_type,
-        form.cuti_khusus_option,
-      ) || effectiveEndDate,
+      end_date:
+        getAllowedEndDate(
+          form.start_date,
+          form.leave_type,
+          form.cuti_khusus_option,
+        ) || effectiveEndDate,
     });
     const requestedDaysForSubmit = calculateRequestedDays(
       submittedForm.start_date,
@@ -366,7 +513,9 @@ function EmployeeLeave() {
     })();
 
     if (requiresBukti && !form.bukti) {
-      setError("Jenis ini mensyaratkan bukti pendukung (surat dokter/dokumen).");
+      setError(
+        "Jenis ini mensyaratkan bukti pendukung (surat dokter/dokumen).",
+      );
       return;
     }
 
@@ -380,7 +529,9 @@ function EmployeeLeave() {
       izinSakitMaxDays > 0 &&
       requestedDaysForSubmit > izinSakitMaxDays
     ) {
-      setError(`Izin Sakit hanya bisa diajukan maksimal ${izinSakitMaxDays} hari sesuai aturan database.`);
+      setError(
+        `Izin Sakit hanya bisa diajukan maksimal ${izinSakitMaxDays} hari sesuai aturan database.`,
+      );
       return;
     }
 
@@ -390,6 +541,15 @@ function EmployeeLeave() {
     }
 
     if (form.leave_type === "izin_terlambat") {
+      const dayOfWeek = new Date(`${form.start_date}T00:00:00`).getDay();
+      const isWeekendDay = dayOfWeek === 0 || dayOfWeek === 6;
+      const isHoliday = isPublicHoliday(form.start_date);
+      
+      if (isWeekendDay || isHoliday) {
+        const dayName = isHoliday ? getHolidayName(form.start_date) : (dayOfWeek === 0 ? 'Minggu' : 'Sabtu');
+        setError(`Pengajuan izin terlambat tidak dapat dilakukan pada hari libur (${dayName}).`);
+        return;
+      }
       if (!form.time) {
         setError("Masukkan jam masuk / pulang cepat untuk Izin Terlambat.");
         return;
@@ -401,18 +561,24 @@ function EmployeeLeave() {
     }
 
     if (form.leave_type === "izin_pribadi") {
-      const monthlyLimit = (policy && policy.meta && policy.meta.monthly_limit) || 2;
+      const monthlyLimit =
+        (policy && policy.meta && policy.meta.monthly_limit) || 2;
       if (requestedDaysForSubmit > Number(monthlyLimit)) {
-        setError(`Izin Keperluan Pribadi dibatasi maksimal ${monthlyLimit} hari per pengajuan.`);
+        setError(
+          `Izin Keperluan Pribadi dibatasi maksimal ${monthlyLimit} hari per pengajuan.`,
+        );
         return;
       }
     }
 
-    const maxDaysForLeave = getEffectiveMaxDays(form.leave_type, form.cuti_khusus_option);
+    const maxDaysForLeave = getEffectiveMaxDays(
+      form.leave_type,
+      form.cuti_khusus_option,
+    );
 
     if (maxDaysForLeave > 0 && requestedDaysForSubmit > maxDaysForLeave) {
       setError(
-        `${LEAVE_TYPE_LABEL[form.leave_type] || form.leave_type} maksimal ${maxDaysForLeave} hari per pengajuan.`,
+        `${getLeaveTypeLabel(form.leave_type, leaveTypeOptions) || form.leave_type} maksimal ${maxDaysForLeave} hari per pengajuan.`,
       );
       return;
     }
@@ -429,7 +595,7 @@ function EmployeeLeave() {
       await pegawaiApi.submitLeaveRequest(submittedForm);
       setForm({
         ...INITIAL_FORM,
-        leave_type: getDefaultLeaveTypeByMode(leaveMode),
+        leave_type: getLeaveTypesByMode(leaveMode, leaveTypeOptions)?.[0] || "",
       });
       setSuccessMessage("Pengajuan cuti/izin berhasil dikirim");
       await loadData(statusFilter);
@@ -471,12 +637,21 @@ function EmployeeLeave() {
     String(todayAttendance?.status || "").toLowerCase(),
   );
 
+  const totalPages = Math.ceil(requests.length / itemsPerPage);
+  const startIndex = (currentPage - 1) * itemsPerPage;
+  const endIndex = startIndex + itemsPerPage;
+  const paginatedRequests = requests.slice(startIndex, endIndex);
+
+  const handleChangePage = (page) => {
+    setCurrentPage(page);
+  };
+
   const openProofModal = (proofPath, leaveType) => {
     if (!proofPath) return;
     setSelectedProof({
       path: proofPath,
       type: getFileTypeFromPath(proofPath),
-      leaveType: LEAVE_TYPE_LABEL[leaveType] || leaveType,
+      leaveType: getLeaveTypeLabel(leaveType, leaveTypeOptions) || leaveType,
     });
   };
 
@@ -501,6 +676,10 @@ function EmployeeLeave() {
       end_date: prev.start_date,
     }));
   }, [form.leave_type, form.start_date, form.end_date]);
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [requests]);
 
   return (
     <>
@@ -563,7 +742,7 @@ function EmployeeLeave() {
             {activeLeaveToday ? (
               <>
                 <p className="text-lg font-semibold">
-                  {LEAVE_TYPE_LABEL[activeLeaveToday.leave_type] ||
+                  {getLeaveTypeLabel(activeLeaveToday.leave_type, leaveTypeOptions) ||
                     activeLeaveToday.leave_type}
                 </p>
                 <p className="text-xs opacity-70 mt-1">
@@ -578,65 +757,63 @@ function EmployeeLeave() {
         </div>
 
         {!leaveMode && (
-  <div className="mb-5 rounded-2xl border border-base-300 bg-base-100 p-5 shadow-sm transition-all duration-300">
-    <div className="mb-4">
-      <h3 className="text-base font-semibold text-base-content">
-        Jenis Pengajuan
-      </h3>
+          <div className="mb-5 rounded-2xl border border-base-300 bg-base-100 p-5 shadow-sm transition-all duration-300">
+            <div className="mb-4">
+              <h3 className="text-base font-semibold text-base-content">
+                Jenis Pengajuan
+              </h3>
 
-      <div className="mt-3 rounded-xl bg-base-200 px-4 py-3 text-sm text-base-content/80">
-        Silakan pilih <b>Izin</b> atau <b>Cuti</b> untuk membuka form
-        pengajuan.
-      </div>
-    </div>
+              <div className="mt-3 rounded-xl bg-base-200 px-4 py-3 text-sm text-base-content/80">
+                Silakan pilih <b>Izin</b> atau <b>Cuti</b> untuk membuka form
+                pengajuan.
+              </div>
+            </div>
 
-    <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-      <button
-  type="button"
-  onClick={() => selectLeaveMode("izin")}
-  className={`
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+              <button
+                type="button"
+                onClick={() => selectLeaveMode("izin")}
+                className={`
     btn btn-primary w-full rounded-2xl
     py-3 text-sm font-semibold
     transition-all duration-200
     ${leaveMode === "izin" ? "shadow-lg scale-[1.02]" : ""}
   `}
->
-  {LEAVE_MODE_LABEL.izin}
-</button>
-      <button
-  type="button"
-  onClick={() => selectLeaveMode("cuti")}
-  className={`
+              >
+                {LEAVE_MODE_LABEL.izin}
+              </button>
+              <button
+                type="button"
+                onClick={() => selectLeaveMode("cuti")}
+                className={`
     btn btn-secondary w-full rounded-2xl py-3 text-sm font-semibold
     transition-all duration-200
-    ${
-      leaveMode === "cuti"
-        ? "shadow-lg scale-[1.02]"
-        : ""
-    }
+    ${leaveMode === "cuti" ? "shadow-lg scale-[1.02]" : ""}
   `}
->
-  {LEAVE_MODE_LABEL.cuti}
-</button>
-    </div>
-  </div>
-)}
+              >
+                {LEAVE_MODE_LABEL.cuti}
+              </button>
+            </div>
+          </div>
+        )}
 
-{leaveMode && (
-  <form
-    className="grid grid-cols-1 gap-4 md:grid-cols-2 animate-fadeIn"
-    onSubmit={submitForm}
-  >
+        {leaveMode && (
+          <form
+            className="grid grid-cols-1 gap-4 md:grid-cols-2 animate-fadeIn"
+            onSubmit={submitForm}
+          >
             <div className="text-sm">
-              <label className="block text-xs opacity-70 mb-1">Jenis pengajuan</label>
+              <label className="block text-xs opacity-70 mb-1">
+                Jenis pengajuan
+              </label>
               <select
                 className="select select-bordered w-full"
                 value={form.leave_type}
                 onChange={(e) => updateForm("leave_type", e.target.value)}
               >
-                {LEAVE_MODE_TYPES[leaveMode].map((leaveType) => (
+                {getLeaveTypesByMode(leaveMode, leaveTypeOptions).map((leaveType) => (
                   <option key={leaveType} value={leaveType}>
-                    {LEAVE_TYPE_LABEL[leaveType] || leaveType}
+                    {getLeaveTypeLabel(leaveType, leaveTypeOptions)}
                   </option>
                 ))}
               </select>
@@ -651,14 +828,23 @@ function EmployeeLeave() {
             {form.leave_type === "cuti_khusus" ? (
               <>
                 <div className="text-sm">
-                  <label className="block text-xs opacity-70 mb-1">Alasan cuti khusus</label>
+                  <label className="block text-xs opacity-70 mb-1">
+                    Alasan cuti khusus
+                  </label>
                   <select
                     className="select select-bordered w-full"
                     value={form.cuti_khusus_option}
-                    onChange={(e) => updateForm("cuti_khusus_option", e.target.value)}
+                    onChange={(e) =>
+                      updateForm("cuti_khusus_option", e.target.value)
+                    }
                   >
                     <option value="">Pilih alasan cuti khusus</option>
-                    {((leavePolicy && leavePolicy.meta && leavePolicy.meta.options) || CUTI_KHUSUS_OPTIONS).map((opt) => (
+                    {(
+                      (leavePolicy &&
+                        leavePolicy.meta &&
+                        leavePolicy.meta.options) ||
+                      []
+                    ).map((opt) => (
                       <option key={opt.key} value={opt.key}>
                         {opt.label}
                       </option>
@@ -673,16 +859,52 @@ function EmployeeLeave() {
             {form.leave_type === "izin_terlambat" ? (
               <>
                 <div className="text-sm">
-                  <label className="block text-xs opacity-70 mb-1">Tanggal izin</label>
+                  <label className="block text-xs opacity-70 mb-1">
+                    Tanggal izin
+                  </label>
                   <input
                     className="input input-bordered border-base-300 bg-base-100 focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 w-full"
                     type="date"
                     value={form.start_date}
                     onChange={(e) => updateForm("start_date", e.target.value)}
                   />
+                  {form.start_date && (
+                    <div className="text-xs mt-2">
+                      {(() => {
+                        const dayOfWeek = new Date(`${form.start_date}T00:00:00`).getDay();
+                        const isWeekendDay = dayOfWeek === 0 || dayOfWeek === 6;
+                        const isHoliday = isPublicHoliday(form.start_date);
+                        
+                        if (isWeekendDay) {
+                          const dayName = dayOfWeek === 0 ? 'Minggu' : 'Sabtu';
+                          return (
+                            <span className="text-warning font-semibold">
+                              ⚠️ {dayName} adalah hari libur. Pengajuan tidak dapat diproses.
+                            </span>
+                          );
+                        }
+                        
+                        if (isHoliday) {
+                          return (
+                            <span className="text-warning font-semibold">
+                              ⚠️ {getHolidayName(form.start_date)} (Hari Libur Nasional). Pengajuan tidak dapat diproses.
+                            </span>
+                          );
+                        }
+                        
+                        return (
+                          <span className="text-success">
+                            ✓ Hari kerja - dapat diajukan
+                          </span>
+                        );
+                      })()}
+                    </div>
+                  )}
                 </div>
                 <div className="text-sm">
-                  <label className="block text-xs opacity-70 mb-1">Jam masuk / pulang cepat</label>
+                  <label className="block text-xs opacity-70 mb-1">
+                    Jam masuk / pulang cepat
+                  </label>
                   <input
                     type="time"
                     className="input input-bordered w-full"
@@ -691,14 +913,20 @@ function EmployeeLeave() {
                   />
                 </div>
                 <div className="text-sm">
-                  <label className="block text-xs opacity-70 mb-1">Tipe izin</label>
+                  <label className="block text-xs opacity-70 mb-1">
+                    Tipe izin
+                  </label>
                   <select
                     className="select select-bordered w-full"
                     value={form.cuti_khusus_option || ""}
-                    onChange={(e) => updateForm("cuti_khusus_option", e.target.value)}
+                    onChange={(e) =>
+                      updateForm("cuti_khusus_option", e.target.value)
+                    }
                   >
                     <option value="">Pilih tipe izin</option>
-                    <option value="terlambat">Terlambat (masuk terlambat)</option>
+                    <option value="terlambat">
+                      Terlambat (masuk terlambat)
+                    </option>
                     <option value="pulang_cepat">Pulang Cepat</option>
                   </select>
                 </div>
@@ -721,12 +949,54 @@ function EmployeeLeave() {
                 />
               </>
             )}
+            {form.leave_type !== "izin_terlambat" && form.start_date && form.end_date && (
+              <div className="md:col-span-2 p-2 rounded bg-base-200 border border-base-300 text-xs">
+                {(() => {
+                  const weekendDays = getWeekendDaysInRange(form.start_date, form.end_date);
+                  if (weekendDays.length > 0) {
+                    const weekends = weekendDays.filter(d => d.type === 'weekend');
+                    const holidays = weekendDays.filter(d => d.type === 'holiday');
+                    
+                    return (
+                      <div className="space-y-1">
+                        <p className="font-semibold text-warning">⚠️ Hari libur dalam rentang:</p>
+                        {holidays.length > 0 && (
+                          <div>
+                            <p className="font-semibold text-warning ml-2">📍 Hari Libur Nasional:</p>
+                            {holidays.map((day, idx) => (
+                              <p key={idx} className="text-warning ml-4">
+                                • {day.dayName}: {day.displayDate}
+                              </p>
+                            ))}
+                          </div>
+                        )}
+                        {weekends.length > 0 && (
+                          <div>
+                            <p className="font-semibold text-warning ml-2">📅 Akhir Pekan:</p>
+                            {weekends.map((day, idx) => (
+                              <p key={idx} className="text-warning ml-4">
+                                • {day.dayName}: {day.displayDate}
+                              </p>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    );
+                  }
+                  return (
+                    <p className="text-success font-semibold">
+                      ✓ Semua hari dalam rentang adalah hari kerja
+                    </p>
+                  );
+                })()}
+              </div>
+            )}
             <div className="md:col-span-2 text-xs opacity-70">
               {form.leave_type === "izin_terlambat"
-                ? "Izin terlambat/pulang cepat hanya untuk 1 tanggal pengajuan."
+                ? "Izin terlambat/pulang cepat hanya untuk 1 tanggal pengajuan pada hari kerja."
                 : maxDaysForCurrentLeave > 0
-                ? `Rentang tanggal otomatis dibatasi maksimal ${maxDaysForCurrentLeave} hari sesuai peraturan izin dan cuti.`
-                : "Rentang tanggal mengikuti aturan izin dan cuti yang aktif."}
+                  ? `Rentang tanggal otomatis dibatasi maksimal ${maxDaysForCurrentLeave} hari sesuai peraturan izin dan cuti.`
+                  : "Rentang tanggal mengikuti aturan izin dan cuti yang aktif. Pengajuan tidak berlaku pada hari libur nasional atau akhir pekan."}
             </div>
             <textarea
               className="textarea textarea-bordered md:col-span-2"
@@ -748,7 +1018,8 @@ function EmployeeLeave() {
                     if (Number(policy.require_bukti || 0) === 1) return true;
                     if (
                       Number(policy.require_bukti_if_days_gt || 0) > 0 &&
-                      requestedDays > Number(policy.require_bukti_if_days_gt || 0)
+                      requestedDays >
+                        Number(policy.require_bukti_if_days_gt || 0)
                     )
                       return true;
                     return false;
@@ -762,13 +1033,17 @@ function EmployeeLeave() {
                   ].includes(form.leave_type);
                 })();
 
-                if (requiresBuktiNow) return "Bukti (surat dokter/dokumen) wajib untuk jenis ini.";
+                if (requiresBuktiNow)
+                  return "Bukti (surat dokter/dokumen) wajib untuk jenis ini.";
                 if (form.leave_type === "izin_pribadi") {
-                  const monthlyLimit = (policy && policy.meta && policy.meta.monthly_limit) || 2;
+                  const monthlyLimit =
+                    (policy && policy.meta && policy.meta.monthly_limit) || 2;
                   return `Izin Keperluan Pribadi: maksimal ${monthlyLimit} hari per bulan; tidak dibayar.`;
                 }
-                if (form.leave_type === "cuti_sakit") return "Skema pembayaran untuk cuti sakit: 4 bulan 100%, 4 bulan 75%, 4 bulan 50%, selanjutnya 25%.";
-                if (maxDaysForCurrentLeave > 0) return `Maksimal ${maxDaysForCurrentLeave} hari untuk jenis ini.`;
+                if (form.leave_type === "cuti_sakit")
+                  return "Skema pembayaran untuk cuti sakit: 4 bulan 100%, 4 bulan 75%, 4 bulan 50%, selanjutnya 25%.";
+                if (maxDaysForCurrentLeave > 0)
+                  return `Maksimal ${maxDaysForCurrentLeave} hari untuk jenis ini.`;
                 return "Tipe file bukti: PDF/JPG/JPEG/PNG. Bukti bersifat opsional.";
               })()}
             </div>
@@ -788,7 +1063,7 @@ function EmployeeLeave() {
                 Ulangi Pilihan
               </button>
             </div>
-                    </form>
+          </form>
         )}
       </TitleCard>
 
@@ -813,24 +1088,25 @@ function EmployeeLeave() {
         {loading ? (
           <div>Memuat data pengajuan...</div>
         ) : (
-          <div className="overflow-x-auto">
-            <table className="table table-zebra">
-              <thead>
-                <tr>
-                  <th>Diajukan</th>
-                  <th>Periode</th>
-                  <th>Jenis</th>
-                  <th>Total Hari</th>
-                  <th>Status</th>
-                  <th>Disetujui Oleh</th>
-                  <th>Waktu Persetujuan</th>
-                  <th>Bukti</th>
-                  <th>Alasan</th>
-                </tr>
-              </thead>
-              <tbody>
-                {requests.length > 0 ? (
-                  requests.map((item) => (
+          <>
+            <div className="overflow-x-auto">
+              <table className="table table-zebra">
+                <thead>
+                  <tr>
+                    <th>Diajukan</th>
+                    <th>Periode</th>
+                    <th>Jenis</th>
+                    <th>Total Hari</th>
+                    <th>Status</th>
+                    <th>Disetujui Oleh</th>
+                    <th>Waktu Persetujuan</th>
+                    <th>Bukti</th>
+                    <th>Alasan</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {requests.length > 0 ? (
+                    paginatedRequests.map((item) => (
                     <tr key={item.id}>
                       <td>{formatDate(item.created_at)}</td>
                       <td>
@@ -838,7 +1114,7 @@ function EmployeeLeave() {
                         {formatDate(item.end_date)}
                       </td>
                       <td>
-                        {LEAVE_TYPE_LABEL[item.leave_type] || item.leave_type}
+                        {getLeaveTypeLabel(item.leave_type, leaveTypeOptions) || item.leave_type}
                       </td>
                       <td>{item.total_days || 0}</td>
                       <td>
@@ -854,7 +1130,7 @@ function EmployeeLeave() {
                         {item.bukti ? (
                           <button
                             type="button"
-                             className="
+                            className="
         px-3 py-1 text-xs
         bg-gradient-to-b from-blue-400 to-blue-600
         text-white rounded-full
@@ -887,7 +1163,16 @@ function EmployeeLeave() {
                 )}
               </tbody>
             </table>
-          </div>
+            </div>
+            {requests.length > 0 && (
+              <Pagination
+                page={currentPage}
+                totalPages={totalPages}
+                onChangePage={handleChangePage}
+                itemsPerPage={itemsPerPage}
+              />
+            )}
+          </>
         )}
       </TitleCard>
 

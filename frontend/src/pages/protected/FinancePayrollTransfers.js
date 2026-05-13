@@ -67,17 +67,6 @@ const getSlipDateParts = (item) => {
     }
 }
 
-const toSafeFileNamePart = (value) => {
-    const normalized = String(value || '')
-        .trim()
-        .replace(/[\\/:*?"<>|]/g, '-')
-        .replace(/\s+/g, '-')
-        .replace(/-+/g, '-')
-        .replace(/^-|-$/g, '')
-
-    return normalized || 'pegawai'
-}
-
 function FinancePayrollTransfers() {
     const dispatch = useDispatch()
     const [searchParams, setSearchParams] = useSearchParams()
@@ -100,6 +89,7 @@ function FinancePayrollTransfers() {
     const [search] = useState('')
     const [statusFilter, setStatusFilter] = useState(initialStatus)
     const [sortMode] = useState(initialSort)
+    const [selectedPayroll, setSelectedPayroll] = useState(null)
 
     useEffect(() => {
         dispatch(setPageTitle({ title: 'Riwayat Slip Gaji' }))
@@ -228,36 +218,30 @@ function FinancePayrollTransfers() {
 
     const openPayrollPdf = async (payrollItem) => {
         const payrollId = payrollItem?.id
-        const previewWindow = window.open('about:blank', '_blank')
 
         try {
             setError('')
             const blob = await financeApi.getPayrollPdfBlob(payrollId)
             const url = window.URL.createObjectURL(blob)
             const { day, month, year } = getSlipDateParts(payrollItem)
-            const employeeName = toSafeFileNamePart(payrollItem?.employee_name)
 
-            // Trigger direct download while keeping PDF preview behavior.
-            const downloadLink = document.createElement('a')
-            downloadLink.href = url
-            downloadLink.download = `slip-gaji-${employeeName}-${payrollId}-${day}-${month}-${year}.pdf`
-            document.body.appendChild(downloadLink)
-            downloadLink.click()
-            document.body.removeChild(downloadLink)
-
-            if (previewWindow) {
-                previewWindow.location.href = url
-            } else {
-                window.open(url, '_blank')
-            }
-
-            setTimeout(() => window.URL.revokeObjectURL(url), 60000)
+            setSelectedPayroll({
+                url,
+                payrollId,
+                period: `${payrollItem.period_month}/${payrollItem.period_year}`,
+                date: `${day}-${month}-${year}`,
+                type: "pdf"
+            })
         } catch (err) {
-            if (previewWindow && !previewWindow.closed) {
-                previewWindow.close()
-            }
             setError(err.message)
         }
+    }
+
+    const closePayrollModal = () => {
+        if (selectedPayroll?.url) {
+            window.URL.revokeObjectURL(selectedPayroll.url)
+        }
+        setSelectedPayroll(null)
     }
     const getPayrollStatusBadge = (status) => {
     const normalized = String(status || '').toLowerCase().trim()
@@ -395,10 +379,10 @@ const getPayrollStatusLabel = (status) => {
                                         <div className="flex flex-wrap items-center gap-2">
                                             <button
                                                 type="button"
-                                                className="btn btn-xs btn-outline whitespace-nowrap"
+                                                className="px-3 py-1 text-xs bg-gradient-to-b from-blue-400 to-blue-600 text-white rounded-full shadow-md hover:shadow-lg border border-blue-600 hover:from-blue-500 hover:to-blue-700 transition-all duration-200 whitespace-nowrap"
                                                 onClick={() => openPayrollPdf(item)}
                                             >
-                                                Unduh slip gaji
+                                                Lihat
                                             </button>
                                             <button
                                                 type="button"
@@ -432,6 +416,48 @@ const getPayrollStatusLabel = (status) => {
                     </table>
                 </div>
             </TitleCard>
+
+            <input
+                type="checkbox"
+                id="payroll-modal"
+                className="modal-toggle"
+                checked={!!selectedPayroll}
+                onChange={closePayrollModal}
+            />
+            <div className="modal">
+                <div className="modal-box max-w-4xl">
+                    <button
+                        type="button"
+                        className="btn btn-sm btn-circle absolute right-2 top-2"
+                        onClick={closePayrollModal}
+                    >
+                        ✕
+                    </button>
+                    <h3 className="font-semibold text-xl mb-1">Slip Gaji</h3>
+                    <p className="text-sm opacity-70 mb-4">
+                        Periode: {selectedPayroll?.period || "-"}
+                    </p>
+
+                    <div className="w-full min-h-[420px] bg-base-200 rounded-lg overflow-hidden flex items-center justify-center">
+                        {selectedPayroll?.type === "pdf" ? (
+                            <iframe
+                                title="Slip Gaji PDF"
+                                src={selectedPayroll.url}
+                                className="w-full h-[70vh] border-0"
+                            />
+                        ) : (
+                            <p className="opacity-70">Tidak ada file slip gaji.</p>
+                        )}
+                    </div>
+                </div>
+                <label
+                    className="modal-backdrop"
+                    htmlFor="payroll-modal"
+                    onClick={closePayrollModal}
+                >
+                    Close
+                </label>
+            </div>
         </>
     )
 }

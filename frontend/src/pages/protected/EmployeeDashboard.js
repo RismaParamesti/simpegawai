@@ -29,8 +29,10 @@ const parseTimeToSeconds = (value) => {
 
 const getAttendanceWorkingHoursWindow = (attendance = {}) => {
   const schedule = attendance?.working_hours_schedule || {};
-  const checkInTime = attendance?.standard_check_in || schedule.check_in_time || "08:00:00";
-  const checkOutTime = attendance?.standard_check_out || schedule.check_out_time || "17:00:00";
+  const checkInTime =
+    attendance?.standard_check_in || schedule.check_in_time || "08:00:00";
+  const checkOutTime =
+    attendance?.standard_check_out || schedule.check_out_time || "17:00:00";
 
   return {
     checkInTime,
@@ -356,9 +358,20 @@ function EmployeeDashboard() {
 
   const hasCheckedIn = !!todayAttendance?.check_in;
   const hasCheckedOut = !!todayAttendance?.check_out;
-  const isLeaveIntegratedToday = ["izin", "sakit", "libur"].includes(
-    String(todayAttendance?.status || "").toLowerCase(),
-  );
+  const hasApprovedSpecialPermission = Boolean(todayAttendance?.can_attendance);
+  const specialPermissionSeconds = todayAttendance?.special_permission_time
+    ? (() => {
+        const [hours = "0", minutes = "0", seconds = "0"] = String(
+          todayAttendance.special_permission_time,
+        ).split(":");
+        return Number(hours) * 3600 + Number(minutes) * 60 + Number(seconds);
+      })()
+    : null;
+
+  const isLeaveIntegratedToday =
+    ["izin", "sakit", "libur"].includes(
+      String(todayAttendance?.status || "").toLowerCase(),
+    ) && !hasApprovedSpecialPermission;
   const attendanceDate = todayAttendance?.date
     ? new Date(todayAttendance.date)
     : new Date();
@@ -383,7 +396,30 @@ function EmployeeDashboard() {
   const isCheckInCutoffPassed =
     currentSeconds > checkInCutoffSeconds && !hasCheckedIn;
   const isOutsideWorkingHours =
-    currentSeconds < checkInStartSeconds || currentSeconds > checkInCutoffSeconds;
+    currentSeconds < checkInStartSeconds ||
+    currentSeconds > checkInCutoffSeconds;
+  const isAfterCutoff = currentSeconds > checkInCutoffSeconds;
+
+  const canCheckInNow =
+    !hasCheckedIn &&
+    !isSundayToday &&
+    !isLeaveIntegratedToday &&
+    !isAfterCutoff &&
+    (!isOutsideWorkingHours ||
+      (hasApprovedSpecialPermission &&
+        specialPermissionSeconds !== null &&
+        currentSeconds >= specialPermissionSeconds));
+
+  const canCheckOutNow =
+    !!hasCheckedIn &&
+    !hasCheckedOut &&
+    !isSundayToday &&
+    !isLeaveIntegratedToday &&
+    !isAfterCutoff &&
+    (!isOutsideWorkingHours ||
+      (hasApprovedSpecialPermission &&
+        specialPermissionSeconds !== null &&
+        currentSeconds >= specialPermissionSeconds));
 
   const openAttendanceTodayCard = () => {
     navigate("/app/attendance", {
@@ -411,21 +447,23 @@ function EmployeeDashboard() {
             <p className="opacity-70">
               {isSundayToday
                 ? "Hari ini hari libur, anda tidak perlu absen!"
-                : isLeaveIntegratedToday || isApprovedLeaveToday
-                  ? `Hari ini status kamu ${todayAttendance?.status || activeApprovedLeaveToday?.leave_type || "izin/cuti"}. Anda tidak perlu absen.`
-                  : isCheckInTooEarly
-                    ? `Absensi hanya bisa dilakukan pada jam kerja ${attendanceWindow.label}.`
-                    : isCheckInCutoffPassed
-                      ? `Jam absensi sudah berakhir pada pukul ${formatTime(attendanceWindow.checkOutTime)}.`
+                : isCheckInCutoffPassed
+                  ? `Jam absensi sudah berakhir pada pukul ${formatTime(attendanceWindow.checkOutTime)}.`
+                  : isLeaveIntegratedToday
+                    ? `Hari ini status kamu ${todayAttendance?.status || activeApprovedLeaveToday?.leave_type || "izin/cuti"}. Anda tidak perlu absen.`
+                    : hasApprovedSpecialPermission
+                      ? `Hari ini status kamu ${todayAttendance?.status || activeApprovedLeaveToday?.leave_type || "izin/cuti"}. Kamu dapat melakukan absensi${todayAttendance?.special_permission_time ? ` sebelum pukul ${formatTime(todayAttendance.special_permission_time)}` : " sesuai jadwal yang disetujui"}.`
+                      : isCheckInTooEarly
+                        ? `Absensi hanya bisa dilakukan pada jam kerja ${attendanceWindow.label}.`
                         : !hasCheckedIn
                           ? "Hari ini kamu belum absen masuk."
                           : !hasCheckedOut
                             ? "Hari ini kamu belum absen pulang."
                             : "Hari ini kamu sudah absen pulang."}
             </p>
-              <div className="flex flex-wrap gap-3 mt-5">
-  <button
-    className="
+            <div className="flex flex-wrap gap-3 mt-5">
+              <button
+                className="
       btn btn-primary
       disabled:bg-gray-300
       disabled:text-gray-600
@@ -433,20 +471,14 @@ function EmployeeDashboard() {
       disabled:opacity-80
       disabled:cursor-not-allowed
     "
-    disabled={
-      hasCheckedIn ||
-      isLeaveIntegratedToday ||
-      isApprovedLeaveToday ||
-      isSundayToday ||
-      isOutsideWorkingHours
-    }
-    onClick={handleCheckIn}
-  >
-    Absen Masuk
-  </button>
+                disabled={!canCheckInNow}
+                onClick={handleCheckIn}
+              >
+                Absen Masuk
+              </button>
 
-  <button
-    className="
+              <button
+                className="
       btn btn-secondary
       disabled:bg-gray-300
       disabled:text-gray-600
@@ -454,19 +486,11 @@ function EmployeeDashboard() {
       disabled:opacity-80
       disabled:cursor-not-allowed
     "
-    disabled={
-      !hasCheckedIn ||
-      hasCheckedOut ||
-      isLeaveIntegratedToday ||
-      isApprovedLeaveToday ||
-      isSundayToday ||
-      isOutsideWorkingHours
-    }
-    onClick={handleCheckOut}
-  >
-    Absen Pulang
-  </button>
-
+                disabled={!canCheckOutNow}
+                onClick={handleCheckOut}
+              >
+                Absen Pulang
+              </button>
             </div>
           </TitleCard>
           <div

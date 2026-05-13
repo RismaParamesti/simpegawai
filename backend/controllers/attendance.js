@@ -92,14 +92,16 @@ const calculateLateMinutes = (checkInTime, standardCheckInTime) => {
     return Math.ceil(diffSeconds / 60);
 };
 
-const getApprovedLatePermissionForDate = async (employeeId, dateValue) => {
+const getApprovedSpecialPermissionForDate = async (employeeId, dateValue) => {
     const [rows] = await db.promise().query(
         `SELECT lr.id, lr.time, lr.cuti_khusus_option, lr.leave_type
          FROM leave_requests lr
          WHERE lr.employee_id = ?
            AND lr.status = 'approved'
-           AND lr.leave_type = 'izin_terlambat'
-           AND lr.cuti_khusus_option = 'terlambat'
+           AND (
+             lr.leave_type IN ('izin_terlambat', 'pulang_cepat_khusus')
+             OR (lr.leave_type = 'cuti_khusus' AND lr.cuti_khusus_option IN ('terlambat', 'pulang_cepat'))
+           )
            AND lr.start_date <= ?
            AND lr.end_date >= ?
          ORDER BY lr.approved_at DESC, lr.id DESC
@@ -323,6 +325,22 @@ const applyApprovedLeaveEffects = async (leaveRequest) => {
     const attendanceStatus =
         leaveRequest.attendance_status ||
         mapLeaveTypeToAttendanceStatus(leaveRequest.leave_type);
+
+    // For izin_terlambat (late arrival permission), don't create attendance record
+    // This allows alpha status if employee doesn't check-in
+    if (String(leaveRequest.leave_type) === 'izin_terlambat') {
+        // Still need to evaluate discipline and deduct quota if applicable
+        if (isQuotaDeductingLeaveType(leaveRequest.leave_type)) {
+            await db.promise().query(
+                `UPDATE employees 
+                SET remaining_leave_quota = GREATEST(COALESCE(remaining_leave_quota, 0) - ?, 0) 
+                WHERE id = ?`,
+                [leaveRequest.total_days, leaveRequest.employee_id]
+            );
+        }
+        await evaluateAlphaDisciplineForEmployee(leaveRequest.employee_id);
+        return;
+    }
 
     for (
         let date = new Date(startDate);
@@ -739,10 +757,24 @@ router.post(
             const employeeId = employeeResult[0].id;
             const workingHours = await getWorkingHoursByEmployee(employeeId);
             const workingHoursWindow = getWorkingHoursWindow(workingHours);
-            const approvedLatePermission = await getApprovedLatePermissionForDate(
+            const approvedSpecialPermission = await getApprovedSpecialPermissionForDate(
                 employeeId,
                 today
             );
+
+            // Also fetch any approved leave for today (used to detect half-day approvals)
+            const [activeLeaveRows] = await db.promise().query(
+                `SELECT id, leave_type, total_days, time, cuti_khusus_option
+                 FROM leave_requests
+                 WHERE employee_id = ?
+                   AND status = 'approved'
+                   AND ? BETWEEN start_date AND end_date
+                 ORDER BY approved_at DESC, created_at DESC
+                 LIMIT 1`,
+                [employeeId, today]
+            );
+
+            const activeLeave = activeLeaveRows[0] || null;
 
             // Cek apakah sudah ada record attendance hari ini
             const [existingAttendance] = await db
@@ -753,10 +785,16 @@ router.post(
                 );
 
             if (existingAttendance.length > 0) {
-                // Jika status hari ini sudah cuti/izin/sakit, check-in tidak diperbolehkan
+                // Jika status hari ini sudah cuti/izin/sakit/libur, check-in tidak diperbolehkan
+                // Kecuali ada approved special permission atau approved half-day / izin_terlambat
+                const isApprovedHalfDay = activeLeave && Number(activeLeave.total_days) > 0 && Number(activeLeave.total_days) < 1;
+                const isApprovedIzinTerlambat = activeLeave && String(activeLeave.leave_type) === 'izin_terlambat';
+
                 if (
                     ["izin", "sakit", "libur"].includes(existingAttendance[0].status) &&
-                    !approvedLatePermission
+                    !approvedSpecialPermission &&
+                    !isApprovedHalfDay &&
+                    !isApprovedIzinTerlambat
                 ) {
                     return res.status(400).json({
                         message:
@@ -808,10 +846,20 @@ router.post(
 
             // Aturan telat berdasarkan jam kerja dari working_hours,
             // atau jam izin terlambat yang sudah di-approve pada tanggal yang sama.
-            const lateThresholdTime =
-                approvedLatePermission && approvedLatePermission.time
-                    ? approvedLatePermission.time
-                    : workingHoursWindow.check_in_time;
+            // Aturan telat berdasarkan jam kerja dari working_hours,
+            // atau jam izin terlambat / cuti_khusus (terlambat) yang sudah di-approve pada tanggal yang sama.
+            const approvedTimeFromLeave =
+                (approvedSpecialPermission && approvedSpecialPermission.time) ||
+                (activeLeave && activeLeave.time);
+
+            const isLeaveTerlambat =
+                (approvedSpecialPermission && approvedSpecialPermission.cuti_khusus_option === "terlambat") ||
+                (activeLeave && String(activeLeave.cuti_khusus_option) === "terlambat") ||
+                (activeLeave && String(activeLeave.leave_type) === 'izin_terlambat');
+
+            const lateThresholdTime = approvedTimeFromLeave && isLeaveTerlambat
+                ? approvedTimeFromLeave
+                : workingHoursWindow.check_in_time;
             const lateMinutes = calculateLateMinutes(checkInTime, lateThresholdTime);
             const latePolicy = getLatePolicy(lateMinutes);
             const isLate = latePolicy.is_penalized_late;
@@ -946,6 +994,10 @@ router.post(
             const employeeId = employeeResult[0].id;
             const workingHours = await getWorkingHoursByEmployee(employeeId);
             const workingHoursWindow = getWorkingHoursWindow(workingHours);
+            const approvedSpecialPermission = await getApprovedSpecialPermissionForDate(
+                employeeId,
+                today
+            );
             // Cek apakah sudah ada record attendance hari ini
             const [existingAttendance] = await db
                 .promise()
@@ -994,8 +1046,12 @@ router.post(
                 });
             }
 
-
-            const checkOutStartSeconds = workingHoursWindow.check_in_seconds;
+            const checkOutStartSeconds =
+                approvedSpecialPermission &&
+                approvedSpecialPermission.cuti_khusus_option === "pulang_cepat" &&
+                approvedSpecialPermission.time
+                    ? timeStringToSeconds(approvedSpecialPermission.time)
+                    : workingHoursWindow.check_in_seconds;
             const checkOutEndSeconds = workingHoursWindow.check_out_seconds;
             const currentCheckOutSeconds = timeStringToSeconds(checkOutTime);
             if (
@@ -1143,6 +1199,19 @@ router.get("/today", verifyToken, verifyRole(["pegawai"]), async (req, res) => {
         const employeeId = employeeResult[0].id;
         const workingHours = await getWorkingHoursByEmployee(employeeId);
         const workingHoursWindow = getWorkingHoursWindow(workingHours);
+        const approvedSpecialPermission = await getApprovedSpecialPermissionForDate(
+            employeeId,
+            today
+        );
+
+        const specialPermissionPayload = approvedSpecialPermission
+            ? {
+                  id: approvedSpecialPermission.id,
+                  leave_type: approvedSpecialPermission.leave_type,
+                  cuti_khusus_option: approvedSpecialPermission.cuti_khusus_option,
+                  time: approvedSpecialPermission.time,
+              }
+            : null;
 
         // Ambil data attendance hari ini
         const [attendanceResult] = await db
@@ -1160,6 +1229,8 @@ router.get("/today", verifyToken, verifyRole(["pegawai"]), async (req, res) => {
                     check_in: null,
                     check_out: null,
                     status: "libur",
+                    can_attendance: false,
+                    approved_special_permission: null,
                     is_late: false,
                     late_minutes: 0,
                     working_hours: null,
@@ -1176,7 +1247,7 @@ router.get("/today", verifyToken, verifyRole(["pegawai"]), async (req, res) => {
             const [activeLeaveResult] = await db
                 .promise()
                 .query(
-                    `SELECT leave_type
+                    `SELECT id, leave_type, total_days, time, cuti_khusus_option
                      FROM leave_requests
                      WHERE employee_id = ?
                        AND status = 'approved'
@@ -1187,9 +1258,18 @@ router.get("/today", verifyToken, verifyRole(["pegawai"]), async (req, res) => {
                 );
 
             if (activeLeaveResult.length > 0) {
-                const leaveStatus = mapLeaveTypeToAttendanceStatus(
-                    activeLeaveResult[0].leave_type
-                );
+                const leaveRow = activeLeaveResult[0];
+                const leaveStatus = mapLeaveTypeToAttendanceStatus(leaveRow.leave_type);
+
+                // Allow attendance when there is an approved special permission,
+                // or when the approved leave is a half-day (total_days < 1),
+                // or when leave_type is 'izin_terlambat'.
+                const isApprovedHalfDay = leaveRow.total_days && Number(leaveRow.total_days) > 0 && Number(leaveRow.total_days) < 1;
+                const isIzinTerlambat = String(leaveRow.leave_type) === 'izin_terlambat';
+                const canAttendance = Boolean(approvedSpecialPermission) || isApprovedHalfDay || isIzinTerlambat;
+
+                const specialTime = (approvedSpecialPermission && approvedSpecialPermission.time) || leaveRow.time || null;
+                const cutiOption = (approvedSpecialPermission && approvedSpecialPermission.cuti_khusus_option) || leaveRow.cuti_khusus_option || null;
 
                 return res.status(200).json({
                     message: "Attendance status for today from approved leave",
@@ -1197,6 +1277,11 @@ router.get("/today", verifyToken, verifyRole(["pegawai"]), async (req, res) => {
                     check_in: null,
                     check_out: null,
                     status: leaveStatus,
+                    leave_type: leaveRow.leave_type,
+                    cuti_khusus_option: cutiOption,
+                    special_permission_time: specialTime,
+                    can_attendance: canAttendance,
+                    approved_special_permission: specialPermissionPayload,
                     is_late: false,
                     late_minutes: 0,
                     working_hours: null,
@@ -1216,6 +1301,8 @@ router.get("/today", verifyToken, verifyRole(["pegawai"]), async (req, res) => {
                 check_in: null,
                 check_out: null,
                 status: null,
+                can_attendance: false,
+                approved_special_permission: specialPermissionPayload,
                 is_late: false,
                 late_minutes: 0,
                 working_hours: null,
@@ -1234,6 +1321,11 @@ router.get("/today", verifyToken, verifyRole(["pegawai"]), async (req, res) => {
             check_in: attendance.check_in,
             check_out: attendance.check_out,
             status: attendance.status,
+            can_attendance: Boolean(approvedSpecialPermission),
+            approved_special_permission: specialPermissionPayload,
+            leave_type: approvedSpecialPermission?.leave_type || null,
+            cuti_khusus_option: approvedSpecialPermission?.cuti_khusus_option || null,
+            special_permission_time: approvedSpecialPermission?.time || null,
             is_late: attendance.is_late,
             late_minutes: attendance.late_minutes,
             working_hours: attendance.working_hours,

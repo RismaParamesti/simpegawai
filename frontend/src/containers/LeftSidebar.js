@@ -35,24 +35,29 @@ function LeftSidebar() {
         >
           <XMarkIcon className="h-5 inline-block w-5" />
         </button>
-        {routes.map((route, k) => {
-          return (
-            <li key={k} className="px-2">
-              {route.submenu ? (
-                <SidebarSubmenu {...route} />
-              ) : (
+        {routes.map((route, k) => (
+          <div key={k}>
+            {route.submenu ? (
+              <SidebarSubmenu {...route} />
+            ) : (
+              <li>
                 <NavLink
                   end
                   to={route.path}
                   onClick={() => close()}
                   className={({ isActive }) =>
-                    `relative mb-1 rounded-2xl px-4 py-3 font-medium transition-all duration-200 ${isActive ? "bg-primary/10 text-primary shadow-sm ring-1 ring-primary/15" : "text-base-content/80 hover:bg-base-200/80 hover:text-base-content"}`
+                    `relative mb-1 rounded-2xl px-4 py-3 font-medium transition-all duration-200 ${
+                      isActive
+                        ? "bg-primary/10 text-primary shadow-sm ring-1 ring-primary/15"
+                        : "text-base-content/80 hover:bg-base-200/80 hover:text-base-content"
+                    }`
                   }
                 >
                   <span className="flex items-center gap-3">
                     <span className="text-lg">{route.icon}</span>
                     <span>{route.name}</span>
                   </span>
+
                   {location.pathname === route.path ? (
                     <span
                       className="absolute inset-y-2 left-2 w-1 rounded-full bg-primary shadow-[0_0_0_4px_rgba(234,107,47,0.12)]"
@@ -60,10 +65,10 @@ function LeftSidebar() {
                     ></span>
                   ) : null}
                 </NavLink>
-              )}
-            </li>
-          );
-        })}
+              </li>
+            )}
+          </div>
+        ))}
       </ul>
     </div>
   );

@@ -2,6 +2,8 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { useDispatch } from "react-redux";
 import { setPageTitle } from "../../features/common/headerSlice";
 import TitleCard from "../../components/Cards/TitleCard";
+import Pagination from "../../components/Pagination/Pagination";
+import { formatCurrency } from "../../components/Formatters/CurrencyFormatter";
 import { pegawaiApi } from "../../features/pegawai/api";
 
 const INITIAL_FORM = {
@@ -81,9 +83,6 @@ const DEDUCTION_REASON_OPTIONS = [
   { key: "deduction", label: "Total Potongan", payrollField: "deduction" },
 ];
 
-const formatCurrency = (value) =>
-  `Rp ${Number(value || 0).toLocaleString("id-ID")}`;
-
 const getAppealStatusLabel = (status) => {
   const normalizedStatus = String(status || "").toLowerCase();
 
@@ -122,6 +121,70 @@ const getAppealItems = (appeal) => {
   return [];
 };
 
+const parseReviewNotes = (reviewNotes) => {
+  if (!reviewNotes) return [];
+
+  const notes = String(reviewNotes);
+  // Match pattern: [anything] followed by anything until next [ or end
+  const pattern = /\[[^\]]*\][^[]*(?=\[|$)/g;
+  const matches = notes.match(pattern);
+
+  return matches && matches.length > 0
+    ? matches.map((m) => m.trim()).filter(Boolean)
+    : [notes];
+};
+
+const parseReviewItem = (reviewItem) => {
+  if (!reviewItem) return { component: "-", status: "-", detail: "-" };
+
+  const item = String(reviewItem).trim();
+
+  // Extract component part in brackets
+  const componentMatch = item.match(/^\[([^\]]*)\]/);
+  const component = componentMatch ? componentMatch[1] : "-";
+
+  // Remove component part in brackets
+  const withoutComponent = item.replace(/^\[[^\]]*\]\s*/, "");
+
+  // Extract status (disetujui, ditolak, pending, etc.)
+  const statusMatch = withoutComponent.match(
+    /^(disetujui|ditolak|pending|diproses|reviewing)/i,
+  );
+  const status = statusMatch ? statusMatch[1] : "-";
+
+  // Extract detail (everything after status)
+  let detail =
+    withoutComponent
+      .replace(/^(disetujui|ditolak|pending|diproses|reviewing)[,\s]*/i, "")
+      .trim() || "-";
+
+  // Clean up detail: remove "alasan:" prefix, but keep "nominal perbaikan" without colon
+  detail =
+    detail
+      .replace(/^nominal\s+perbaikan\s*:\s*/i, "nominal perbaikan ")
+      .replace(/^alasan\s*:\s*/i, "")
+      .trim() || "-";
+
+  return { component, status, detail };
+};
+
+const formatDetailWithCurrency = (detail) => {
+  if (detail === "-") return "-";
+
+  // Check if detail starts with "nominal perbaikan" and extract the numeric value
+  const nominalMatch = detail.match(/^nominal\s+perbaikan\s+(.+)$/i);
+  if (nominalMatch) {
+    const nominalValue = nominalMatch[1].trim();
+    // Try to parse as number
+    const numValue = parseFloat(nominalValue.replace(/\D/g, ""));
+    if (!isNaN(numValue)) {
+      return `nominal perbaikan ${formatCurrency(numValue)}`;
+    }
+  }
+
+  return detail;
+};
+
 function EmployeeSalaryAppeal() {
   const dispatch = useDispatch();
   const [employeeId, setEmployeeId] = useState(null);
@@ -134,13 +197,26 @@ function EmployeeSalaryAppeal() {
   const [selectedAppeal, setSelectedAppeal] = useState(null);
   const [showViewModal, setShowViewModal] = useState(false);
   const [editingAppealId, setEditingAppealId] = useState(null);
+  const [selectedPayrollModal, setSelectedPayrollModal] = useState(null);
+  const [selectedSupportingDoc, setSelectedSupportingDoc] = useState(null);
+  const [currentPage, setCurrentPage] = useState(1);
   const formCardRef = useRef(null);
+  const itemsPerPage = 10;
 
   const publishedPayrolls = useMemo(() => {
     return payrolls.filter(
       (item) => item.status === "published" || item.status === "claimed",
     );
   }, [payrolls]);
+
+  const totalPages = Math.ceil(appeals.length / itemsPerPage);
+  const startIndex = (currentPage - 1) * itemsPerPage;
+  const endIndex = startIndex + itemsPerPage;
+  const paginatedAppeals = appeals.slice(startIndex, endIndex);
+
+  const handleChangePage = (page) => {
+    setCurrentPage(page);
+  };
 
   const selectedPayroll = useMemo(() => {
     if (!form.payroll_id) return null;
@@ -199,6 +275,7 @@ function EmployeeSalaryAppeal() {
 
       setPayrolls(payrollResult?.data || []);
       setAppeals(appealResult?.data || []);
+      setCurrentPage(1);
     } catch (err) {
       setError(err.message);
     } finally {
@@ -326,23 +403,65 @@ function EmployeeSalaryAppeal() {
   const openPayrollPdf = async (payrollId) => {
     if (!payrollId) return;
 
-    const previewWindow = window.open("about:blank", "_blank");
-
     try {
+      setError("");
       const blob = await pegawaiApi.getPayrollPdfBlob(payrollId);
       const url = window.URL.createObjectURL(blob);
-      if (previewWindow) {
-        previewWindow.location.href = url;
-      } else {
-        window.open(url, "_blank");
-      }
-      setTimeout(() => window.URL.revokeObjectURL(url), 60_000);
+
+      setSelectedPayrollModal({
+        url,
+        payrollId,
+        type: "pdf",
+      });
     } catch (err) {
-      if (previewWindow && !previewWindow.closed) {
-        previewWindow.close();
-      }
       setError(err.message);
     }
+  };
+
+  const closePayrollModal = () => {
+    if (selectedPayrollModal?.url) {
+      window.URL.revokeObjectURL(selectedPayrollModal.url);
+    }
+    setSelectedPayrollModal(null);
+  };
+
+  const getFileTypeFromPath = (filePath) => {
+    if (!filePath) return "unknown";
+    const lowerPath = String(filePath).toLowerCase();
+    if (lowerPath.endsWith(".pdf")) return "pdf";
+    if (
+      lowerPath.endsWith(".jpg") ||
+      lowerPath.endsWith(".jpeg") ||
+      lowerPath.endsWith(".png") ||
+      lowerPath.endsWith(".webp")
+    ) {
+      return "image";
+    }
+    return "unknown";
+  };
+
+  const getAssetUrl = (filePath) => {
+    if (!filePath) return "";
+    if (/^https?:\/\//i.test(filePath)) return filePath;
+
+    const configuredBaseUrl = process.env.REACT_APP_BASE_URL;
+    const fallbackBaseUrl = "http://localhost:5000";
+    const baseUrl = (configuredBaseUrl || fallbackBaseUrl).replace(/\/$/, "");
+    const normalizedPath = String(filePath).replace(/^\/+/, "");
+
+    return `${baseUrl}/${normalizedPath}`;
+  };
+
+  const openSupportingDocModal = (docUrl) => {
+    if (!docUrl) return;
+    setSelectedSupportingDoc({
+      url: getAssetUrl(docUrl),
+      type: getFileTypeFromPath(docUrl),
+    });
+  };
+
+  const closeSupportingDocModal = () => {
+    setSelectedSupportingDoc(null);
   };
 
   const addAppealItem = () => {
@@ -440,6 +559,7 @@ function EmployeeSalaryAppeal() {
 
       setEditingAppealId(null);
       setForm(INITIAL_FORM);
+      setCurrentPage(1);
       if (employeeId) {
         const [payrollResult, appealResult] = await Promise.all([
           pegawaiApi.getPayrollByEmployee(employeeId),
@@ -599,99 +719,174 @@ function EmployeeSalaryAppeal() {
         {loading ? (
           <div>Memuat data banding gaji...</div>
         ) : (
-          <div className="overflow-x-auto">
-            <table className="table table-zebra">
-              <thead>
-                <tr>
-                  <th>Periode</th>
-                  <th>Alasan Komponen</th>
-                  <th>Alasan Teks</th>
-                  <th>Status</th>
-                  <th>Catatan Review</th>
-                  <th>Aksi</th>
-                </tr>
-              </thead>
-              <tbody>
-                {appeals.map((item) => (
-                  <tr key={item.id}>
-                    <td>
-                      {item.period_month}/{item.period_year}
-                    </td>
-                    <td>{item.appeal_reason_label || "-"}</td>
-                    <td>
-                      {getAppealItems(item)
-                        .map((appealReason) => appealReason.reason)
-                        .filter(Boolean)
-                        .join(", ") || "-"}
-                    </td>
-                    <td>
-  <span
-    className={`badge ${
-      APPEAL_STATUS_BADGE_CLASS[
-        String(item.status || "").toLowerCase()
-      ] || "badge-outline"
-    }`}
-  >
-    {getAppealStatusLabel(item.status)}
-  </span>
-</td>
-               <td>{item.review_notes || "-"}</td>
-
-<td className="text-center">
-  <div className="flex items-center justify-center gap-2">
-    
-    <button
-      className="
-        px-3 py-1 text-xs
-        bg-gradient-to-b from-blue-400 to-blue-600
-        text-white rounded-full
-        shadow-md hover:shadow-lg
-        border border-blue-600
-        hover:from-blue-500 hover:to-blue-700
-        transition-all duration-200
-      "
-      type="button"
-      onClick={() => openViewModal(item)}
-    >
-      Lihat
-    </button>
-
-    {item.status === "pending" && (
-      <>
-        <button
-          className="
-            px-3 py-1 text-xs
-            bg-gradient-to-b from-yellow-300 to-yellow-500
-            text-black rounded-full
-            shadow-md hover:shadow-lg
-            border border-yellow-500
-            hover:from-yellow-400 hover:to-yellow-600
-            transition-all duration-200
-          "
-          type="button"
-          onClick={() => startEditFromForm(item)}
-          disabled={submitting}
-        >
-          Edit
-        </button>
-
-        <button
-          className="btn btn-xs btn-error text-white rounded-full"
-          type="button"
-          onClick={() => deleteAppeal(item)}
-          disabled={submitting}
-        >
-          Hapus
-        </button>
-      </>
-    )}
-  </div>
-</td>
+          <>
+            <div className="overflow-x-auto">
+              <table className="table table-zebra">
+                <thead>
+                  <tr>
+                    <th>Periode</th>
+                    <th>Detail Pengajuan</th>
+                    <th>Status</th>
+                    <th>Aksi</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+                </thead>
+                <tbody>
+                  {paginatedAppeals.map((item) => (
+                    <tr key={item.id}>
+                      <td className="font-semibold">
+                        {item.period_month}/{item.period_year}
+                      </td>
+                      <td>
+                        <div className="overflow-x-auto">
+                          <table className="table table-compact table-sm bg-base-100">
+                            <thead>
+                              <tr className="bg-base-200">
+                                <th className="w-8">No</th>
+                                <th className="w-40">Komponen</th>
+                                <th className="w-48">Alasan Teks</th>
+                                <th className="w-32">Komponen Review</th>
+                                <th className="w-24">Status Review</th>
+                                <th className="flex-1">Nominal/Alasan</th>
+                              </tr>
+                            </thead>
+                            <tbody>
+                              {getAppealItems(item).length > 0 ? (
+                                getAppealItems(item).map((appealItem, idx) => {
+                                  const reviewNotes = parseReviewNotes(
+                                    item.review_notes,
+                                  );
+                                  const reviewNote = reviewNotes[idx] || "-";
+                                  const {
+                                    component: reviewComponent,
+                                    status: reviewStatus,
+                                    detail: reviewDetail,
+                                  } = parseReviewItem(reviewNote);
+
+                                  return (
+                                    <tr key={idx} className="border-b-0">
+                                      <td className="text-center font-semibold">
+                                        {idx + 1}
+                                      </td>
+                                      <td className="text-sm">
+                                        {appealItem.appeal_reason_label ||
+                                          appealItem.appeal_reason_item ||
+                                          "-"}
+                                      </td>
+                                      <td className="text-sm">
+                                        {appealItem.reason || "-"}
+                                      </td>
+                                      <td className="text-sm">
+                                        {reviewComponent}
+                                      </td>
+                                      <td className="text-sm">
+                                        <span
+                                          className={`badge badge-sm ${
+                                            reviewStatus === "disetujui"
+                                              ? "badge-success"
+                                              : reviewStatus === "ditolak"
+                                                ? "badge-error"
+                                                : reviewStatus === "pending"
+                                                  ? "badge-warning"
+                                                  : "badge-outline"
+                                          }`}
+                                        >
+                                          {reviewStatus}
+                                        </span>
+                                      </td>
+                                      <td className="text-sm">
+                                        {formatDetailWithCurrency(reviewDetail)}
+                                      </td>
+                                    </tr>
+                                  );
+                                })
+                              ) : (
+                                <tr>
+                                  <td
+                                    colSpan={6}
+                                    className="text-center text-sm opacity-70"
+                                  >
+                                    Tidak ada detail
+                                  </td>
+                                </tr>
+                              )}
+                            </tbody>
+                          </table>
+                        </div>
+                      </td>
+                      <td>
+                        <span
+                          className={`badge ${
+                            APPEAL_STATUS_BADGE_CLASS[
+                              String(item.status || "").toLowerCase()
+                            ] || "badge-outline"
+                          }`}
+                        >
+                          {getAppealStatusLabel(item.status)}
+                        </span>
+                      </td>
+                      <td className="text-center">
+                        <div className="flex items-center justify-center gap-2">
+                          <button
+                            className="
+                              px-3 py-1 text-xs
+                              bg-gradient-to-b from-blue-400 to-blue-600
+                              text-white rounded-full
+                              shadow-md hover:shadow-lg
+                              border border-blue-600
+                              hover:from-blue-500 hover:to-blue-700
+                              transition-all duration-200
+                            "
+                            type="button"
+                            onClick={() => openViewModal(item)}
+                          >
+                            Lihat
+                          </button>
+
+                          {item.status === "pending" && (
+                            <>
+                              <button
+                                className="
+                                  px-3 py-1 text-xs
+                                  bg-gradient-to-b from-yellow-300 to-yellow-500
+                                  text-black rounded-full
+                                  shadow-md hover:shadow-lg
+                                  border border-yellow-500
+                                  hover:from-yellow-400 hover:to-yellow-600
+                                  transition-all duration-200
+                                "
+                                type="button"
+                                onClick={() => startEditFromForm(item)}
+                                disabled={submitting}
+                              >
+                                Edit
+                              </button>
+
+                              <button
+                                className="btn btn-xs btn-error text-white rounded-full"
+                                type="button"
+                                onClick={() => deleteAppeal(item)}
+                                disabled={submitting}
+                              >
+                                Hapus
+                              </button>
+                            </>
+                          )}
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+            {appeals.length > 0 && (
+              <Pagination
+                page={currentPage}
+                totalPages={totalPages}
+                onChangePage={handleChangePage}
+                itemsPerPage={itemsPerPage}
+              />
+            )}
+          </>
         )}
       </TitleCard>
 
@@ -731,15 +926,57 @@ function EmployeeSalaryAppeal() {
                 </div>
                 <div className="bg-base-200 rounded-lg p-3 space-y-1">
                   <p>
-                    <span className="font-semibold">
-                      Nominal Perbaikan (HR):
-                    </span>{" "}
+                    <span className="font-semibold">Nominal Perbaikan:</span>{" "}
                     {formatCurrency(selectedAppeal.expected_amount)}
                   </p>
-                  <p>
-                    <span className="font-semibold">Catatan Review:</span>{" "}
-                    {selectedAppeal.review_notes || "-"}
-                  </p>
+                  <div>
+                    <span className="font-semibold mb-2 block">
+                      Catatan Review:
+                    </span>
+                    {selectedAppeal.review_notes ? (
+                      <div className="space-y-2 text-xs">
+                        {parseReviewNotes(selectedAppeal.review_notes).map(
+                          (reviewNote, idx) => {
+                            const {
+                              component,
+                              status: reviewStatus,
+                              detail: reviewDetail,
+                            } = parseReviewItem(reviewNote);
+                            return (
+                              <div
+                                key={idx}
+                                className="bg-base-100 p-2 rounded border border-base-300"
+                              >
+                                <div className="font-semibold text-xs mb-1">
+                                  {component}
+                                </div>
+                                <div className="flex gap-2 items-start">
+                                  <span
+                                    className={`badge badge-xs flex-shrink-0 ${
+                                      reviewStatus === "disetujui"
+                                        ? "badge-success"
+                                        : reviewStatus === "ditolak"
+                                          ? "badge-error"
+                                          : reviewStatus === "pending"
+                                            ? "badge-warning"
+                                            : "badge-outline"
+                                    }`}
+                                  >
+                                    {reviewStatus}
+                                  </span>
+                                  <span className="flex-1">
+                                    {formatDetailWithCurrency(reviewDetail)}
+                                  </span>
+                                </div>
+                              </div>
+                            );
+                          },
+                        )}
+                      </div>
+                    ) : (
+                      <span>-</span>
+                    )}
+                  </div>
                   <p>
                     <span className="font-semibold">Dibuat:</span>{" "}
                     {selectedAppeal.created_at
@@ -879,31 +1116,42 @@ function EmployeeSalaryAppeal() {
 
               <div className="flex gap-2 pt-2">
                 {selectedAppeal.supporting_documents_url ? (
-                  <a
-  href={selectedAppeal.supporting_documents_url}
-  target="_blank"
-  rel="noreferrer"
-  className="
-    px-3 py-1 text-sm
-    bg-gradient-to-b from-blue-400 to-blue-600
-    text-white rounded-full
-    shadow-md hover:shadow-lg
-    border border-blue-600
-    hover:from-blue-500 hover:to-blue-700
-    transition-all duration-200
-    inline-flex items-center justify-center
-  "
->
-  Lihat Bukti
-</a>
+                  <button
+                    type="button"
+                    onClick={() =>
+                      openSupportingDocModal(
+                        selectedAppeal.supporting_documents_url,
+                      )
+                    }
+                    className="
+                      px-3 py-1 text-sm
+                      bg-gradient-to-b from-blue-400 to-blue-600
+                      text-white rounded-full
+                      shadow-md hover:shadow-lg
+                      border border-blue-600
+                      hover:from-blue-500 hover:to-blue-700
+                      transition-all duration-200
+                      inline-flex items-center justify-center
+                    "
+                  >
+                    Lihat Bukti
+                  </button>
                 ) : null}
                 {selectedAppeal.payroll_id ? (
                   <button
                     type="button"
-                    className="btn btn-secondary btn-sm"
+                    className="
+                      px-3 py-1 text-xs
+                      bg-gradient-to-b from-blue-400 to-blue-600
+                      text-white rounded-full
+                      shadow-md hover:shadow-lg
+                      border border-blue-600
+                      hover:from-blue-500 hover:to-blue-700
+                      transition-all duration-200
+                    "
                     onClick={() => openPayrollPdf(selectedAppeal.payroll_id)}
                   >
-                    Lihat PDF Slip
+                    Lihat Slip Gaji
                   </button>
                 ) : null}
               </div>
@@ -920,6 +1168,107 @@ function EmployeeSalaryAppeal() {
           </div>
         </div>
       )}
+
+      <input
+        type="checkbox"
+        id="payroll-modal"
+        className="modal-toggle"
+        checked={!!selectedPayrollModal}
+        onChange={closePayrollModal}
+      />
+      <div className="modal">
+        <div className="modal-box max-w-4xl">
+          <button
+            type="button"
+            className="btn btn-sm btn-circle absolute right-2 top-2"
+            onClick={closePayrollModal}
+          >
+            ✕
+          </button>
+          <h3 className="font-semibold text-xl mb-1">Slip Gaji</h3>
+          <p className="text-sm opacity-70 mb-4">
+            ID Payroll: {selectedPayrollModal?.payrollId || "-"}
+          </p>
+
+          <div className="w-full min-h-[420px] bg-base-200 rounded-lg overflow-hidden flex items-center justify-center">
+            {selectedPayrollModal?.type === "pdf" ? (
+              <iframe
+                title="Slip Gaji PDF"
+                src={selectedPayrollModal.url}
+                className="w-full h-[70vh] border-0"
+              />
+            ) : (
+              <p className="opacity-70">Tidak ada file slip gaji.</p>
+            )}
+          </div>
+        </div>
+        <label
+          className="modal-backdrop"
+          htmlFor="payroll-modal"
+          onClick={closePayrollModal}
+        >
+          Close
+        </label>
+      </div>
+
+      <input
+        type="checkbox"
+        id="supporting-doc-modal"
+        className="modal-toggle"
+        checked={!!selectedSupportingDoc}
+        onChange={closeSupportingDocModal}
+      />
+      <div className="modal">
+        <div className="modal-box max-w-4xl">
+          <button
+            type="button"
+            className="btn btn-sm btn-circle absolute right-2 top-2"
+            onClick={closeSupportingDocModal}
+          >
+            ✕
+          </button>
+          <h3 className="font-semibold text-xl mb-1">Bukti Pendukung</h3>
+
+          <div className="w-full min-h-[420px] bg-base-200 rounded-lg overflow-hidden flex items-center justify-center">
+            {selectedSupportingDoc?.type === "image" ? (
+              <img
+                src={selectedSupportingDoc.url}
+                alt="Bukti pendukung"
+                className="max-h-[70vh] w-auto object-contain"
+              />
+            ) : selectedSupportingDoc?.type === "pdf" ? (
+              <iframe
+                title="Bukti PDF"
+                src={selectedSupportingDoc.url}
+                className="w-full h-[70vh] border-0"
+              />
+            ) : selectedSupportingDoc?.url ? (
+              <div className="text-center p-6">
+                <p className="mb-2">
+                  Preview tidak tersedia untuk tipe file ini.
+                </p>
+                <a
+                  href={selectedSupportingDoc.url}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="btn btn-primary btn-sm"
+                >
+                  Buka File
+                </a>
+              </div>
+            ) : (
+              <p className="opacity-70">Tidak ada file bukti.</p>
+            )}
+          </div>
+        </div>
+        <label
+          className="modal-backdrop"
+          htmlFor="supporting-doc-modal"
+          onClick={closeSupportingDocModal}
+        >
+          Close
+        </label>
+      </div>
     </>
   );
 }

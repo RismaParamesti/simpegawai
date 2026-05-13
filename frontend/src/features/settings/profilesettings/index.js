@@ -64,6 +64,7 @@ function ProfileSettings(){
     const [diplomaDocumentFile, setDiplomaDocumentFile] = useState(null)
     const [currentPhotoPath, setCurrentPhotoPath] = useState('')
     const [passwordForm, setPasswordForm] = useState(INITIAL_PASSWORD_FORM)
+    const [selectedPreview, setSelectedPreview] = useState(null)
 
     const formatDateForInput = (value) => (value ? String(value).slice(0, 10) : '')
     const getFileUrl = (filePath) => {
@@ -99,6 +100,29 @@ function ProfileSettings(){
             intern: 'Magang',
         }
         return mapping[value] || value || '-'
+    }
+
+    const getFileTypeFromPath = (filePath) => {
+        if (!filePath) return 'unknown'
+        const lowerPath = String(filePath).toLowerCase()
+        if (lowerPath.endsWith('.pdf')) return 'pdf'
+        if (lowerPath.endsWith('.jpg') || lowerPath.endsWith('.jpeg') || lowerPath.endsWith('.png') || lowerPath.endsWith('.webp')) {
+            return 'image'
+        }
+        return 'unknown'
+    }
+
+    const openPreviewModal = (filePath, title) => {
+        if (!filePath) return
+        setSelectedPreview({
+            path: filePath,
+            type: getFileTypeFromPath(filePath),
+            title: title,
+        })
+    }
+
+    const closePreviewModal = () => {
+        setSelectedPreview(null)
     }
 
     const loadProfile = useCallback(async () => {
@@ -291,9 +315,20 @@ function ProfileSettings(){
                         <div className="form-control w-full">
                             <label className="label"><span className="label-text">Foto Profil (opsional)</span></label>
                             <input className="file-input file-input-bordered w-full" type="file" accept="image/png,image/jpeg,image/webp" onChange={(e) => setPhotoFile(e.target.files?.[0] || null)} />
-                            {currentPhotoPath ? (
-                                <label className="label"><span className="label-text-alt">Foto saat ini: {currentPhotoPath}</span></label>
-                            ) : null}
+                            <div className="flex gap-2 mt-2">
+                                {currentPhotoPath ? (
+                                    <>
+                                        <button
+                                            type="button"
+                                            className="btn btn-outline btn-sm"
+                                            onClick={() => openPreviewModal(currentPhotoPath, 'Foto Profil')}
+                                        >
+                                            Lihat Foto
+                                        </button>
+                                        <label className="label flex-1"><span className="label-text-alt">Foto saat ini: {currentPhotoPath}</span></label>
+                                    </>
+                                ) : null}
+                            </div>
                         </div>
 
                         <div className="md:col-span-2 mt-1"><h3 className="font-semibold">Data Pribadi Pegawai</h3></div>
@@ -366,7 +401,7 @@ function ProfileSettings(){
                             <input className="input input-bordered" value={profileForm.department_name} readOnly disabled />
                         </div>
                         <div className="form-control w-full">
-                            <label className="label"><span className="label-text">Level</span></label>
+                            <label className="label"><span className="label-text">Status Kepegawaian</span></label>
                             <input className="input input-bordered" value={profileForm.level} readOnly disabled />
                         </div>
                         <div className="form-control w-full">
@@ -374,11 +409,11 @@ function ProfileSettings(){
                             <input className="input input-bordered" value={profileForm.position_name} readOnly disabled />
                         </div>
                         <div className="form-control w-full">
-                            <label className="label"><span className="label-text">Tanggal Join</span></label>
+                            <label className="label"><span className="label-text">Tanggal Bergabung</span></label>
                             <input className="input input-bordered" value={profileForm.join_date} readOnly disabled />
                         </div>
                         <div className="form-control w-full">
-                            <label className="label"><span className="label-text">Basic Salary</span></label>
+                            <label className="label"><span className="label-text">Gaji Pokok</span></label>
                             <input className="input input-bordered" value={formatMataUangIDR(profileForm.basic_salary)} readOnly disabled />
                         </div>
                         <div className="form-control w-full">
@@ -394,7 +429,13 @@ function ProfileSettings(){
                         <div className="form-control w-full">
                             <label className="label"><span className="label-text">Dokumen KTP</span></label>
                             {profileForm.ktp_document ? (
-                                <a className="btn btn-outline mb-2" href={getFileUrl(profileForm.ktp_document)} target="_blank" rel="noreferrer">Lihat Dokumen</a>
+                                <button
+                                    type="button"
+                                    className="btn btn-outline mb-2"
+                                    onClick={() => openPreviewModal(profileForm.ktp_document, 'Dokumen KTP')}
+                                >
+                                    Lihat Dokumen
+                                </button>
                             ) : (
                                 <input className="input input-bordered mb-2" value="Belum ada dokumen" readOnly disabled />
                             )}
@@ -403,7 +444,13 @@ function ProfileSettings(){
                         <div className="form-control w-full">
                             <label className="label"><span className="label-text">Dokumen Ijazah</span></label>
                             {profileForm.diploma_document ? (
-                                <a className="btn btn-outline mb-2" href={getFileUrl(profileForm.diploma_document)} target="_blank" rel="noreferrer">Lihat Dokumen</a>
+                                <button
+                                    type="button"
+                                    className="btn btn-outline mb-2"
+                                    onClick={() => openPreviewModal(profileForm.diploma_document, 'Dokumen Ijazah')}
+                                >
+                                    Lihat Dokumen
+                                </button>
                             ) : (
                                 <input className="input input-bordered mb-2" value="Belum ada dokumen" readOnly disabled />
                             )}
@@ -412,7 +459,13 @@ function ProfileSettings(){
                         <div className="form-control w-full">
                             <label className="label"><span className="label-text">Dokumen Kontrak Kerja</span></label>
                             {profileForm.employment_contract_document ? (
-                                <a className="btn btn-outline" href={getFileUrl(profileForm.employment_contract_document)} target="_blank" rel="noreferrer">Lihat Dokumen</a>
+                                <button
+                                    type="button"
+                                    className="btn btn-outline"
+                                    onClick={() => openPreviewModal(profileForm.employment_contract_document, 'Dokumen Kontrak Kerja')}
+                                >
+                                    Lihat Dokumen
+                                </button>
                             ) : (
                                 <input className="input input-bordered" value="Belum ada dokumen" readOnly disabled />
                             )}
@@ -443,6 +496,65 @@ function ProfileSettings(){
                     </div>
                 </form>
             </TitleCard>
+
+            <input
+                type="checkbox"
+                id="preview-modal"
+                className="modal-toggle"
+                checked={!!selectedPreview}
+                onChange={closePreviewModal}
+            />
+            <div className="modal">
+                <div className="modal-box max-w-4xl">
+                    <button
+                        type="button"
+                        className="btn btn-sm btn-circle absolute right-2 top-2"
+                        onClick={closePreviewModal}
+                    >
+                        ✕
+                    </button>
+                    <h3 className="font-semibold text-xl mb-4">{selectedPreview?.title || 'Preview'}</h3>
+
+                    <div className="w-full min-h-[420px] bg-base-200 rounded-lg overflow-hidden flex items-center justify-center">
+                        {selectedPreview?.type === 'image' ? (
+                            <img
+                                src={getFileUrl(selectedPreview.path)}
+                                alt={selectedPreview?.title || 'Preview'}
+                                className="max-h-[70vh] w-auto object-contain"
+                            />
+                        ) : selectedPreview?.type === 'pdf' ? (
+                            <iframe
+                                title={selectedPreview?.title || 'PDF Preview'}
+                                src={getFileUrl(selectedPreview.path)}
+                                className="w-full h-[70vh] border-0"
+                            />
+                        ) : selectedPreview?.path ? (
+                            <div className="text-center p-6">
+                                <p className="mb-2">
+                                    Preview tidak tersedia untuk tipe file ini.
+                                </p>
+                                <a
+                                    href={getFileUrl(selectedPreview.path)}
+                                    target="_blank"
+                                    rel="noreferrer"
+                                    className="btn btn-primary btn-sm"
+                                >
+                                    Buka File
+                                </a>
+                            </div>
+                        ) : (
+                            <p className="opacity-70">Tidak ada file untuk ditampilkan.</p>
+                        )}
+                    </div>
+                </div>
+                <label
+                    className="modal-backdrop"
+                    htmlFor="preview-modal"
+                    onClick={closePreviewModal}
+                >
+                    Close
+                </label>
+            </div>
         </>
     )
 }

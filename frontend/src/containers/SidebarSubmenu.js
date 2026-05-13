@@ -22,17 +22,19 @@ function SidebarSubmenu({ submenu, name, icon }) {
   }, [location.pathname, submenu]);
 
   return (
-    <div className="flex flex-col rounded-2xl">
+    <div className="flex flex-col">
       <button
         type="button"
-        className="flex w-full items-center gap-3 rounded-2xl px-4 py-3 text-left font-medium text-base-content/80 transition hover:bg-base-200/80 hover:text-base-content"
+        className="relative flex w-full items-center px-4 py-3 text-left text-base-content/80 transition hover:bg-base-200 hover:text-base-content"
         onClick={() => setIsExpanded(!isExpanded)}
       >
-        <span className="text-lg">{icon}</span>
-        <span className="flex-1">{name}</span>
+        <span className="flex w-6 shrink-0 justify-center">{icon}</span>
+
+        <span className="ml-4">{name}</span>
+
         <ChevronDownIcon
           className={
-            "h-5 w-5 shrink-0 transition-transform duration-300 " +
+            "absolute right-4 h-5 w-5 transition-transform duration-300 " +
             (isExpanded ? "rotate-180" : "")
           }
         />
@@ -49,8 +51,11 @@ function SidebarSubmenu({ submenu, name, icon }) {
                     onClick={closeDrawerOnMobile}
                     className={`relative rounded-xl px-3 py-2 transition ${location.pathname === m.path ? "bg-primary/10 text-primary font-medium" : "text-base-content/75 hover:bg-base-100/80 hover:text-base-content"}`}
                   >
-                    <span className="flex items-center gap-3">
-                      <span className="text-base">{m.icon}</span>
+                    <span className="flex items-center">
+                      <span className="flex w-8 justify-center text-base">
+                        {m.icon}
+                      </span>
+
                       <span>{m.name}</span>
                     </span>
                     {location.pathname === m.path ? (
