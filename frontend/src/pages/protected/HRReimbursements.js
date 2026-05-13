@@ -12,10 +12,10 @@ const getStatusBadge = (status) => {
 }
 
 const statusLabelMap = {
-    pending: 'Menunggu Persetujuan',
-    approved: 'Disetujui Atasan',
-    rejected: 'Ditolak',
-    included_in_payroll: 'Masuk Payroll',
+    pending: 'pending',
+    approved: 'approved',
+    rejected: 'rejected',
+    included_in_payroll: 'included_in_payroll',
 }
 
 const getStatusLabel = (status) => {

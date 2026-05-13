@@ -287,11 +287,11 @@ const getPayrollStatusLabel = (status) => {
     const map = {
         draft: 'Draft',
         claimed: 'Claimed',
-        submitted: 'Siap Diproses',
+        submitted: 'Pending',
         published: 'Published',
         transferred: 'Transferred',
-        approved: 'Disetujui',
-        rejected: 'Ditolak',
+        approved: 'Approved',
+        rejected: 'Rejected',
     }
 
     return map[normalized] || status || '-'

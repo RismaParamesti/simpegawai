@@ -18,7 +18,8 @@ const PAYROLL_BADGE_CLASS = {
   draft: "badge-warning",
   transferred: "badge-info",
   published: "badge-success",
-  
+  claimed: "badge-primary",
+  rejected: "badge-error",
 };
 
 const APPEAL_BADGE_CLASS = {

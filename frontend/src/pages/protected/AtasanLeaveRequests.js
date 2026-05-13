@@ -226,7 +226,7 @@ function AtasanLeaveRequests() {
                         <option value="approved">Approved</option>
                         <option value="rejected">Rejected</option>
                     </select>
-                    <button className="btn" onClick={loadData}>Refresh</button>
+                    <button className="btn-secondary rounded-full" onClick={loadData}>Refresh</button>
                 </div>
 
                 {loading ? (
@@ -265,7 +265,7 @@ function AtasanLeaveRequests() {
                                             {item.status === 'pending' ? (
                                                 <div className="flex gap-2">
                                                     <button
-                                                        className="btn btn-neutral btn-xs"
+                                                        className=" px-3 py-1 text-xs bg-gradient-to-b from-blue-400 to-blue-600 text-white rounded-full shadow-md hover:shadow-lg border border-blue-600 hover:from-blue-500 hover:to-blue-700 transition-all duration-200 "
                                                         onClick={() => openDetailModal(item)}
                                                     >
                                                         Detail
@@ -325,7 +325,7 @@ function AtasanLeaveRequests() {
                         <option value="approved">Approved</option>
                         <option value="rejected">Rejected</option>
                     </select>
-                    <button className="btn" onClick={loadData}>Refresh</button>
+                    <button className="btn-secondary rounded-full" onClick={loadData}>Refresh</button>
                 </div>
 
                 {loading ? (
@@ -359,10 +359,13 @@ function AtasanLeaveRequests() {
                                         <td>{item.approved_by_name || '-'}</td>
                                         <td>{item.approved_at ? new Date(item.approved_at).toLocaleString('id-ID') : '-'}</td>
                                         <td>
-                                            <button className="btn btn-ghost btn-xs" onClick={() => openDetailModal(item)}>
-                                                Detail
-                                            </button>
-                                        </td>
+    <button
+        className=" px-3 py-1 text-xs bg-gradient-to-b from-blue-400 to-blue-600 text-white rounded-full shadow-md hover:shadow-lg border border-blue-600 hover:from-blue-500 hover:to-blue-700 transition-all duration-200 "
+        onClick={() => openDetailModal(item)}
+    >
+        Detail
+    </button>
+</td>
                                     </tr>
                                 ))}
                                 {filteredHistoryItems.length === 0 && (

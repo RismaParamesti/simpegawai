@@ -26,12 +26,32 @@ const REIMBURSEMENT_TYPE_LABELS = REIMBURSEMENT_TYPE_OPTIONS.reduce((accumulator
 
 const getStatusLabel = (status) => {
     const labels = {
-        pending: 'Menunggu Persetujuan',
-        approved: 'Disetujui Atasan (Menunggu Validasi HR)',
-        included_in_payroll: 'Masuk Payroll',
-        rejected: 'Ditolak',
+        pending: 'pending',
+        approved: 'approved',
+        included_in_payroll: 'included payroll',
+        rejected: 'rejected',
     }
+
     return labels[status] || status
+}
+
+const getStatusBadge = (status) => {
+    switch ((status || "").toLowerCase()) {
+        case "pending":
+            return "badge badge-warning text-white"
+
+        case "approved":
+            return "badge badge-info text-white"
+
+        case "included_in_payroll":
+            return "badge badge-success text-white"
+
+        case "rejected":
+            return "badge badge-error text-white"
+
+        default:
+            return "badge badge-outline"
+    }
 }
 
 const getTypeLabel = (item) => {
@@ -174,7 +194,11 @@ function EmployeeReimbursement() {
                                         <td>{item.created_at ? new Date(item.created_at).toLocaleDateString('id-ID') : '-'}</td>
                                         <td>{getTypeLabel(item)}</td>
                                         <td>Rp {Number(item.amount || 0).toLocaleString('id-ID')}</td>
-                                        <td>{getStatusLabel(item.status)}</td>
+                                       <td>
+    <span className={getStatusBadge(item.status)}>
+        {getStatusLabel(item.status)}
+    </span>
+</td>
                                         <td>
                                             {item.attachment ? (
                                                 <a

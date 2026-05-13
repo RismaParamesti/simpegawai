@@ -12,19 +12,43 @@ function InternalPage(){
     const [error, setError] = useState('')
     const [dashboard, setDashboard] = useState(null)
 
-    const getStatusBadgeClass = (status) => {
-        const normalizedStatus = String(status || '').trim().toLowerCase()
+   const getStatusBadgeClass = (status) => {
+    const s = String(status || '').toLowerCase().trim()
 
-        if (normalizedStatus === 'active' || normalizedStatus === 'aktif') {
-            return 'badge badge-success'
-        }
+    switch (s) {
+        // Status aktif
+        case 'active':
+        case 'aktif':
+            return 'badge badge-success text-white'
 
-        if (normalizedStatus === 'inactive' || normalizedStatus === 'nonaktif' || normalizedStatus === 'non-active') {
-            return 'badge badge-error'
-        }
+        // Status nonaktif
+        case 'inactive':
+        case 'nonactive':
+        case 'non-active':
+        case 'tidak aktif':
+        case 'nonaktif':
+            return 'badge badge-error text-white'
 
-        return 'badge badge-neutral'
+        // Status pegawai tetap
+        case 'permanent':
+        case 'tetap':
+            return 'badge badge-primary text-white'
+
+        // Status kontrak
+        case 'contract':
+        case 'kontrak':
+            return 'badge badge-warning text-black'
+
+        // Status magang
+        case 'intern':
+        case 'magang':
+            return 'badge badge-info text-white'
+
+        default:
+            return 'badge badge-outline'
     }
+}
+
 
     const loadDashboard = async () => {
         try {

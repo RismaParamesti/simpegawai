@@ -173,7 +173,30 @@ function AtasanAttendance() {
         }
         return acc
     }, {})
+const getAttendanceStatusBadge = (status) => {
+    switch ((status || "").toLowerCase()) {
+        case "hadir":
+            return "badge badge-success text-white"
 
+        case "izin":
+            return "badge badge-info text-white"
+
+        case "sakit":
+            return "badge badge-warning text-white"
+
+        case "alpha":
+            return "badge badge-error text-white"
+
+        case "libur":
+            return "badge badge-neutral text-white"
+
+        case "terlambat":
+            return "badge badge-secondary text-white"
+
+        default:
+            return "badge badge-outline"
+    }
+}
     return (
         <>
             <TitleCard title="Laporan Kehadiran Tim" topMargin="mt-0">
@@ -286,8 +309,21 @@ function AtasanAttendance() {
                                         <td>{item.check_out || '-'}</td>
                                         <td>{formatWorkDuration(item.working_hours)}</td>
                                         <td>{formatWorkDuration(item.overtime_hours)}</td>
-                                        <td><span className="badge badge-outline">{item.status}</span></td>
-                                        <td>{['izin', 'sakit', 'libur', 'alpha'].includes(String(item.status || '').toLowerCase()) ? '-' : (item.is_late ? formatLateDuration(item.late_minutes || 0) : 'Tidak')}</td>
+                                        <td>
+    <span className={getAttendanceStatusBadge(item.status)}>
+        {item.status}
+    </span>
+</td>
+
+<td>
+    {['izin', 'sakit', 'libur', 'alpha'].includes(
+        String(item.status || '').toLowerCase()
+    )
+        ? '-'
+        : (item.is_late
+            ? formatLateDuration(item.late_minutes || 0)
+            : 'Tidak')}
+</td>
                                     </tr>
                                 ))}
                                 {records.length === 0 && (
