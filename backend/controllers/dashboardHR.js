@@ -156,6 +156,8 @@ router.get("/", verifyToken, verifyRole(["hr"]), async (req, res) => {
             SELECT d.name, d.code, COUNT(e.id) as employee_count
             FROM departments d
             LEFT JOIN positions p ON d.id = p.department_id
+                AND LOWER(COALESCE(p.level, '')) != 'commissioner'
+                AND LOWER(COALESCE(p.name, '')) NOT LIKE '%commissioner%'
             LEFT JOIN employees e ON p.id = e.position_id
             WHERE d.status = 'active'
             GROUP BY d.id, d.name, d.code
@@ -168,6 +170,8 @@ router.get("/", verifyToken, verifyRole(["hr"]), async (req, res) => {
             FROM positions p
             LEFT JOIN employees e ON p.id = e.position_id
             WHERE p.status = 'active'
+              AND LOWER(COALESCE(p.level, '')) != 'commissioner'
+              AND LOWER(COALESCE(p.name, '')) NOT LIKE '%commissioner%'
             GROUP BY p.id, p.name, p.level
             ORDER BY employee_count DESC
             LIMIT 10

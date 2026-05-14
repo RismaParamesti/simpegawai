@@ -88,31 +88,8 @@ function InternalPage(){
     const recentUsers = dashboard?.recent_activity?.new_users || []
     const recentEmployees = dashboard?.recent_activity?.new_employees || []
     const departmentStats = dashboard?.departments || []
+    const positionStats = dashboard?.positions || []
     const shiftStats = dashboard?.shifts || []
-
-    const adminQuickActions = [
-        {
-            key: 'users',
-            title: 'Kelola Pengguna',
-            desc: 'Tambah, ubah, atau nonaktifkan akun dan peran pengguna.',
-            path: '/app/users',
-            badge: users.total_users || 0,
-        },
-        {
-            key: 'employees',
-            title: 'Data Pegawai',
-            desc: 'Pantau data pegawai, jabatan, dan kelengkapan informasi.',
-            path: '/app/employees',
-            badge: employees.total_employees || 0,
-        },
-        {
-            key: 'activity-logs',
-            title: 'Log Aktivitas',
-            desc: 'Lihat aktivitas sistem, perubahan data, dan histori akses.',
-            path: '/app/activity-logs',
-            badge: recentUsers.length + recentEmployees.length,
-        },
-    ]
 
     const statCards = [
         { title: 'Total Pegawai', value: employees.total_employees || 0, path: '/app/employees' },
@@ -139,35 +116,44 @@ function InternalPage(){
             </div>
 
             <div className="grid lg:grid-cols-2 grid-cols-1 gap-6 mt-6">
-                <TitleCard title="Distribusi Departemen" topMargin="mt-0">
+                <TitleCard title="Departemen Terbaru" topMargin="mt-0">
                     <div className="overflow-x-auto">
                         <table className="table table-zebra">
                             <thead>
                                 <tr>
                                     <th>Departemen</th>
+                                    <th>Posisi</th>
                                     <th>Jumlah Pegawai</th>
                                     <th>Rata-rata Gaji</th>
                                 </tr>
                             </thead>
                             <tbody>
                                 {departmentStats.slice(0, 5).map((department) => (
-                                    <tr key={`${department.name}-${department.code}`}>
+                                    <tr key={department.id || `${department.name}-${department.code}`}>
                                         <td>
                                             <div className="font-semibold">{department.name}</div>
                                             <div className="text-xs opacity-70">{department.code || '-'}</div>
                                         </td>
+                                        <td>{department.position_count || 0}</td>
                                         <td>{department.employee_count || 0}</td>
                                         <td>Rp {(Number(department.avg_salary) || 0).toLocaleString('id-ID')}</td>
                                     </tr>
                                 ))}
                                 {departmentStats.length === 0 && (
                                     <tr>
-                                        <td colSpan={3} className="text-center opacity-70">Belum ada data departemen</td>
+                                        <td colSpan={4} className="text-center opacity-70">Belum ada data departemen</td>
                                     </tr>
                                 )}
                             </tbody>
                         </table>
                     </div>
+                    {departmentStats.length > 5 ? (
+                        <div className="text-right mt-3">
+                            <button className="btn btn-ghost btn-sm" onClick={() => navigate('/app/positions')}>
+                                Lihat Semua
+                            </button>
+                        </div>
+                    ) : null}
                 </TitleCard>
 
                 <TitleCard title="Informasi Jam Kerja" topMargin="mt-0">
@@ -198,6 +184,13 @@ function InternalPage(){
                             </tbody>
                         </table>
                     </div>
+                    {shiftStats.length > 5 ? (
+                        <div className="text-right mt-3">
+                            <button className="btn btn-ghost btn-sm" onClick={() => navigate('/app/attendance')}>
+                                Lihat Semua
+                            </button>
+                        </div>
+                    ) : null}
                 </TitleCard>
             </div>
 
@@ -213,7 +206,7 @@ function InternalPage(){
                                 </tr>
                             </thead>
                             <tbody>
-                                {recentUsers.map((user) => (
+                                {recentUsers.slice(0, 5).map((user) => (
                                     <tr key={user.id}>
                                         <td>{user.name}</td>
                                         <td>{user.email}</td>
@@ -228,6 +221,13 @@ function InternalPage(){
                             </tbody>
                         </table>
                     </div>
+                    {recentUsers.length > 5 ? (
+                        <div className="text-right mt-3">
+                            <button className="btn btn-ghost btn-sm" onClick={() => navigate('/app/users')}>
+                                Lihat Semua
+                            </button>
+                        </div>
+                    ) : null}
                 </TitleCard>
 
                 <TitleCard title="Pegawai Terbaru" topMargin="mt-0">
@@ -241,7 +241,7 @@ function InternalPage(){
                                 </tr>
                             </thead>
                             <tbody>
-                                {recentEmployees.map((employee) => (
+                                {recentEmployees.slice(0, 5).map((employee) => (
                                     <tr key={employee.employee_code}>
                                         <td>{employee.employee_code}</td>
                                         <td>{employee.name}</td>
@@ -256,6 +256,13 @@ function InternalPage(){
                             </tbody>
                         </table>
                     </div>
+                    {recentEmployees.length > 5 ? (
+                        <div className="text-right mt-3">
+                            <button className="btn btn-ghost btn-sm" onClick={() => navigate('/app/employees')}>
+                                Lihat Semua
+                            </button>
+                        </div>
+                    ) : null}
                 </TitleCard>
             </div>
         </>

@@ -4,14 +4,6 @@ import { setPageTitle } from '../../features/common/headerSlice'
 import TitleCard from '../../components/Cards/TitleCard'
 import { adminApi } from '../../features/admin/api'
 
-const MANAGER_POSITION_NAMES = [
-    'operations manager',
-    'marketing & sales manager',
-    'finance, accounting & tax manager',
-    'hr&ga manager',
-    'hr & ga manager',
-]
-
 const API_ORIGIN = (process.env.REACT_APP_BASE_URL || '')
     .replace(/\/api\/?$/, '')
     .replace(/\/$/, '')
@@ -38,6 +30,8 @@ const formatRupiah = (value) => `Rp. ${Number(value || 0).toLocaleString('id-ID'
 
 const normalizeText = (value = '') => String(value).toLowerCase().replace(/\s+/g, ' ').trim()
 
+const isManagerLevelPosition = (position) => normalizeText(position?.level) === 'manager'
+
 const getRawAutoRolesForEdit = (formState, allPositions) => {
     const autoRoles = new Set(['pegawai'])
     const normalizedDepartment = normalizeText(formState.department_name)
@@ -54,7 +48,7 @@ const getRawAutoRolesForEdit = (formState, allPositions) => {
 
     const selectedPosition = allPositions.find((position) => String(position.id) === String(formState.position_id))
     const normalizedPosition = normalizeText(selectedPosition?.name)
-    if (MANAGER_POSITION_NAMES.includes(normalizedPosition)) {
+    if (isManagerLevelPosition(selectedPosition)) {
         autoRoles.add('atasan')
     }
     if (normalizedPosition === 'hr&ga manager' || normalizedPosition === 'hr & ga manager') {

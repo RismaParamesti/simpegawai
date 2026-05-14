@@ -31,60 +31,50 @@ const departmentsRoutes = require("./controllers/departments");
 const positionsRoutes = require("./controllers/positions");
 
 const getAlphaGenerationTime = () => {
-    const rawTime = String(process.env.DAILY_ALPHA_CRON_TIME || "23:59").trim();
-    const [hourPart, minutePart] = rawTime.split(":");
-    const hour = Number(hourPart);
-    const minute = Number(minutePart);
+  const rawTime = String(process.env.DAILY_ALPHA_CRON_TIME || "23:59").trim();
+  const [hourPart, minutePart] = rawTime.split(":");
+  const hour = Number(hourPart);
+  const minute = Number(minutePart);
 
-    if (!Number.isFinite(hour) || !Number.isFinite(minute)) {
-        return { hour: 23, minute: 59 };
-    }
+  if (!Number.isFinite(hour) || !Number.isFinite(minute)) {
+    return { hour: 23, minute: 59 };
+  }
 
-    return {
-        hour: Math.max(0, Math.min(23, hour)),
-        minute: Math.max(0, Math.min(59, minute)),
-    };
+  return {
+    hour: Math.max(0, Math.min(23, hour)),
+    minute: Math.max(0, Math.min(59, minute)),
+  };
 };
 
 const scheduleDailyAlphaGeneration = () => {
-    const runJob = async () => {
-        try {
-            if (typeof attendanceRoutes.runDailyAlphaGeneration !== "function") {
-                console.warn("[WARN] Daily alpha generator is not available.");
-                return;
-            }
+  const runJob = async () => {
+    try {
+      if (typeof attendanceRoutes.runDailyAlphaGeneration !== "function") {
+        return;
+      }
 
-            const result = await attendanceRoutes.runDailyAlphaGeneration();
-            console.log(
-                `[CRON] Daily alpha generation finished for ${result.date}: ${result.generated_alpha}/${result.total_employees}`
-            );
-        } catch (error) {
-            console.error("[CRON] Daily alpha generation failed:", error.message);
-        }
-    };
+      const result = await attendanceRoutes.runDailyAlphaGeneration();
+    } catch (error) {}
+  };
 
-    const scheduleNextRun = () => {
-        const { hour, minute } = getAlphaGenerationTime();
-        const now = new Date();
-        const nextRun = new Date(now);
-        nextRun.setHours(hour, minute, 0, 0);
+  const scheduleNextRun = () => {
+    const { hour, minute } = getAlphaGenerationTime();
+    const now = new Date();
+    const nextRun = new Date(now);
+    nextRun.setHours(hour, minute, 0, 0);
 
-        if (nextRun <= now) {
-            nextRun.setDate(nextRun.getDate() + 1);
-        }
+    if (nextRun <= now) {
+      nextRun.setDate(nextRun.getDate() + 1);
+    }
 
-        const delay = nextRun.getTime() - now.getTime();
-        setTimeout(async () => {
-            await runJob();
-            setInterval(runJob, 24 * 60 * 60 * 1000);
-        }, delay);
+    const delay = nextRun.getTime() - now.getTime();
+    setTimeout(async () => {
+      await runJob();
+      setInterval(runJob, 24 * 60 * 60 * 1000);
+    }, delay);
+  };
 
-        console.log(
-            `[CRON] Daily alpha generation scheduled at ${String(hour).padStart(2, "0")}:${String(minute).padStart(2, "0")}`
-        );
-    };
-
-    scheduleNextRun();
+  scheduleNextRun();
 };
 
 const app = express();
@@ -101,6 +91,11 @@ const path = require("path");
 
 // Static files untuk akses lampiran (contoh: bukti cuti/izin)
 app.use("/uploads", express.static(path.join(__dirname, "uploads")));
+
+app.use("/api", (req, res, next) => {
+  res.set("Cache-Control", "no-store");
+  next();
+});
 
 // Routes
 app.use("/api/auth", authRoutes);
@@ -130,24 +125,22 @@ app.use("/api", hrInterviewRoutes);
 app.use("/api/hr", hrcandidateRoutes);
 
 app.get("/", (req, res) => {
-    res.send("API is running...");
+  res.send("API is running...");
 });
 
 // Menentukan port server: ambil dari environment variable atau default ke 5000
 const PORT = process.env.PORT || 5000;
 
 const startServer = async () => {
-    try {
-        // Bootstrap schema agar fitur soft delete tidak gagal di DB lama.
-        if (typeof db.ensureSoftDeleteColumns === "function") {
-            await db.ensureSoftDeleteColumns();
-        }
-    } catch (error) {
-        console.error("[WARN] Soft delete bootstrap failed:", error.message);
+  try {
+    // Bootstrap schema agar fitur soft delete tidak gagal di DB lama.
+    if (typeof db.ensureSoftDeleteColumns === "function") {
+      await db.ensureSoftDeleteColumns();
     }
+  } catch (error) {}
 
-    // Menjalankan server dan menampilkan pesan saat berhasil dijalankan
-    app.listen(PORT, () => console.log(`Server running on port ${PORT}`));
+  // Menjalankan server dan menampilkan pesan saat berhasil dijalankan
+  app.listen(PORT, () => console.log(`Server running on port ${PORT}`));
 };
 
 startServer();

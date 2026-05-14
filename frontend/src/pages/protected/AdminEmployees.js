@@ -4,15 +4,6 @@ import { setPageTitle } from '../../features/common/headerSlice'
 import TitleCard from '../../components/Cards/TitleCard'
 import { adminApi } from '../../features/admin/api'
 
-const MANAGER_POSITION_NAMES = [
-    'director',
-    'operations manager',
-    'marketing & sales manager',
-    'finance, accounting & tax manager',
-    'hr&ga manager',
-    'hr & ga manager',
-]
-
 const normalizeText = (value = '') => String(value).toLowerCase().replace(/\s+/g, ' ').trim()
 
 const formatRupiah = (value) => `Rp. ${Number(value || 0).toLocaleString('id-ID')}`
@@ -39,11 +30,7 @@ const getDocumentUrl = (documentPath) => {
     return `http://localhost:5000${normalizedPath}`
 }
 
-const isDirectorPosition = (position) => {
-    const normalizedName = normalizeText(position?.name)
-    const normalizedLevel = normalizeText(position?.level)
-    return normalizedName === 'director' || normalizedLevel === 'director'
-}
+const isManagerLevelPosition = (position) => normalizeText(position?.level) === 'manager'
 
 const getRawAutoRolesForCreateForm = (formState, allPositions) => {
     const autoRoles = new Set(['pegawai'])
@@ -64,7 +51,7 @@ const getRawAutoRolesForCreateForm = (formState, allPositions) => {
 
     const selectedPosition = allPositions.find((position) => String(position.id) === String(formState.position_id))
     const normalizedPosition = normalizeText(selectedPosition?.name)
-    if (MANAGER_POSITION_NAMES.includes(normalizedPosition) || isDirectorPosition(selectedPosition)) {
+    if (isManagerLevelPosition(selectedPosition)) {
         autoRoles.add('atasan')
     }
 
@@ -125,6 +112,16 @@ function AdminEmployees() {
     const [showCreateModal, setShowCreateModal] = useState(false)
     const [createForm, setCreateForm] = useState(INITIAL_FORM)
     const [createDocuments, setCreateDocuments] = useState(INITIAL_DOCUMENTS)
+
+    useEffect(() => {
+        if (!error) return undefined
+
+        const timeoutId = setTimeout(() => {
+            setError('')
+        }, 5000)
+
+        return () => clearTimeout(timeoutId)
+    }, [error])
 
     const departments = useMemo(() => {
         const uniqueDepartments = Array.from(
@@ -510,7 +507,7 @@ function AdminEmployees() {
     return (
         <>
             {error ? (
-                <div className="alert alert-error mb-4">
+                <div className="alert alert-error fixed right-6 top-6 z-[11000] w-[min(92vw,420px)] shadow-2xl">
                     <span>{error}</span>
                 </div>
             ) : null}
@@ -584,14 +581,9 @@ function AdminEmployees() {
                 checked={showCreateModal}
                 onChange={() => { setError(''); setShowCreateModal(false) }}
             />
-            <div className="modal">
-                <div className="modal-box max-w-6xl">
+            <div className="modal z-[9999]">
+                <div className="modal-box relative z-[10000] max-w-6xl max-h-[90vh] overflow-y-auto">
                     <h3 className="font-bold text-lg">Tambah Pegawai</h3>
-                    {error ? (
-                        <div className="alert alert-error mt-3">
-                            <span>{error}</span>
-                        </div>
-                    ) : null}
                     <form className="space-y-4 mt-4" onSubmit={handleCreateEmployee}>
                         <div className="border border-base-300 rounded-lg p-4">
                             <p className="font-semibold mb-3">Akun Pengguna</p>
@@ -721,8 +713,8 @@ function AdminEmployees() {
             </div>
 
             <input type="checkbox" id="view-employee-modal" className="modal-toggle" checked={!!viewingEmployee} onChange={() => setViewingEmployee(null)} />
-            <div className="modal">
-                <div className="modal-box max-w-3xl">
+            <div className="modal z-[9999]">
+                <div className="modal-box relative z-[10000] max-w-3xl max-h-[90vh] overflow-y-auto">
                     <h3 className="font-bold text-lg">Detail Data Pegawai</h3>
                     {viewingEmployee ? (
                         <div className="space-y-4 mt-4">
@@ -839,8 +831,8 @@ function AdminEmployees() {
             </div>
 
             <input type="checkbox" id="delete-employee-modal" className="modal-toggle" checked={!!deleteTarget} onChange={() => setDeleteTarget(null)} />
-            <div className="modal">
-                <div className="modal-box max-w-md">
+            <div className="modal z-[9999]">
+                <div className="modal-box relative z-[10000] max-w-md max-h-[90vh] overflow-y-auto">
                     <h3 className="font-bold text-lg text-error">Konfirmasi Hapus Pegawai</h3>
                     {deleteTarget ? (
                         <div className="mt-3 space-y-2">
@@ -861,8 +853,8 @@ function AdminEmployees() {
             </div>
 
             <input type="checkbox" id="edit-employee-modal" className="modal-toggle" checked={!!editingEmployee} onChange={() => setEditingEmployee(null)} />
-            <div className="modal">
-                <div className="modal-box max-w-3xl">
+            <div className="modal z-[9999]">
+                <div className="modal-box relative z-[10000] max-w-3xl max-h-[90vh] overflow-y-auto">
                     <h3 className="font-bold text-lg">Ubah Data Pegawai</h3>
                     {editingEmployee ? (
                         <div className="space-y-4 mt-4">

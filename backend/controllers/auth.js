@@ -30,6 +30,39 @@ const getPhotoPathFromRequest = (req) => {
     return req.body?.photo;
 };
 
+const normalizeRoleSet = (roles = []) => {
+    const hierarchicalRoles = [
+        "admin",
+        "atasan",
+        "hr",
+        "finance",
+        "commissioner",
+        "director",
+    ];
+    const rolesSet = new Set(roles);
+    const hasHierarchyRole = Array.from(rolesSet).some((role) =>
+        hierarchicalRoles.includes(role),
+    );
+
+    if (hasHierarchyRole) {
+        rolesSet.add("pegawai");
+    }
+
+    return rolesSet;
+};
+
+const applyPositionBasedRoles = (roles = [], position = null) => {
+    const rolesSet = normalizeRoleSet(roles);
+    const positionLevel = String(position?.level || "").toLowerCase().trim();
+
+    if (positionLevel === "manager") {
+        rolesSet.add("atasan");
+        rolesSet.add("pegawai");
+    }
+
+    return Array.from(rolesSet);
+};
+
 // ============================
 // REGISTER STAFF (admin/hr)
 // ============================
@@ -110,23 +143,7 @@ router.post(
             return res.status(400).json({ message: "Invalid role" });
         }
 
-        // Normalisasi peran: semua role (admin, atasan, hr, finance) harus juga memiliki 'pegawai'
-        const hierarchicalRoles = [
-            "admin",
-            "atasan",
-            "hr",
-            "finance",
-            "commissioner",
-            "director",
-        ];
-        const normalizedRolesSet = new Set(roles);
-        const hasHierarchyRole = Array.from(normalizedRolesSet).some((r) =>
-            hierarchicalRoles.includes(r),
-        );
-        if (hasHierarchyRole) {
-            normalizedRolesSet.add("pegawai");
-        }
-        const finalRoles = Array.from(normalizedRolesSet);
+        let finalRoles = applyPositionBasedRoles(roles);
 
         try {
             // Cek apakah email sudah terdaftar
@@ -154,13 +171,15 @@ router.post(
             // Validasi position_id exists
             const [positionCheck] = await db
                 .promise()
-                .query("SELECT id, base_salary FROM positions WHERE id = ?", [
+                .query("SELECT id, level, base_salary FROM positions WHERE id = ?", [
                     position_id,
                 ]);
 
             if (positionCheck.length === 0) {
                 return res.status(400).json({ message: "Invalid position_id" });
             }
+
+            finalRoles = applyPositionBasedRoles(finalRoles, positionCheck[0]);
 
             // Gunakan base_salary dari position jika basic_salary tidak diberikan
             const finalBasicSalary =
@@ -663,7 +682,14 @@ router.get(
                 .query("SELECT id, name FROM roles ORDER BY name ASC");
 
             const [positions] = await db.promise().query(`
-                SELECT p.id, p.name, p.base_salary, d.name as department_name
+                SELECT
+                    p.id,
+                    p.name,
+                    p.level,
+                    p.base_salary,
+                    p.position_allowance,
+                    p.department_id,
+                    d.name as department_name
                 FROM positions p
                 LEFT JOIN departments d ON p.department_id = d.id
                 WHERE LOWER(COALESCE(p.level, '')) != 'commissioner'
@@ -747,20 +773,19 @@ router.put(
                 ];
                 const rolesFiltered = roles.filter((role) => validRoles.includes(role));
 
-                const hierarchicalRoles = [
-                    "admin",
-                    "atasan",
-                    "hr",
-                    "finance",
-                    "commissioner",
-                    "director",
-                ];
-                const rolesSet = new Set(rolesFiltered);
-                if (Array.from(rolesSet).some((role) => hierarchicalRoles.includes(role))) {
-                    rolesSet.add("pegawai");
-                }
+                const [employeePositionRows] = await db.promise().query(
+                    `SELECT p.level
+                     FROM employees e
+                     LEFT JOIN positions p ON e.position_id = p.id
+                     WHERE e.user_id = ? AND e.deleted_at IS NULL
+                     LIMIT 1`,
+                    [userId],
+                );
 
-                const finalRoles = Array.from(rolesSet);
+                const finalRoles = applyPositionBasedRoles(
+                    rolesFiltered,
+                    employeePositionRows[0],
+                );
 
                 await db
                     .promise()
