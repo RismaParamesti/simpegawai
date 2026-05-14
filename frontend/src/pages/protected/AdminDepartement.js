@@ -13,7 +13,7 @@ const normalizedApiRoot = (
 const API_BASE_URL = normalizedApiRoot.endsWith("/api")
   ? normalizedApiRoot
   : `${normalizedApiRoot}/api`;
-const DEPARTMENTS_ENDPOINT = `${API_BASE_URL}/employees/departments`;
+const DEPARTMENTS_ENDPOINT = `${API_BASE_URL}/departments`;
 
 const getErrorMessage = async (response, fallbackMessage) => {
   try {

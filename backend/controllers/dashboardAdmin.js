@@ -20,6 +20,7 @@ router.get("/", verifyToken, verifyRole(["admin"]), async (req, res) => {
                 SUM(CASE WHEN employment_status = 'contract' THEN 1 ELSE 0 END) as contract,
                 SUM(CASE WHEN employment_status = 'intern' THEN 1 ELSE 0 END) as intern
             FROM employees
+            WHERE deleted_at IS NULL
         `);
 
         // 2. User Statistics
@@ -77,14 +78,45 @@ router.get("/", verifyToken, verifyRole(["admin"]), async (req, res) => {
 
         // 6. Department Distribution
         const [departmentStats] = await db.promise().query(`
-            SELECT d.name, d.code, COUNT(e.id) as employee_count,
-                   AVG(e.basic_salary) as avg_salary
+            SELECT
+                d.id,
+                d.name,
+                d.code,
+                d.status,
+                COUNT(DISTINCT p.id) as position_count,
+                COUNT(DISTINCT e.id) as employee_count,
+                AVG(e.basic_salary) as avg_salary,
+                d.created_at,
+                d.updated_at
             FROM departments d
             LEFT JOIN positions p ON d.id = p.department_id
-            LEFT JOIN employees e ON p.id = e.position_id
+                AND LOWER(COALESCE(p.level, '')) != 'commissioner'
+                AND LOWER(COALESCE(p.name, '')) NOT LIKE '%commissioner%'
+            LEFT JOIN employees e ON p.id = e.position_id AND e.deleted_at IS NULL
             WHERE d.status = 'active'
-            GROUP BY d.id, d.name, d.code
-            ORDER BY employee_count DESC
+            GROUP BY d.id, d.name, d.code, d.status, d.created_at, d.updated_at
+            ORDER BY COALESCE(d.updated_at, d.created_at) DESC, d.name ASC
+        `);
+
+        const [positionStats] = await db.promise().query(`
+            SELECT
+                p.id,
+                p.name,
+                p.level,
+                p.status,
+                p.department_id,
+                d.name as department_name,
+                COUNT(DISTINCT e.id) as employee_count,
+                p.created_at,
+                p.updated_at
+            FROM positions p
+            LEFT JOIN departments d ON p.department_id = d.id
+            LEFT JOIN employees e ON p.id = e.position_id AND e.deleted_at IS NULL
+            WHERE LOWER(COALESCE(p.level, '')) != 'commissioner'
+              AND LOWER(COALESCE(p.name, '')) NOT LIKE '%commissioner%'
+              AND COALESCE(p.status, 'active') = 'active'
+            GROUP BY p.id, p.name, p.level, p.status, p.department_id, d.name, p.created_at, p.updated_at
+            ORDER BY COALESCE(p.updated_at, p.created_at) DESC, p.name ASC
         `);
 
         // 7. Working Hours/Shifts
@@ -123,6 +155,7 @@ router.get("/", verifyToken, verifyRole(["admin"]), async (req, res) => {
             `SELECT e.employee_code, u.name, e.employment_status, e.created_at
              FROM employees e
              JOIN users u ON e.user_id = u.id
+             WHERE e.deleted_at IS NULL
              ORDER BY e.created_at DESC
              LIMIT 5`
         );
@@ -160,6 +193,7 @@ router.get("/", verifyToken, verifyRole(["admin"]), async (req, res) => {
                 ),
             },
             departments: departmentStats,
+            positions: positionStats,
             shifts: shiftsStats,
             attendance_summary: monthlyAttendance[0],
             recent_activity: {

@@ -192,7 +192,7 @@ export const financeApi = {
 
     async getPositions() {
         try {
-            const response = await axios.get('/api/employees/positions/list/all')
+            const response = await axios.get('/api/positions/list/all')
             return response.data?.data || []
         } catch (error) {
             throw new Error(parseApiError(error, 'Gagal memuat data posisi'))
@@ -201,7 +201,7 @@ export const financeApi = {
 
     async updatePositionSalary(positionId, payload) {
         try {
-            const response = await axios.put(`/api/employees/positions/update/${positionId}`, payload)
+            const response = await axios.put(`/api/positions/update/${positionId}`, payload)
             return response.data || {}
         } catch (error) {
             throw new Error(parseApiError(error, 'Gagal menyimpan gaji posisi'))

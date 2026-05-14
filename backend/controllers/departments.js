@@ -4,6 +4,12 @@ const db = require("../config/db");
 const { verifyToken, verifyRole } = require("../middleware/authMiddleware");
 const { logActivity, getIpAddress, getUserAgent } = require("../middleware/activityLogger");
 
+const visiblePositionJoinCondition = `
+  d.id = p.department_id
+  AND LOWER(COALESCE(p.level, '')) != 'commissioner'
+  AND LOWER(COALESCE(p.name, '')) NOT LIKE '%commissioner%'
+`;
+
 // ============================
 // GET all departments (admin/HR only)
 // ============================
@@ -21,7 +27,7 @@ router.get("/", verifyToken, verifyRole(["admin", "hr"]), async (req, res) => {
         COUNT(DISTINCT e.id) as totalEmployees,
         COUNT(DISTINCT p.id) as totalPositions
       FROM departments d
-      LEFT JOIN positions p ON d.id = p.department_id
+      LEFT JOIN positions p ON ${visiblePositionJoinCondition}
       LEFT JOIN employees e ON p.id = e.position_id AND e.deleted_at IS NULL
       GROUP BY d.id, d.code, d.name, d.description, d.status, d.created_at, d.updated_at
       ORDER BY d.name ASC
@@ -47,7 +53,7 @@ router.get("/:id", verifyToken, verifyRole(["admin", "hr"]), async (req, res) =>
         COUNT(DISTINCT e.id) as totalEmployees,
         COUNT(DISTINCT p.id) as totalPositions
       FROM departments d
-      LEFT JOIN positions p ON d.id = p.department_id
+      LEFT JOIN positions p ON ${visiblePositionJoinCondition}
       LEFT JOIN employees e ON p.id = e.position_id AND e.deleted_at IS NULL
       WHERE d.id = ?
       GROUP BY d.id
@@ -67,7 +73,7 @@ router.get("/:id", verifyToken, verifyRole(["admin", "hr"]), async (req, res) =>
 // ============================
 // POST create new department (admin only)
 // ============================
-router.post("/", verifyToken, verifyRole(["admin"]), async (req, res) => {
+router.post("/", verifyToken, verifyRole(["admin", "hr"]), async (req, res) => {
   try {
     const { code, name, description, status } = req.body;
 
@@ -78,26 +84,31 @@ router.post("/", verifyToken, verifyRole(["admin"]), async (req, res) => {
 
     // Check if code already exists
     const [existing] = await db.promise().query(
-      "SELECT id FROM departments WHERE code = ?",
-      [code]
+      "SELECT id FROM departments WHERE code = ? OR name = ?",
+      [code, name]
     );
 
     if (existing.length > 0) {
-      return res.status(409).json({ message: "Department code already exists" });
+      return res.status(409).json({ message: "Department code or name already exists" });
     }
 
     // Insert new department
     const [result] = await db.promise().query(
-      "INSERT INTO departments (code, name, description, status) VALUES (?, ?, ?, ?)",
+      "INSERT INTO departments (code, name, description, status, created_at, updated_at) VALUES (?, ?, ?, ?, NOW(), NOW())",
       [code, name, description || null, status || "active"]
     );
 
     // Log activity
-    await logActivity(req, "CREATE", "DEPARTMENTS", `Created department: ${name}`, null, {
-      code,
-      name,
-      description,
-      status,
+    await logActivity({
+      userId: req.user.id,
+      username: req.user.username,
+      role: req.user.roles?.[0] || req.user.role,
+      action: "CREATE",
+      module: "departments",
+      description: `Created department: ${name}`,
+      newValues: { code, name, description, status },
+      ipAddress: getIpAddress(req),
+      userAgent: getUserAgent(req),
     });
 
     res.status(201).json({
@@ -123,7 +134,7 @@ router.post("/", verifyToken, verifyRole(["admin"]), async (req, res) => {
 // ============================
 // PUT update department (admin only)
 // ============================
-router.put("/:id", verifyToken, verifyRole(["admin"]), async (req, res) => {
+router.put("/:id", verifyToken, verifyRole(["admin", "hr"]), async (req, res) => {
   try {
     const { id } = req.params;
     const { code, name, description, status } = req.body;
@@ -147,26 +158,32 @@ router.put("/:id", verifyToken, verifyRole(["admin"]), async (req, res) => {
 
     // Check if new code conflicts with other departments
     const [codeConflict] = await db.promise().query(
-      "SELECT id FROM departments WHERE code = ? AND id != ?",
-      [code, id]
+      "SELECT id FROM departments WHERE (code = ? OR name = ?) AND id != ?",
+      [code, name, id]
     );
 
     if (codeConflict.length > 0) {
-      return res.status(409).json({ message: "Department code already exists" });
+      return res.status(409).json({ message: "Department code or name already exists" });
     }
 
     // Update department
     await db.promise().query(
-      "UPDATE departments SET code = ?, name = ?, description = ?, status = ? WHERE id = ?",
+      "UPDATE departments SET code = ?, name = ?, description = ?, status = ?, updated_at = NOW() WHERE id = ?",
       [code, name, description || null, status || "active", id]
     );
 
     // Log activity
-    await logActivity(req, "UPDATE", "DEPARTMENTS", `Updated department: ${name}`, oldDept, {
-      code,
-      name,
-      description,
-      status,
+    await logActivity({
+      userId: req.user.id,
+      username: req.user.username,
+      role: req.user.roles?.[0] || req.user.role,
+      action: "UPDATE",
+      module: "departments",
+      description: `Updated department: ${name}`,
+      oldValues: oldDept,
+      newValues: { code, name, description, status },
+      ipAddress: getIpAddress(req),
+      userAgent: getUserAgent(req),
     });
 
     res.json({
@@ -190,7 +207,7 @@ router.put("/:id", verifyToken, verifyRole(["admin"]), async (req, res) => {
 // ============================
 // DELETE department (admin only)
 // ============================
-router.delete("/:id", verifyToken, verifyRole(["admin"]), async (req, res) => {
+router.delete("/:id", verifyToken, verifyRole(["admin", "hr"]), async (req, res) => {
   try {
     const { id } = req.params;
 
@@ -223,7 +240,17 @@ router.delete("/:id", verifyToken, verifyRole(["admin"]), async (req, res) => {
     await db.promise().query("DELETE FROM departments WHERE id = ?", [id]);
 
     // Log activity
-    await logActivity(req, "DELETE", "DEPARTMENTS", `Deleted department: ${dept.name}`, dept, null);
+    await logActivity({
+      userId: req.user.id,
+      username: req.user.username,
+      role: req.user.roles?.[0] || req.user.role,
+      action: "DELETE",
+      module: "departments",
+      description: `Deleted department: ${dept.name}`,
+      oldValues: dept,
+      ipAddress: getIpAddress(req),
+      userAgent: getUserAgent(req),
+    });
 
     res.json({ message: "Department deleted successfully" });
   } catch (error) {

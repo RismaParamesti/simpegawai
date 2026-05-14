@@ -246,6 +246,13 @@ function HRDashboard() {
                             Tidak ada permohonan cuti/izin pending
                         </div>
                     )}
+                    {leaveManagement.pending_items?.length > 5 ? (
+                        <div className="text-right mt-3">
+                            <Link className="btn btn-ghost btn-sm" to="/app/leave-requests">
+                                Lihat Semua
+                            </Link>
+                        </div>
+                    ) : null}
                 </TitleCard>
 
                 {/* Reimbursements Need Validation */}
@@ -291,6 +298,13 @@ function HRDashboard() {
                             Tidak ada reimbursement yang perlu divalidasi
                         </div>
                     )}
+                    {reimbursementValidation.need_validation?.length > 5 ? (
+                        <div className="text-right mt-3">
+                            <Link className="btn btn-ghost btn-sm" to="/app/reimbursements">
+                                Lihat Semua
+                            </Link>
+                        </div>
+                    ) : null}
                 </TitleCard>
             </div>
 
@@ -346,6 +360,13 @@ function HRDashboard() {
                             Tidak ada banding gaji yang perlu direview
                         </div>
                     )}
+                    {salaryAppeals.pending_reviews?.length > 5 ? (
+                        <div className="text-right mt-3">
+                            <Link className="btn btn-ghost btn-sm" to="/app/salary-appeals">
+                                Lihat Semua
+                            </Link>
+                        </div>
+                    ) : null}
                 </TitleCard>
 
                 {/* Monthly Attendance Summary */}
@@ -406,7 +427,7 @@ function HRDashboard() {
                                     </tr>
                                 </thead>
                                 <tbody>
-                                    {organization.departments.slice(0, 8).map((dept, idx) => (
+                                    {organization.departments.slice(0, 5).map((dept, idx) => (
                                         <tr key={idx}>
                                             <td className="font-semibold">{dept.name}</td>
                                             <td>
@@ -425,6 +446,13 @@ function HRDashboard() {
                             Data departemen tidak tersedia
                         </div>
                     )}
+                    {organization.departments?.length > 5 ? (
+                        <div className="text-right mt-3">
+                            <Link className="btn btn-ghost btn-sm" to="/app/employees">
+                                Lihat Semua
+                            </Link>
+                        </div>
+                    ) : null}
                 </TitleCard>
 
                 {/* Position Distribution */}
@@ -440,7 +468,7 @@ function HRDashboard() {
                                     </tr>
                                 </thead>
                                 <tbody>
-                                    {organization.positions.slice(0, 8).map((pos, idx) => (
+                                    {organization.positions.slice(0, 5).map((pos, idx) => (
                                         <tr key={idx}>
                                             <td className="font-semibold">{pos.name}</td>
                                             <td>
@@ -459,6 +487,13 @@ function HRDashboard() {
                             Data jabatan tidak tersedia
                         </div>
                     )}
+                    {organization.positions?.length > 5 ? (
+                        <div className="text-right mt-3">
+                            <Link className="btn btn-ghost btn-sm" to="/app/employees">
+                                Lihat Semua
+                            </Link>
+                        </div>
+                    ) : null}
                 </TitleCard>
             </div>
         </>

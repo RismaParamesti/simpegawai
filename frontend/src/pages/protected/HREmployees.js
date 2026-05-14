@@ -8,16 +8,10 @@ import TitleCard from "../../components/Cards/TitleCard";
 import { hrApi } from "../../features/hr/api";
 import { MagnifyingGlassIcon } from "@heroicons/react/24/outline";
 
-const MANAGER_POSITION_NAMES = [
-  "operations manager",
-  "marketing & sales manager",
-  "finance, accounting & tax manager",
-  "hr&ga manager",
-  "hr & ga manager",
-];
-
 const normalizeText = (value = "") =>
   String(value).toLowerCase().replace(/\s+/g, " ").trim();
+
+const isManagerLevelPosition = (position) => normalizeText(position?.level) === "manager";
 const formatRupiah = (value) =>
   `Rp. ${Number(value || 0).toLocaleString("id-ID")}`;
 
@@ -59,8 +53,7 @@ const getRawAutoRolesForForm = (formState, allPositions) => {
     (position) => String(position.id) === String(formState.position_id),
   );
   const normalizedPosition = normalizeText(selectedPosition?.name);
-  if (MANAGER_POSITION_NAMES.includes(normalizedPosition))
-    autoRoles.add("atasan");
+  if (isManagerLevelPosition(selectedPosition)) autoRoles.add("atasan");
   if (
     normalizedPosition === "hr&ga manager" ||
     normalizedPosition === "hr & ga manager"
@@ -212,6 +205,7 @@ function HREmployees() {
       uniquePositions.push({
         id: key,
         name: item.position_name || "-",
+        level: item.level || item.position_level || "",
         department_name: item.department_name || "",
         base_salary: item.base_salary || 0,
       });
@@ -239,6 +233,7 @@ function HREmployees() {
       const metaPositions = (meta?.positions || []).map((position) => ({
         id: String(position.id),
         name: position.name || "-",
+        level: position.level || "",
         department_name: position.department_name || "",
         base_salary: position.base_salary || 0,
       }));

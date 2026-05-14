@@ -11,6 +11,53 @@ const {
   getUserAgent,
 } = require("../middleware/activityLogger");
 
+const syncAtasanRoleByPosition = async (userId, positionId) => {
+  if (!userId || !positionId) return;
+
+  const [positionRows] = await db
+    .promise()
+    .query("SELECT level FROM positions WHERE id = ?", [positionId]);
+
+  if (positionRows.length === 0) return;
+
+  const isManagerLevel =
+    String(positionRows[0].level || "").toLowerCase().trim() === "manager";
+
+  const [roles] = await db.promise().query(
+    `SELECT r.name
+     FROM user_roles ur
+     JOIN roles r ON r.id = ur.role_id
+     WHERE ur.user_id = ?`,
+    [userId],
+  );
+
+  const roleSet = new Set(roles.map((role) => role.name));
+  roleSet.add("pegawai");
+
+  if (isManagerLevel) {
+    roleSet.add("atasan");
+  } else {
+    roleSet.delete("atasan");
+  }
+
+  await db.promise().query("DELETE FROM user_roles WHERE user_id = ?", [userId]);
+
+  for (const roleName of roleSet) {
+    const [roleRows] = await db
+      .promise()
+      .query("SELECT id FROM roles WHERE name = ?", [roleName]);
+
+    if (roleRows.length > 0) {
+      await db
+        .promise()
+        .query("INSERT INTO user_roles (user_id, role_id) VALUES (?, ?)", [
+          userId,
+          roleRows[0].id,
+        ]);
+    }
+  }
+};
+
 // ============================
 // MULTER CONFIG (Employee documents)
 // ============================
@@ -85,6 +132,8 @@ router.get(
                     COUNT(DISTINCT p.id) as totalPositions
                 FROM departments d
                 LEFT JOIN positions p ON d.id = p.department_id
+                    AND LOWER(COALESCE(p.level, '')) != 'commissioner'
+                    AND LOWER(COALESCE(p.name, '')) NOT LIKE '%commissioner%'
                 LEFT JOIN employees e ON p.id = e.position_id AND e.deleted_at IS NULL
                 GROUP BY d.id, d.code, d.name, d.description, d.status, d.created_at, d.updated_at
                 ORDER BY d.name ASC
@@ -449,6 +498,10 @@ router.put(
               userValues,
             );
         }
+      }
+
+      if (employee.user_id && position_id) {
+        await syncAtasanRoleByPosition(employee.user_id, position_id);
       }
 
       // Log employee update

@@ -801,7 +801,7 @@ function EmployeeDashboard() {
                 Belum ada slip gaji
               </p>
             )}
-            {payrolls.slice(0, 3).map((item) => (
+            {payrolls.slice(0, 5).map((item) => (
               <button
                 key={item.id}
                 type="button"
@@ -826,6 +826,17 @@ function EmployeeDashboard() {
                 </div>
               </button>
             ))}
+            {payrolls.length > 5 ? (
+              <div className="text-right pt-1">
+                <button
+                  type="button"
+                  className="btn btn-ghost btn-sm"
+                  onClick={() => navigate("/app/payroll")}
+                >
+                  Lihat Semua
+                </button>
+              </div>
+            ) : null}
           </div>
         </TitleCard>
       </div>

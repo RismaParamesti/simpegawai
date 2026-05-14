@@ -43,7 +43,7 @@ export const adminApi = {
 
     async createDepartment(payload) {
         try {
-            const response = await axios.post('/api/employees/departments', payload)
+            const response = await axios.post('/api/departments', payload)
             return response.data
         } catch (error) {
             throw new Error(parseApiError(error, 'Gagal menambah departemen'))
@@ -52,7 +52,7 @@ export const adminApi = {
 
     async getDepartments() {
         try {
-            const response = await axios.get('/api/employees/departments')
+            const response = await axios.get('/api/departments')
             return response.data?.data || []
         } catch (error) {
             throw new Error(parseApiError(error, 'Gagal memuat data departemen'))
@@ -61,7 +61,7 @@ export const adminApi = {
 
     async updateDepartment(departmentId, payload) {
         try {
-            const response = await axios.put(`/api/employees/departments/${departmentId}`, payload)
+            const response = await axios.put(`/api/departments/${departmentId}`, payload)
             return response.data
         } catch (error) {
             throw new Error(parseApiError(error, 'Gagal mengubah departemen'))
@@ -70,7 +70,7 @@ export const adminApi = {
 
     async deleteDepartment(departmentId) {
         try {
-            const response = await axios.delete(`/api/employees/departments/${departmentId}`)
+            const response = await axios.delete(`/api/departments/${departmentId}`)
             return response.data
         } catch (error) {
             throw new Error(parseApiError(error, 'Gagal menghapus departemen'))
@@ -79,7 +79,7 @@ export const adminApi = {
 
     async createPosition(payload) {
         try {
-            const response = await axios.post('/api/employees/positions', payload)
+            const response = await axios.post('/api/positions', payload)
             return response.data
         } catch (error) {
             throw new Error(parseApiError(error, 'Gagal menambah posisi'))
@@ -88,7 +88,7 @@ export const adminApi = {
 
     async getPositions() {
         try {
-            const response = await axios.get('/api/employees/positions')
+            const response = await axios.get('/api/positions')
             return response.data?.data || []
         } catch (error) {
             throw new Error(parseApiError(error, 'Gagal memuat data posisi'))
@@ -106,7 +106,7 @@ export const adminApi = {
 
     async updatePosition(positionId, payload) {
         try {
-            const response = await axios.put(`/api/employees/positions/${positionId}`, payload)
+            const response = await axios.put(`/api/positions/${positionId}`, payload)
             return response.data
         } catch (error) {
             throw new Error(parseApiError(error, 'Gagal mengubah posisi'))
@@ -115,7 +115,7 @@ export const adminApi = {
 
     async deletePosition(positionId) {
         try {
-            const response = await axios.delete(`/api/employees/positions/${positionId}`)
+            const response = await axios.delete(`/api/positions/${positionId}`)
             return response.data
         } catch (error) {
             throw new Error(parseApiError(error, 'Gagal menghapus posisi'))

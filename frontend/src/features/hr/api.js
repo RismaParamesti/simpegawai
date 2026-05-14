@@ -264,8 +264,8 @@ export const hrApi = {
     // Organization Data
     async getDepartments() {
         try {
-            const response = await axios.get('/api/employees/departments')
-            return response.data || []
+            const response = await axios.get('/api/departments')
+            return response.data?.data || []
         } catch (error) {
             throw new Error(parseApiError(error, 'Gagal memuat data departemen'))
         }
@@ -273,8 +273,8 @@ export const hrApi = {
 
     async getPositions() {
         try {
-            const response = await axios.get('/api/employees/positions')
-            return response.data || []
+            const response = await axios.get('/api/positions')
+            return response.data?.data || []
         } catch (error) {
             throw new Error(parseApiError(error, 'Gagal memuat data jabatan'))
         }

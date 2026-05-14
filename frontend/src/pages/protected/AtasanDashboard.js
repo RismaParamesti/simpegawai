@@ -336,7 +336,7 @@ function AtasanDashboard() {
                                     </tr>
                                 </thead>
                                 <tbody>
-                                    {lateRows.map((row) => (
+                                    {lateRows.slice(0, 5).map((row) => (
                                         <tr key={row.key}>
                                             <td>{row.no}</td>
                                             <td className="font-semibold">{row.name}</td>
@@ -347,6 +347,13 @@ function AtasanDashboard() {
                                     ))}
                                 </tbody>
                             </table>
+                            {lateRows.length > 5 ? (
+                                <div className="text-right mt-3">
+                                    <button className="btn btn-ghost btn-sm" onClick={() => navigate('/app/team-attendance')}>
+                                        Lihat Semua
+                                    </button>
+                                </div>
+                            ) : null}
                         </div>
                     ) : (
                         <div className="text-center opacity-70 py-10">Belum ada yang terlambat hari ini</div>
@@ -367,7 +374,7 @@ function AtasanDashboard() {
                                 </tr>
                             </thead>
                             <tbody>
-                                {pendingLeaves.slice(0, 6).map((item) => (
+                                {pendingLeaves.slice(0, 5).map((item) => (
                                     <tr key={item.id}>
                                         <td>
                                             <div className="font-semibold">{item.employee_name}</div>
@@ -386,6 +393,13 @@ function AtasanDashboard() {
                             </tbody>
                         </table>
                     </div>
+                    {pendingLeaves.length > 5 ? (
+                        <div className="text-right mt-3">
+                            <button className="btn btn-ghost btn-sm" onClick={() => navigate('/app/leave-requests')}>
+                                Lihat Semua
+                            </button>
+                        </div>
+                    ) : null}
                 </TitleCard>
 
                 <TitleCard title="Reimbursement Pending" topMargin="mt-0">
@@ -400,7 +414,7 @@ function AtasanDashboard() {
                                 </tr>
                             </thead>
                             <tbody>
-                                {pendingReimbursements.slice(0, 6).map((item) => (
+                                {pendingReimbursements.slice(0, 5).map((item) => (
                                     <tr key={item.id}>
                                         <td>
                                             <div className="font-semibold">{item.employee_name}</div>
@@ -419,6 +433,13 @@ function AtasanDashboard() {
                             </tbody>
                         </table>
                     </div>
+                    {pendingReimbursements.length > 5 ? (
+                        <div className="text-right mt-3">
+                            <button className="btn btn-ghost btn-sm" onClick={() => navigate('/app/reimbursements')}>
+                                Lihat Semua
+                            </button>
+                        </div>
+                    ) : null}
                 </TitleCard>
             </div>
 
@@ -435,7 +456,7 @@ function AtasanDashboard() {
                             </tr>
                         </thead>
                         <tbody>
-                            {recentActions.map((item) => (
+                            {recentActions.slice(0, 5).map((item) => (
                                 <tr key={`${item.type}-${item.id}`}>
                                     <td><span className="badge badge-ghost badge-sm">{item.type}</span></td>
                                     <td>
@@ -459,6 +480,13 @@ function AtasanDashboard() {
                         </tbody>
                     </table>
                 </div>
+                {recentActions.length > 5 ? (
+                    <div className="text-right mt-3">
+                        <button className="btn btn-ghost btn-sm" onClick={() => navigate('/app/leave-requests')}>
+                            Lihat Semua
+                        </button>
+                    </div>
+                ) : null}
             </TitleCard>
         </>
     )
