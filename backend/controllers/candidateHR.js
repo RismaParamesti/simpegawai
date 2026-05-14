@@ -12,6 +12,31 @@ const {
   DOCUMENT_FIELD_METADATA,
 } = require("../utils/documentRequirements");
 
+let applicationsTableHasCoverLetterFilePromise = null;
+const applicationsTableHasCoverLetterFile = async () => {
+  if (!applicationsTableHasCoverLetterFilePromise) {
+    applicationsTableHasCoverLetterFilePromise = db
+      .promise()
+      .query(
+        `SELECT COUNT(*) AS cnt
+         FROM INFORMATION_SCHEMA.COLUMNS
+         WHERE TABLE_SCHEMA = DATABASE()
+           AND TABLE_NAME = 'applications'
+           AND COLUMN_NAME = 'cover_letter_file'`,
+      )
+      .then(([rows]) => rows[0].cnt > 0)
+      .catch((error) => {
+        console.warn(
+          "Failed to inspect applications.cover_letter_file column:",
+          error.message,
+        );
+        return false;
+      });
+  }
+
+  return applicationsTableHasCoverLetterFilePromise;
+};
+
 // ============================
 // GET INTERVIEW COMPLETED & APPLICATIONS CANCELED BY COMPANY (HR/Admin)
 // ============================
@@ -94,6 +119,10 @@ router.get(
   async (req, res) => {
     try {
       const { status, job_opening_id } = req.query;
+      const hasCoverLetterFileColumn = await applicationsTableHasCoverLetterFile();
+      const coverLetterSelect = hasCoverLetterFileColumn
+        ? "a.cover_letter_file AS cover_letter_file"
+        : "a.cover_letter AS cover_letter_file";
 
       let query = `
             SELECT  
@@ -125,7 +154,7 @@ router.get(
   c.portfolio,
   c.expected_salary,
 
-  a.cover_letter,
+  ${coverLetterSelect},
   a.cv_file,
   a.ktp_file,
   a.photo_file,

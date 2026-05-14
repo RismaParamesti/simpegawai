@@ -322,8 +322,21 @@ export default function InterviewModal({
                       <div className="card-body text-sm">
                         <h3 className="card-title text-lg">Cover Letter</h3>
                         <div className="whitespace-pre-line break-words p-2 border rounded bg-base-100 min-h-[48px]">
-                          {detailCandidate?.cover_letter ? (
-                            detailCandidate.cover_letter
+                          {detailCandidate?.cover_letter_file ? (
+                            <a
+                              href={
+                                detailCandidate.cover_letter_file.startsWith("http")
+                                  ? detailCandidate.cover_letter_file
+                                  : detailCandidate.cover_letter_file.startsWith("/")
+                                    ? `http://localhost:5000${detailCandidate.cover_letter_file}`
+                                    : `http://localhost:5000/${detailCandidate.cover_letter_file}`
+                              }
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="font-semibold break-all hover:underline"
+                            >
+                              {detailCandidate.cover_letter_file}
+                            </a>
                           ) : (
                             <span className="opacity-60 italic">
                               Tidak ada cover letter

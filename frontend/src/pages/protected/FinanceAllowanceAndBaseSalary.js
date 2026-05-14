@@ -8,15 +8,11 @@ import { financeApi } from "../../features/finance/api";
 const formatCurrency = (value) =>
   `Rp ${Number(value || 0).toLocaleString("id-ID")}`;
 
-const isHiddenPosition = (name = "", level = "") => {
-  const n = String(name || "").toLowerCase().trim();
-  const l = String(level || "").toLowerCase().trim();
+const isCommissionerPosition = (position = {}) => {
+  const name = String(position.name || "").toLowerCase().trim();
+  const level = String(position.level || "").toLowerCase().trim();
 
-  if (!n && !l) return false;
-  // Sembunyikan posisi commissioner (variasi penulisan)
-  if (n.includes("commissioner") || l === "commissioner") return true;
-
-  return false;
+  return name.includes("commissioner") || level === "commissioner";
 };
 
 function PositionSalary() {
@@ -37,8 +33,7 @@ function PositionSalary() {
     try {
       setLoading(true);
       const data = await financeApi.getPositions();
-      const filtered = (data || []).filter((p) => !isHiddenPosition(p.name, p.level));
-      setPositions(filtered);
+      setPositions((data || []).filter((position) => !isCommissionerPosition(position)));
     } catch (err) {
       dispatch(showNotification({ 
         message: err.message || "Gagal memuat data posisi", 

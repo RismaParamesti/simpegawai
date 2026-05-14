@@ -251,7 +251,12 @@ export default function HRJobOpenings() {
               >
                 <option value="">Pilih Posisi</option>
                 {positions
-                  .filter((pos) => pos.name.toLowerCase() !== "commissioner")
+                  .filter((pos) => {
+                    const name = String(pos.name || "").toLowerCase().trim();
+                    const level = String(pos.level || "").toLowerCase().trim();
+
+                    return !name.includes("commissioner") && level !== "commissioner";
+                  })
                   .map((pos) => (
                     <option key={pos.id} value={pos.id}>
                       {pos.name}

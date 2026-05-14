@@ -129,6 +129,17 @@ PREPARE stmt FROM @preparedstatement;
 EXECUTE stmt;
 DEALLOCATE PREPARE stmt;
 
+-- Add cover_letter_file if not exists
+SET @columnname = "cover_letter_file";
+SET @preparedstatement = (SELECT IF(
+    (SELECT COUNT(*) FROM INFORMATION_SCHEMA.COLUMNS WHERE (TABLE_NAME = @tablename) AND (COLUMN_NAME = @columnname) AND (TABLE_SCHEMA = @dbname)) > 0,
+    "SELECT 1",
+    CONCAT("ALTER TABLE ", @tablename, " ADD COLUMN ", @columnname, " VARCHAR(255) DEFAULT NULL AFTER `cover_letter`")
+));
+PREPARE stmt FROM @preparedstatement;
+EXECUTE stmt;
+DEALLOCATE PREPARE stmt;
+
 -- ========================================
 -- Summary of Document Structure:
 -- ========================================

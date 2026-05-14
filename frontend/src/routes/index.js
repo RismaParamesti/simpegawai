@@ -4,120 +4,59 @@ import { lazy } from "react";
 
 // Employee Pages
 const Dashboard = lazy(() => import("../pages/protected/Dashboard"));
-const EmployeeDashboard = lazy(
-  () => import("../pages/protected/EmployeeDashboard"),
-);
-const EmployeeAttendance = lazy(
-  () => import("../pages/protected/EmployeeAttendance"),
-);
+const EmployeeDashboard = lazy(() => import("../pages/protected/EmployeeDashboard"),);
+const EmployeeAttendance = lazy(() => import("../pages/protected/EmployeeAttendance"),);
 const EmployeeWarningLetters = lazy(() => import("../pages/protected/EmployeeWarningLetters"));
 const EmployeeLeave = lazy(() => import("../pages/protected/EmployeeLeave"));
-const EmployeePayroll = lazy(
-  () => import("../pages/protected/EmployeePayroll"),
-);
-const EmployeeReimbursement = lazy(
-  () => import("../pages/protected/EmployeeReimbursement"),
-);
-const EmployeeSalaryAppeal = lazy(
-  () => import("../pages/protected/EmployeeSalaryAppeal"),
-);
-const ProfileSettings = lazy(
-  () => import("../pages/protected/ProfileSettings"),
-);
+const EmployeePayroll = lazy(() => import("../pages/protected/EmployeePayroll"),);
+const EmployeeReimbursement = lazy(() => import("../pages/protected/EmployeeReimbursement"),);
+const EmployeeSalaryAppeal = lazy(() => import("../pages/protected/EmployeeSalaryAppeal"),);
+const ProfileSettings = lazy(() => import("../pages/protected/ProfileSettings"),);
 const Page404 = lazy(() => import("../pages/protected/404"));
 
 // Admin Pages
 const AdminUsers = lazy(() => import("../pages/protected/AdminUsers"));
 const AdminEmployees = lazy(() => import("../pages/protected/AdminEmployees"));
-const AdminActivityLogs = lazy(
-  () => import("../pages/protected/AdminActivityLogs"),
-);
-const ApproveAllowance = lazy(
-  () => import("../pages/protected/AdminApproveAllowance"),
-);
-const AdminHRWarningLetters = lazy(
-  () => import("../pages/protected/AdminHRWarningLetters"),
-);
+const AdminActivityLogs = lazy(() => import("../pages/protected/AdminActivityLogs"),);
+const AdmindDepartement = lazy(() => import("../pages/protected/AdminDepartement"),);
+const AdminDepartmentsPosition = lazy(() => import("../pages/protected/AdminDepartmentsPosition"),);
+const ApproveAllowance = lazy(() => import("../pages/protected/AdminApproveAllowance"),);
 
 // HR Pages
 const HRDashboard = lazy(() => import("../pages/protected/HRDashboard"));
 const HREmployees = lazy(() => import("../pages/protected/HREmployees"));
 const HRAttendance = lazy(() => import("../pages/protected/HRAttendance"));
-const HRLeaveRequests = lazy(
-  () => import("../pages/protected/HRLeaveRequests"),
-);
-const HRReimbursements = lazy(
-  () => import("../pages/protected/HRReimbursements"),
-);
-const HRSalaryAppeals = lazy(
-  () => import("../pages/protected/HRSalaryAppeals"),
-);
+const HRLeaveRequests = lazy(() => import("../pages/protected/HRLeaveRequests"),);
+const HRReimbursements = lazy(() => import("../pages/protected/HRReimbursements"),);
+const HRSalaryAppeals = lazy(() => import("../pages/protected/HRSalaryAppeals"),);
 const Allowance = lazy(() => import("../pages/protected/HRAllowance"));
-const HRPayrollDirectorAdjustments = lazy(
-  () => import("../pages/protected/HRAllowanceOther"),
-);
-const HRWarningLetters = lazy(
-  () => import("../pages/protected/HRWarningLetters"),
-);
+const HRPayrollDirectorAdjustments = lazy(() => import("../pages/protected/HRAllowanceOther"),);
+const HRWarningLetters = lazy(() => import("../pages/protected/HRWarningLetters"),);
 const HRJobOpenings = lazy(() => import("../pages/protected/HRJobOpenings"));
-const HRRecruitmentProcess = lazy(
-  () => import("../pages/protected/HRRecruitmentProcess"),
-);
-const HRCandidate = lazy(
-  () => import("../pages/protected/HRDetailRecruitment"),
-);
+const HRRecruitmentProcess = lazy(() => import("../pages/protected/HRRecruitmentProcess"),);
+const HRCandidate = lazy(() => import("../pages/protected/HRDetailRecruitment"),);
 const HRInterview = lazy(() => import("../pages/protected/HRInterview"));
 const JobDetail = lazy(() => import("../pages/protected/HRDetailInterview"));
-const HRHiredCandidate = lazy(
-  () => import("../pages/protected/HRHiredCandidate"),
-);
-const HRHiredCandidateDetail = lazy(
-  () => import("../pages/protected/HRHiredCandidateDetail"),
-);
-const HRHiredCandidateDetailModal = lazy(
-  () => import("../pages/protected/HRHiredCandidateDetailModal"),
-);
+const HRHiredCandidate = lazy(() => import("../pages/protected/HRHiredCandidate"),);
+const HRHiredCandidateDetail = lazy(() => import("../pages/protected/HRHiredCandidateDetail"),);
+const HRHiredCandidateDetailModal = lazy(() => import("../pages/protected/HRHiredCandidateDetailModal"),);
 
 // Atasan Pages
-const AtasanDashboard = lazy(
-  () => import("../pages/protected/AtasanDashboard"),
-);
-const AtasanLeaveRequests = lazy(
-  () => import("../pages/protected/AtasanLeaveRequests"),
-);
-const AtasanReimbursements = lazy(
-  () => import("../pages/protected/AtasanReimbursements"),
-);
-const AtasanAttendance = lazy(
-  () => import("../pages/protected/AtasanAttendance"),
-);
+const AtasanDashboard = lazy(() => import("../pages/protected/AtasanDashboard"),);
+const AtasanLeaveRequests = lazy(() => import("../pages/protected/AtasanLeaveRequests"),);
+const AtasanReimbursements = lazy(() => import("../pages/protected/AtasanReimbursements"),);
+const AtasanAttendance = lazy(() => import("../pages/protected/AtasanAttendance"),);
 
 // Finance Pages
-const FinanceDashboard = lazy(
-  () => import("../pages/protected/FinanceDashboard"),
-);
+const FinanceDashboard = lazy(() => import("../pages/protected/FinanceDashboard"),);
 const FinancePayroll = lazy(() => import("../pages/protected/FinancePayroll"));
-const FinancePayrollRevision = lazy(
-  () => import("../pages/protected/FinancePayrollRevision"),
-);
-const FinancePayrollTransfers = lazy(
-  () => import("../pages/protected/FinancePayrollTransfers"),
-);
-const FinanceAllowance = lazy(
-  () => import("../pages/protected/FinanceAllowance"),
-);
-const FinanceAllowancePayrollSettings = lazy(
-  () => import("../pages/protected/FinanceAllowancePayrollSettings"),
-);
-const PositionSalary = lazy(
-  () => import("../pages/protected/FinanceAllowanceAndBaseSalary"),
-);
-const FinanceReimbursements = lazy(
-  () => import("../pages/protected/FinanceReimbursements"),
-);
-const FinanceSalaryAppeals = lazy(
-  () => import("../pages/protected/FinanceSalaryAppeals"),
-);
+const FinancePayrollRevision = lazy(() => import("../pages/protected/FinancePayrollRevision"),);
+const FinancePayrollTransfers = lazy(() => import("../pages/protected/FinancePayrollTransfers"),);
+const FinanceAllowance = lazy(() => import("../pages/protected/FinanceAllowance"),);
+const FinanceAllowancePayrollSettings = lazy(() => import("../pages/protected/FinanceAllowancePayrollSettings"),);
+const PositionSalary = lazy(() => import("../pages/protected/FinanceAllowanceAndBaseSalary"),);
+const FinanceReimbursements = lazy(() => import("../pages/protected/FinanceReimbursements"),);
+const FinanceSalaryAppeals = lazy(() => import("../pages/protected/FinanceSalaryAppeals"),);
 const FinanceReports = lazy(() => import("../pages/protected/FinanceReports"));
 
 const adminRoutes = [
@@ -128,6 +67,14 @@ const adminRoutes = [
   {
     path: "/users",
     component: AdminUsers,
+  },
+  {
+    path: "/positions",
+    component: AdmindDepartement,
+  },
+  {
+    path: "/positions/:departmentId",
+    component: AdminDepartmentsPosition,
   },
   {
     path: "/employees",

@@ -83,6 +83,7 @@ export default function ApplicationDetailModal({
   const dokumenFields = [
     { key: "cv_file", label: "CV / Resume" },
     { key: "portfolio_file", label: "Portfolio" },
+    { key: "cover_letter_file", label: "Surat Lamaran" },
     { key: "ijazah_file", label: "Ijazah" },
     { key: "transcript_file", label: "Transkrip Nilai" },
     { key: "certificate_file", label: "Sertifikat" },
@@ -412,12 +413,19 @@ export default function ApplicationDetailModal({
           </div>
 
           {/* COVER LETTER */}
-          {app.cover_letter && (
+          {app.cover_letter_file && (
             <div className="card bg-base-200 text-base-content border border-base-300">
               <div className="card-body">
                 <h3 className="card-title text-lg text-base-content">💌 Surat Lamaran</h3>
-                <div className="bg-base-100 p-4 rounded border border-base-300 text-sm whitespace-pre-line text-base-content">
-                  {app.cover_letter}
+                <div className="bg-base-100 p-4 rounded border border-base-300 text-sm text-base-content">
+                  <a
+                    href={getDocumentUrl(app.cover_letter_file)}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="font-semibold break-all text-base-content hover:underline"
+                  >
+                    {app.cover_letter_file}
+                  </a>
                 </div>
               </div>
             </div>

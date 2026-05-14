@@ -11,7 +11,7 @@ import ReceiptPercentIcon from "@heroicons/react/24/outline/ReceiptPercentIcon";
 import BriefcaseIcon from "@heroicons/react/24/outline/BriefcaseIcon";
 import UserGroupIcon from "@heroicons/react/24/outline/UserGroupIcon";
 import ClipboardDocumentCheckIcon from "@heroicons/react/24/outline/ClipboardDocumentCheckIcon";
-import UserPlusIcon from '@heroicons/react/24/outline/UserPlusIcon'
+import UserPlusIcon from "@heroicons/react/24/outline/UserPlusIcon";
 
 const iconClasses = `h-6 w-6`;
 
@@ -20,6 +20,11 @@ const adminRoutes = [
     path: "/app/dashboard",
     icon: <Squares2X2Icon className={iconClasses} />,
     name: "Dashboard Admin",
+  },
+  {
+    path: "/app/positions",
+    icon: <UsersIcon className={iconClasses} />,
+    name: "Derpartemen & Jabatan",
   },
   {
     path: "/app/users",
