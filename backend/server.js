@@ -27,6 +27,8 @@ const hrInterviewRoutes = require("./controllers/hrInterview");
 const candidateCallRoutes = require("./controllers/candidateCall");
 const uploadInvitationRoutes = require("./controllers/uploadInvitation");
 const hrcandidateRoutes = require("./controllers/candidateHR");
+const departmentsRoutes = require("./controllers/departments");
+const positionsRoutes = require("./controllers/positions");
 
 const getAlphaGenerationTime = () => {
     const rawTime = String(process.env.DAILY_ALPHA_CRON_TIME || "23:59").trim();
@@ -110,6 +112,8 @@ app.use("/api/working-hours", workingHoursRoutes);
 app.use("/api/reimbursements", reimbursementRoutes);
 app.use("/api/salary-appeals", salaryAppealRoutes);
 app.use("/api/employees", employeeRoutes);
+app.use("/api/departments", departmentsRoutes);
+app.use("/api/positions", positionsRoutes);
 app.use("/api/dashboard/admin", dashboardAdminRoutes);
 app.use("/api/dashboard/atasan", dashboardAtasanRoutes);
 app.use("/api/dashboard/hr", dashboardHRRoutes);

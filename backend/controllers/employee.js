@@ -69,6 +69,64 @@ router.get("/", verifyToken, verifyRole(["admin", "hr"]), async (req, res) => {
 });
 
 // ============================
+// GET DEPARTMENTS (public within authenticated scope)
+// ============================
+router.get(
+  "/departments",
+  verifyToken,
+  async (req, res) => {
+    try {
+      console.log("[GET /departments] Starting request", { userId: req.user?.id, timestamp: new Date().toISOString() });
+      const [departments] = await db.promise().query(`
+                SELECT
+                    d.id, d.code, d.name, d.description, d.status,
+                    d.created_at, d.updated_at,
+                    COUNT(DISTINCT e.id) as totalEmployees,
+                    COUNT(DISTINCT p.id) as totalPositions
+                FROM departments d
+                LEFT JOIN positions p ON d.id = p.department_id
+                LEFT JOIN employees e ON p.id = e.position_id AND e.deleted_at IS NULL
+                GROUP BY d.id, d.code, d.name, d.description, d.status, d.created_at, d.updated_at
+                ORDER BY d.name ASC
+            `);
+
+      console.log(`[GET /departments] Success - returned ${departments.length} departments`);
+      console.log("[GET /departments] First department object:", JSON.stringify(departments[0]));
+      res.json({ data: departments });
+    } catch (error) {
+      console.error("[GET /departments] Error fetching departments:", error);
+      res.status(500).json({ message: "Failed to fetch departments", error: error.message });
+    }
+  },
+);
+
+// ============================
+// GET POSITIONS (for dropdowns)
+// ============================
+router.get(
+  "/positions",
+  verifyToken,
+  async (req, res) => {
+    try {
+      const [positions] = await db.promise().query(`
+                SELECT p.id, p.name, p.level, p.base_salary, p.position_allowance, p.status, p.department_id, d.name as department_name
+                FROM positions p
+                LEFT JOIN departments d ON p.department_id = d.id
+                WHERE p.status = 'active'
+                AND LOWER(COALESCE(p.level, '')) != 'commissioner'
+                AND LOWER(COALESCE(p.name, '')) NOT LIKE '%commissioner%'
+                ORDER BY p.name ASC
+            `);
+
+      res.json({ data: positions });
+    } catch (error) {
+      console.error(error);
+      res.status(500).json({ message: "Server error" });
+    }
+  },
+);
+
+// ============================
 // GET single employee detail (admin/HR only)
 // ============================
 router.get(
@@ -613,6 +671,8 @@ router.get(
                     p.updated_at
                 FROM positions p
                 LEFT JOIN departments d ON p.department_id = d.id
+                WHERE LOWER(COALESCE(p.level, '')) != 'commissioner'
+                AND LOWER(COALESCE(p.name, '')) NOT LIKE '%commissioner%'
                 ORDER BY p.level DESC, p.name ASC
             `);
 
@@ -689,6 +749,354 @@ router.put(
       });
 
       res.json({ message: "Position salary updated successfully" });
+    } catch (error) {
+      console.error(error);
+      res.status(500).json({ message: "Server error" });
+    }
+  },
+);
+
+// ============================
+// CREATE DEPARTMENT (admin/hr)
+// ============================
+router.post(
+  "/departments",
+  verifyToken,
+  verifyRole(["admin", "hr"]),
+  async (req, res) => {
+    const { code, name, description, status } = req.body;
+
+    if (!code || !name) {
+      return res.status(400).json({ message: "code and name are required" });
+    }
+
+    try {
+      // uniqueness check for code
+      const [existing] = await db
+        .promise()
+        .query("SELECT id FROM departments WHERE code = ? OR name = ?", [code, name]);
+
+      if (existing.length > 0) {
+        return res.status(409).json({ message: "Department code or name already exists" });
+      }
+
+      const [result] = await db.promise().query(
+        `INSERT INTO departments (code, name, description, status, created_at, updated_at) VALUES (?, ?, ?, ?, NOW(), NOW())`,
+        [code, name, description || null, status || "active"],
+      );
+
+      await logActivity({
+        userId: req.user.id,
+        username: req.user.username,
+        role: req.user.roles?.[0] || req.user.role,
+        action: "CREATE",
+        module: "departments",
+        description: `Created department: ${name}`,
+        newValues: { code, name, description, status },
+        ipAddress: getIpAddress(req),
+        userAgent: getUserAgent(req),
+      });
+
+      res.status(201).json({ message: "Department created", id: result.insertId });
+    } catch (error) {
+      console.error(error);
+      res.status(500).json({ message: "Server error" });
+    }
+  },
+);
+
+// ============================
+// UPDATE DEPARTMENT (admin/hr)
+// ============================
+router.put(
+  "/departments/:id",
+  verifyToken,
+  verifyRole(["admin", "hr"]),
+  async (req, res) => {
+    const { id } = req.params;
+    const { code, name, description, status } = req.body;
+
+    try {
+      const [existing] = await db
+        .promise()
+        .query("SELECT id FROM departments WHERE id = ?", [id]);
+
+      if (existing.length === 0) {
+        return res.status(404).json({ message: "Department not found" });
+      }
+
+      const updates = [];
+      const values = [];
+
+      if (code !== undefined) {
+        updates.push("code = ?");
+        values.push(code);
+      }
+      if (name !== undefined) {
+        updates.push("name = ?");
+        values.push(name);
+      }
+      if (description !== undefined) {
+        updates.push("description = ?");
+        values.push(description);
+      }
+      if (status !== undefined) {
+        updates.push("status = ?");
+        values.push(status);
+      }
+
+      if (updates.length === 0) {
+        return res.status(400).json({ message: "No fields to update" });
+      }
+
+      updates.push("updated_at = NOW()");
+      values.push(id);
+
+      const updateQuery = `UPDATE departments SET ${updates.join(", ")} WHERE id = ?`;
+      await db.promise().query(updateQuery, values);
+
+      await logActivity({
+        userId: req.user.id,
+        username: req.user.username,
+        role: req.user.roles?.[0] || req.user.role,
+        action: "UPDATE",
+        module: "departments",
+        description: `Updated department ID: ${id}`,
+        newValues: { code, name, description, status },
+        ipAddress: getIpAddress(req),
+        userAgent: getUserAgent(req),
+      });
+
+      res.json({ message: "Department updated successfully" });
+    } catch (error) {
+      console.error(error);
+      res.status(500).json({ message: "Server error" });
+    }
+  },
+);
+
+// ============================
+// DELETE DEPARTMENT (admin/hr)
+// ============================
+router.delete(
+  "/departments/:id",
+  verifyToken,
+  verifyRole(["admin", "hr"]),
+  async (req, res) => {
+    const { id } = req.params;
+
+    try {
+      const [existing] = await db
+        .promise()
+        .query("SELECT id FROM departments WHERE id = ?", [id]);
+
+      if (existing.length === 0) {
+        return res.status(404).json({ message: "Department not found" });
+      }
+
+      // Check if department has positions
+      const [positions] = await db
+        .promise()
+        .query("SELECT COUNT(*) as count FROM positions WHERE department_id = ?", [id]);
+
+      if (positions[0].count > 0) {
+        return res.status(400).json({ message: "Cannot delete department with existing positions" });
+      }
+
+      await db.promise().query("DELETE FROM departments WHERE id = ?", [id]);
+
+      await logActivity({
+        userId: req.user.id,
+        username: req.user.username,
+        role: req.user.roles?.[0] || req.user.role,
+        action: "DELETE",
+        module: "departments",
+        description: `Deleted department ID: ${id}`,
+        ipAddress: getIpAddress(req),
+        userAgent: getUserAgent(req),
+      });
+
+      res.json({ message: "Department deleted successfully" });
+    } catch (error) {
+      console.error(error);
+      res.status(500).json({ message: "Server error" });
+    }
+  },
+);
+
+// ============================
+// CREATE POSITION (admin/hr)
+// ============================
+router.post(
+  "/positions",
+  verifyToken,
+  verifyRole(["admin", "hr"]),
+  async (req, res) => {
+    const { department_id, name, level, base_salary, position_allowance, status } = req.body;
+
+    if (!department_id || !name) {
+      return res.status(400).json({ message: "department_id and name are required" });
+    }
+
+    try {
+      // validate department
+      const [dept] = await db.promise().query("SELECT id FROM departments WHERE id = ?", [department_id]);
+      if (dept.length === 0) {
+        return res.status(400).json({ message: "Invalid department_id" });
+      }
+
+      const [result] = await db.promise().query(
+        `INSERT INTO positions (department_id, name, level, base_salary, position_allowance, status, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, NOW(), NOW())`,
+        [department_id, name, level || 'staff', base_salary || 0, position_allowance || null, status || 'active'],
+      );
+
+      await logActivity({
+        userId: req.user.id,
+        username: req.user.username,
+        role: req.user.roles?.[0] || req.user.role,
+        action: "CREATE",
+        module: "positions",
+        description: `Created position: ${name}`,
+        newValues: { department_id, name, level, base_salary, position_allowance, status },
+        ipAddress: getIpAddress(req),
+        userAgent: getUserAgent(req),
+      });
+
+      res.status(201).json({ message: "Position created", id: result.insertId });
+    } catch (error) {
+      console.error(error);
+      res.status(500).json({ message: "Server error" });
+    }
+  },
+);
+
+// ============================
+// UPDATE POSITION (admin/hr)
+// ============================
+router.put(
+  "/positions/:id",
+  verifyToken,
+  verifyRole(["admin", "hr"]),
+  async (req, res) => {
+    const { id } = req.params;
+    const { department_id, name, level, base_salary, position_allowance, status } = req.body;
+
+    try {
+      const [existing] = await db
+        .promise()
+        .query("SELECT id FROM positions WHERE id = ?", [id]);
+
+      if (existing.length === 0) {
+        return res.status(404).json({ message: "Position not found" });
+      }
+
+      if (department_id) {
+        const [dept] = await db.promise().query("SELECT id FROM departments WHERE id = ?", [department_id]);
+        if (dept.length === 0) {
+          return res.status(400).json({ message: "Invalid department_id" });
+        }
+      }
+
+      const updates = [];
+      const values = [];
+
+      if (department_id !== undefined) {
+        updates.push("department_id = ?");
+        values.push(department_id);
+      }
+      if (name !== undefined) {
+        updates.push("name = ?");
+        values.push(name);
+      }
+      if (level !== undefined) {
+        updates.push("level = ?");
+        values.push(level);
+      }
+      if (base_salary !== undefined) {
+        updates.push("base_salary = ?");
+        values.push(base_salary);
+      }
+      if (position_allowance !== undefined) {
+        updates.push("position_allowance = ?");
+        values.push(position_allowance);
+      }
+      if (status !== undefined) {
+        updates.push("status = ?");
+        values.push(status);
+      }
+
+      if (updates.length === 0) {
+        return res.status(400).json({ message: "No fields to update" });
+      }
+
+      updates.push("updated_at = NOW()");
+      values.push(id);
+
+      const updateQuery = `UPDATE positions SET ${updates.join(", ")} WHERE id = ?`;
+      await db.promise().query(updateQuery, values);
+
+      await logActivity({
+        userId: req.user.id,
+        username: req.user.username,
+        role: req.user.roles?.[0] || req.user.role,
+        action: "UPDATE",
+        module: "positions",
+        description: `Updated position ID: ${id}`,
+        newValues: { department_id, name, level, base_salary, position_allowance, status },
+        ipAddress: getIpAddress(req),
+        userAgent: getUserAgent(req),
+      });
+
+      res.json({ message: "Position updated successfully" });
+    } catch (error) {
+      console.error(error);
+      res.status(500).json({ message: "Server error" });
+    }
+  },
+);
+
+// ============================
+// DELETE POSITION (admin/hr)
+// ============================
+router.delete(
+  "/positions/:id",
+  verifyToken,
+  verifyRole(["admin", "hr"]),
+  async (req, res) => {
+    const { id } = req.params;
+
+    try {
+      const [existing] = await db
+        .promise()
+        .query("SELECT id FROM positions WHERE id = ?", [id]);
+
+      if (existing.length === 0) {
+        return res.status(404).json({ message: "Position not found" });
+      }
+
+      // Check if position has employees
+      const [employees] = await db
+        .promise()
+        .query("SELECT COUNT(*) as count FROM employees WHERE position_id = ? AND deleted_at IS NULL", [id]);
+
+      if (employees[0].count > 0) {
+        return res.status(400).json({ message: "Cannot delete position with existing employees" });
+      }
+
+      await db.promise().query("DELETE FROM positions WHERE id = ?", [id]);
+
+      await logActivity({
+        userId: req.user.id,
+        username: req.user.username,
+        role: req.user.roles?.[0] || req.user.role,
+        action: "DELETE",
+        module: "positions",
+        description: `Deleted position ID: ${id}`,
+        ipAddress: getIpAddress(req),
+        userAgent: getUserAgent(req),
+      });
+
+      res.json({ message: "Position deleted successfully" });
     } catch (error) {
       console.error(error);
       res.status(500).json({ message: "Server error" });

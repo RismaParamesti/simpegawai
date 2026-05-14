@@ -61,7 +61,7 @@ uploads/candidate_documents/
 **Auth:** Required (kandidat)  
 **Body:** FormData dengan:
 - `job_opening_id`: ID lowongan (required)
-- `cover_letter`: Surat lamaran (optional)
+- `cover_letter_file`: Surat lamaran file (optional)
 - File fields (optional sesuai posisi):
   - `cv_file`
   - `portfolio_file`
@@ -164,7 +164,7 @@ await axios.post('/api/candidates/upload-photo', formData, {
 ```javascript
 const formData = new FormData();
 formData.append('job_opening_id', jobId);
-formData.append('cover_letter', coverLetter);
+formData.append('cover_letter_file', coverLetterFile);
 formData.append('cv_file', cvFile);
 formData.append('portfolio_file', portfolioFile);
 formData.append('github_repo', githubUrl);

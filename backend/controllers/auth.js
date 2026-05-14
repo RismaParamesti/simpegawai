@@ -666,6 +666,8 @@ router.get(
                 SELECT p.id, p.name, p.base_salary, d.name as department_name
                 FROM positions p
                 LEFT JOIN departments d ON p.department_id = d.id
+                WHERE LOWER(COALESCE(p.level, '')) != 'commissioner'
+                AND LOWER(COALESCE(p.name, '')) NOT LIKE '%commissioner%'
                 ORDER BY p.name ASC
             `);
 

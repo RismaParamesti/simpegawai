@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { useDispatch } from "react-redux";
 import { useLocation, useNavigate } from "react-router-dom";
 import { setPageTitle } from "../features/common/headerSlice";
@@ -146,7 +146,6 @@ function CandidateApplyPage() {
     }
     return {
       job_opening_id: jobFromPage?.id || "",
-      cover_letter: "",
     };
   });
 
@@ -162,6 +161,7 @@ function CandidateApplyPage() {
     reference_letter_file: null,
     skck_file: null,
     portfolio_file: null,
+    cover_letter_file: null,
     github_link: null,
     design_link: null,
     youtube_link: null,
@@ -180,6 +180,7 @@ function CandidateApplyPage() {
     reference_letter_file: "",
     skck_file: "",
     portfolio_file: "",
+    cover_letter_file: "",
     github_link: "",
     design_link: "",
     youtube_link: "",
@@ -190,6 +191,30 @@ function CandidateApplyPage() {
   // Required documents state
   const [requiredDocuments, setRequiredDocuments] = useState([]);
   const [optionalDocuments, setOptionalDocuments] = useState([]);
+
+  // Fetch required documents ketika job dipilih
+  const loadRequiredDocuments = useCallback(async (jobId, basePosition = "") => {
+    try {
+      let url = `/api/job-openings/${jobId}/documents`;
+      if (basePosition) {
+        url += `?base_position=${encodeURIComponent(basePosition)}`;
+      }
+      const res = await axios.get(url);
+      if (res.data) {
+        setRequiredDocuments(res.data.requiredDocuments || []);
+        setOptionalDocuments(res.data.optionalDocuments || []);
+      }
+    } catch (error) {
+      console.error("Failed to load required documents:", error);
+      setRequiredDocuments([
+        { fieldName: "cv_file", label: "CV / Resume", required: true },
+        { fieldName: "ijazah_file", label: "Ijazah", required: true },
+        { fieldName: "ktp_file", label: "KTP", required: true },
+        { fieldName: "photo_file", label: "Foto Diri", required: true },
+      ]);
+      setOptionalDocuments([]);
+    }
+  }, []);
 
   // ========== AUTO-SAVE TO LOCALSTORAGE ==========
   useEffect(() => {
@@ -211,7 +236,6 @@ function CandidateApplyPage() {
   useEffect(() => {
     dispatch(setPageTitle({ title: "Ajukan Lamaran Pekerjaan" }));
     let candidateDataFromDB = null;
-    let dbDataIsComplete = false;
 
     const initializeApplication = async () => {
       try {
@@ -228,15 +252,6 @@ function CandidateApplyPage() {
         // Handle profile
         if (profileRes && profileRes.data && profileRes.data.candidate) {
           candidateDataFromDB = profileRes.data.candidate;
-          dbDataIsComplete = !!(
-            candidateDataFromDB.name &&
-            candidateDataFromDB.email &&
-            candidateDataFromDB.phone &&
-            candidateDataFromDB.birth_place &&
-            candidateDataFromDB.date_of_birth &&
-            candidateDataFromDB.nik &&
-            candidateDataFromDB.address
-          );
         }
 
         // Data diri (candidateData) selalu diisi dari database jika ada
@@ -317,7 +332,7 @@ function CandidateApplyPage() {
 
         // Load required documents jika job sudah dipilih dari awal
         if (jobFromPage?.id) {
-          await loadRequiredDocuments(jobFromPage.id);
+          await loadRequiredDocuments(jobFromPage.id, jobFromPage.base_position);
         }
       } catch (error) {
         console.error("Failed to initialize application:", error);
@@ -327,26 +342,19 @@ function CandidateApplyPage() {
       }
     };
     initializeApplication();
-  }, [dispatch, comeFromJobListing, jobFromPage?.id]);
+  }, [dispatch, comeFromJobListing, jobFromPage, loadRequiredDocuments]);
 
   // ========== REFRESH DOKUMEN SAAT PILIHAN LOWONGAN BERUBAH ==========
   useEffect(() => {
     if (selectedJob && selectedJob.id) {
-      loadRequiredDocuments(selectedJob.id);
+      loadRequiredDocuments(selectedJob.id, selectedJob.base_position);
     }
-  }, [selectedJob?.id]);
+  }, [selectedJob, loadRequiredDocuments]);
 
   // ========== FORM HANDLERS ==========
   const handleCandidateChange = (e) => {
     setCandidateData({
       ...candidateData,
-      [e.target.name]: e.target.value,
-    });
-  };
-
-  const handleApplicationChange = (e) => {
-    setApplicationData({
-      ...applicationData,
       [e.target.name]: e.target.value,
     });
   };
@@ -375,32 +383,6 @@ function CandidateApplyPage() {
       ...fileNames,
       [name]: value,
     });
-  };
-
-  // Fetch required documents ketika job dipilih
-  const loadRequiredDocuments = async (jobId) => {
-    try {
-      let url = `/api/job-openings/${jobId}/documents`;
-      // Jika selectedJob punya base_position, kirim sebagai query
-      if (selectedJob && selectedJob.base_position) {
-        url += `?base_position=${encodeURIComponent(selectedJob.base_position)}`;
-      }
-      const res = await axios.get(url);
-      if (res.data) {
-        setRequiredDocuments(res.data.requiredDocuments || []);
-        setOptionalDocuments(res.data.optionalDocuments || []);
-      }
-    } catch (error) {
-      console.error("Failed to load required documents:", error);
-      // Set default if fetch fails
-      setRequiredDocuments([
-        { fieldName: "cv_file", label: "CV / Resume", required: true },
-        { fieldName: "ijazah_file", label: "Ijazah", required: true },
-        { fieldName: "ktp_file", label: "KTP", required: true },
-        { fieldName: "photo_file", label: "Foto Diri", required: true },
-      ]);
-      setOptionalDocuments([]);
-    }
   };
 
   const handleNext = () => {
@@ -545,7 +527,9 @@ function CandidateApplyPage() {
       // Prepare FormData for file uploads
       const formData = new FormData();
       formData.append("job_opening_id", applicationData.job_opening_id);
-      formData.append("cover_letter", applicationData.cover_letter || "");
+      if (files.cover_letter_file instanceof File) {
+        formData.append("cover_letter_file", files.cover_letter_file);
+      }
 
       // Add files - semua dokumen yang ada di requiredDocuments dan optionalDocuments
       [...requiredDocuments, ...optionalDocuments].forEach((doc) => {
@@ -609,6 +593,12 @@ function CandidateApplyPage() {
         NotificationManager.error(
           `Dokumen yang diperlukan: ${missingDocs}`,
           "Dokumen Tidak Lengkap",
+          4000,
+        );
+      } else if (error.response?.data?.unexpectedFields?.length > 0) {
+        NotificationManager.error(
+          `Field upload tidak dikenali: ${error.response.data.unexpectedFields.join(", ")}`,
+          "Gagal Upload",
           4000,
         );
       } else {
@@ -1571,22 +1561,26 @@ function CandidateApplyPage() {
             <div className="form-control">
               <label className="label">
                 <span className="label-text font-semibold">
-                  Surat Lamaran / Cover Letter (Opsional)
+                  Surat Lamaran / Cover Letter (File, Opsional)
                 </span>
               </label>
-              <textarea
-                name="cover_letter"
-                className="textarea textarea-bordered"
-                placeholder="Ceritakan mengapa Anda tertarik dengan posisi ini..."
-                value={applicationData.cover_letter}
-                onChange={handleApplicationChange}
-                rows="6"
+              <input
+                type="file"
+                name="cover_letter_file"
+                className="file-input file-input-bordered"
+                accept=".pdf,.doc,.docx"
+                onChange={handleFileChange}
               />
               <label className="label">
                 <span className="label-text-alt">
-                  Jika kosong akan menggunakan template default
+                  Upload file PDF/DOC/DOCX untuk surat lamaran Anda
                 </span>
               </label>
+              {fileNames.cover_letter_file && (
+                <p className="text-sm text-success mt-1">
+                  ✓ {fileNames.cover_letter_file}
+                </p>
+              )}
             </div>
           </div>
         </div>
@@ -1880,12 +1874,35 @@ function CandidateApplyPage() {
             )}
 
             {/* Cover Letter */}
-            {applicationData.cover_letter && (
+            {fileNames.cover_letter_file && (
               <div className="card bg-base-200">
                 <div className="card-body">
                   <h3 className="card-title text-lg">💌 Surat Lamaran</h3>
-                  <div className="bg-white p-4 rounded border border-gray-300 text-sm whitespace-pre-wrap">
-                    {applicationData.cover_letter}
+                  <div className="bg-white p-4 rounded border border-gray-300 text-sm">
+                    <div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
+                      <div>
+                        <p className="font-semibold break-all">
+                          {fileNames.cover_letter_file}
+                        </p>
+                        <p className="text-xs text-gray-500">
+                          Surat lamaran dikirim sebagai file.
+                        </p>
+                      </div>
+                      {files.cover_letter_file instanceof File && (
+                        <button
+                          type="button"
+                          className="btn btn-xs btn-outline"
+                          onClick={() =>
+                            window.open(
+                              URL.createObjectURL(files.cover_letter_file),
+                              "_blank",
+                            )
+                          }
+                        >
+                          Lihat File
+                        </button>
+                      )}
+                    </div>
                   </div>
                 </div>
               </div>

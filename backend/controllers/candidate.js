@@ -60,7 +60,11 @@ router.get(
       }
     } catch (error) {
       console.error(error);
-      res.status(500).json({ message: "Server error" });
+      res.status(500).json({
+        message: "Server error",
+        error: error.message,
+        code: error.code,
+      });
     }
   },
 );
@@ -598,6 +602,78 @@ const uploadApplicationDocs = multer({
   fileFilter: candidateFileFilter,
 });
 
+let applicationsTableHasCoverLetterFilePromise = null;
+const applicationsTableHasCoverLetterFile = async () => {
+  if (!applicationsTableHasCoverLetterFilePromise) {
+    applicationsTableHasCoverLetterFilePromise = db
+      .promise()
+      .query(
+        `SELECT COUNT(*) AS cnt
+         FROM INFORMATION_SCHEMA.COLUMNS
+         WHERE TABLE_SCHEMA = DATABASE()
+           AND TABLE_NAME = 'applications'
+           AND COLUMN_NAME = 'cover_letter_file'`,
+      )
+      .then(([rows]) => rows[0].cnt > 0)
+      .catch((error) => {
+        console.warn(
+          "Failed to inspect applications.cover_letter_file column:",
+          error.message,
+        );
+        return false;
+      });
+  }
+
+  return applicationsTableHasCoverLetterFilePromise;
+};
+
+const APPLICATION_FILE_FIELD_ALIASES = {
+  cv: "cv_file",
+  resume: "cv_file",
+  ktp: "ktp_file",
+  photo: "photo_file",
+  ijazah: "ijazah_file",
+  transcript: "transcript_file",
+  certificate: "certificate_file",
+  experience_letter: "experience_letter_file",
+  reference_letter: "reference_letter_file",
+  skck: "skck_file",
+  portfolio: "portfolio_file",
+  cover_letter: "cover_letter_file",
+  github: "github_link",
+  design: "design_link",
+  youtube: "youtube_link",
+  marketing_portfolio: "marketing_portfolio_link",
+  campaign: "campaign_link",
+  design_portfolio_file: "design_link",
+  marketing_campaign_file: "campaign_link",
+};
+
+const APPLICATION_FILE_FIELDS = new Set([
+  "cv_file",
+  "ktp_file",
+  "photo_file",
+  "ijazah_file",
+  "transcript_file",
+  "certificate_file",
+  "experience_letter_file",
+  "reference_letter_file",
+  "skck_file",
+  "portfolio_file",
+  "other_document",
+  "cover_letter_file",
+  "github_link",
+  "design_link",
+  "youtube_link",
+  "marketing_portfolio_link",
+  "campaign_link",
+]);
+
+const normalizeApplicationFieldName = (fieldName) => {
+  if (!fieldName) return fieldName;
+  return APPLICATION_FILE_FIELD_ALIASES[fieldName] || fieldName;
+};
+
 // ============================
 // GET CANDIDATE PROFILE (Own data)
 // ============================
@@ -839,27 +915,10 @@ router.post(
   "/apply",
   verifyToken,
   verifyRole(["kandidat"]),
-  uploadApplicationDocs.fields([
-    { name: "cv_file", maxCount: 1 },
-    { name: "ktp_file", maxCount: 1 },
-    { name: "photo_file", maxCount: 1 },
-    { name: "ijazah_file", maxCount: 1 },
-    { name: "transcript_file", maxCount: 1 },
-    { name: "certificate_file", maxCount: 1 },
-    { name: "experience_letter_file", maxCount: 1 },
-    { name: "reference_letter_file", maxCount: 1 },
-    { name: "skck_file", maxCount: 1 },
-    { name: "portfolio_file", maxCount: 1 },
-    { name: "other_document", maxCount: 1 },
-    { name: "github_link", maxCount: 1 },
-    { name: "design_link", maxCount: 1 },
-    { name: "youtube_link", maxCount: 1 },
-    { name: "marketing_portfolio_link", maxCount: 1 },
-    { name: "campaign_link", maxCount: 1 },
-  ]),
+  uploadApplicationDocs.any(),
   async (req, res) => {
     try {
-      const { job_opening_id, cover_letter } = req.body;
+      const { job_opening_id } = req.body;
 
       if (!job_opening_id) {
         return res.status(400).json({ message: "job_opening_id is required" });
@@ -913,13 +972,25 @@ router.post(
           .json({ message: "You have already applied to this job" });
       }
 
+      const hasCoverLetterFileColumn = await applicationsTableHasCoverLetterFile();
+      const coverLetterColumnName = hasCoverLetterFileColumn
+        ? "cover_letter_file"
+        : "cover_letter";
+
       // Get required documents untuk posisi ini
       const documentRequirements = getRequiredDocuments(jobData.position_name);
 
       // Helper function to build file path
       const buildFilePath = (fieldName) => {
-        if (req.files && req.files[fieldName]) {
-          return `uploads/candidate_documents/${req.candidatePath}/${req.files[fieldName][0].filename}`;
+        const normalizedField = normalizeApplicationFieldName(fieldName);
+        if (!req.files || req.files.length === 0) {
+          return null;
+        }
+        const matchedFile = req.files.find(
+          (file) => normalizeApplicationFieldName(file.fieldname) === normalizedField,
+        );
+        if (matchedFile) {
+          return `uploads/candidate_documents/${req.candidatePath}/${matchedFile.filename}`;
         }
         return null;
       };
@@ -941,6 +1012,7 @@ router.post(
         "skck_file",
         "portfolio_file",
         "other_document",
+        "cover_letter_file",
       ];
 
       fileFields.forEach((field) => {
@@ -950,6 +1022,28 @@ router.post(
           filePaths[field] = filePath;
         }
       });
+
+      const unexpectedFields = (req.files || [])
+        .map((file) => file.fieldname)
+        .filter((fieldName) => !APPLICATION_FILE_FIELDS.has(normalizeApplicationFieldName(fieldName)));
+
+      if (unexpectedFields.length > 0) {
+        // Bersihkan file yang sempat tersimpan supaya request tidak gagal diam-diam.
+        for (const file of req.files || []) {
+          try {
+            if (file.path && fs.existsSync(file.path)) {
+              fs.unlinkSync(file.path);
+            }
+          } catch (cleanupError) {
+            console.warn("Failed to cleanup unexpected upload:", cleanupError.message);
+          }
+        }
+
+        return res.status(400).json({
+          message: "Unexpected upload field",
+          unexpectedFields,
+        });
+      }
 
       // Handle URL fields
       const urlFields = [
@@ -986,36 +1080,53 @@ router.post(
         });
       }
 
+      const applicationColumns = [
+        "job_opening_id",
+        "candidate_id",
+        coverLetterColumnName,
+        "cv_file",
+        "ktp_file",
+        "photo_file",
+        "ijazah_file",
+        "transcript_file",
+        "certificate_file",
+        "experience_letter_file",
+        "reference_letter_file",
+        "skck_file",
+        "portfolio_file",
+        "other_document",
+        "github_link",
+        "design_link",
+        "youtube_link",
+        "marketing_portfolio_link",
+        "campaign_link",
+      ];
+      const applicationValues = [
+        job_opening_id,
+        candidateId,
+        filePaths.cover_letter_file || null,
+        filePaths.cv_file || null,
+        filePaths.ktp_file || null,
+        filePaths.photo_file || null,
+        filePaths.ijazah_file || null,
+        filePaths.transcript_file || null,
+        filePaths.certificate_file || null,
+        filePaths.experience_letter_file || null,
+        filePaths.reference_letter_file || null,
+        filePaths.skck_file || null,
+        filePaths.portfolio_file || null,
+        filePaths.other_document || null,
+        filePaths.github_link || null,
+        filePaths.design_link || null,
+        filePaths.youtube_link || null,
+        filePaths.marketing_portfolio_link || null,
+        filePaths.campaign_link || null,
+      ];
+
       const [result] = await db.promise().query(
-        `INSERT INTO applications (
-                    job_opening_id, candidate_id, cover_letter,
-                    cv_file, ktp_file, photo_file, ijazah_file, transcript_file,
-                    certificate_file, experience_letter_file, reference_letter_file, skck_file,
-                    portfolio_file, other_document, github_link, design_link, youtube_link,
-                    marketing_portfolio_link, campaign_link,
-                    status, submitted_at
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'submitted', NOW())`,
-        [
-          job_opening_id,
-          candidateId,
-          cover_letter || "",
-          filePaths.cv_file || null,
-          filePaths.ktp_file || null,
-          filePaths.photo_file || null,
-          filePaths.ijazah_file || null,
-          filePaths.transcript_file || null,
-          filePaths.certificate_file || null,
-          filePaths.experience_letter_file || null,
-          filePaths.reference_letter_file || null,
-          filePaths.skck_file || null,
-          filePaths.portfolio_file || null,
-          filePaths.other_document || null,
-          filePaths.github_link || null,
-          filePaths.design_link || null,
-          filePaths.youtube_link || null,
-          filePaths.marketing_portfolio_link || null,
-          filePaths.campaign_link || null,
-        ],
+        `INSERT INTO applications (${applicationColumns.join(", ")}, status, submitted_at)
+         VALUES (${applicationColumns.map(() => "?").join(", ")}, 'submitted', NOW())`,
+        applicationValues,
       );
 
       // Update application count
@@ -1057,7 +1168,12 @@ router.get(
 
       const candidateId = candidate[0].id;
 
-            const query = `
+      const hasCoverLetterFileColumn = await applicationsTableHasCoverLetterFile();
+      const coverLetterSelect = hasCoverLetterFileColumn
+        ? "a.cover_letter_file AS cover_letter_file"
+        : "a.cover_letter AS cover_letter_file";
+
+      const query = `
              SELECT a.*, jo.title AS job_title, jo.location, jo.employment_type,
                p.name AS position_name, p.level,
                d.name AS department_name,
@@ -1069,7 +1185,8 @@ router.get(
                i.duration_minutes,
                i.result,
                i.status AS interview_status,
-               c.name, c.email, c.phone, c.gender, c.birth_place, c.date_of_birth, c.marital_status, c.nationality, c.address, c.nik, c.npwp, c.education_level, c.university, c.major, c.graduation_year, c.linkedin, c.portfolio, c.expected_salary
+             c.name, c.email, c.phone, c.gender, c.birth_place, c.date_of_birth, c.marital_status, c.nationality, c.address, c.nik, c.npwp, c.education_level, c.university, c.major, c.graduation_year, c.linkedin, c.portfolio, c.expected_salary,
+             ${coverLetterSelect}
              FROM applications a
              JOIN job_openings jo ON a.job_opening_id = jo.id
              JOIN positions p ON jo.position_id = p.id
@@ -1120,6 +1237,11 @@ router.get(
 
       const candidateId = candidate[0].id;
 
+      const hasCoverLetterFileColumn = await applicationsTableHasCoverLetterFile();
+      const coverLetterSelect = hasCoverLetterFileColumn
+        ? "a.cover_letter_file AS cover_letter_file"
+        : "a.cover_letter AS cover_letter_file";
+
       const query = `
                  SELECT a.*, 
                      jo.title AS job_title, jo.description, jo.requirements, jo.responsibilities, jo.salary_range_min, jo.salary_range_max, jo.quota, jo.deadline, jo.location, jo.employment_type,
@@ -1127,7 +1249,8 @@ router.get(
                      d.name AS department_name,
                      i.scheduled_date, i.meeting_link, i.location AS interview_location,
                      i.interview_type, i.result AS interview_result, i.status AS interview_status,
-                     c.name, c.email, c.phone, c.gender, c.birth_place, c.date_of_birth, c.marital_status, c.nationality, c.address, c.nik, c.npwp, c.education_level, c.university, c.major, c.graduation_year, c.linkedin, c.portfolio, c.expected_salary
+                     c.name, c.email, c.phone, c.gender, c.birth_place, c.date_of_birth, c.marital_status, c.nationality, c.address, c.nik, c.npwp, c.education_level, c.university, c.major, c.graduation_year, c.linkedin, c.portfolio, c.expected_salary,
+                     ${coverLetterSelect}
             FROM applications a
             JOIN job_openings jo ON a.job_opening_id = jo.id
             JOIN positions p ON jo.position_id = p.id
@@ -1264,7 +1387,7 @@ router.get(
   c.portfolio,
   c.expected_salary,
 
-  a.cover_letter,
+  ${coverLetterSelect},
   a.cv_file,
   a.ktp_file,
   a.photo_file,

@@ -34,6 +34,7 @@ CREATE TABLE IF NOT EXISTS `applications` (
   `job_opening_id` INT(11) NOT NULL,
   `candidate_id` INT(11) NOT NULL,
   `cover_letter` TEXT,
+  `cover_letter_file` VARCHAR(255) DEFAULT NULL,
   `status` ENUM('submitted', 'reviewing', 'shortlisted', 'interview_scheduled', 'interviewed', 'accepted', 'rejected', 'withdrawn') DEFAULT 'submitted',
   `admin_notes` TEXT,
   `submitted_at` TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,

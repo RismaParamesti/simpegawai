@@ -41,6 +41,87 @@ export const adminApi = {
         }
     },
 
+    async createDepartment(payload) {
+        try {
+            const response = await axios.post('/api/employees/departments', payload)
+            return response.data
+        } catch (error) {
+            throw new Error(parseApiError(error, 'Gagal menambah departemen'))
+        }
+    },
+
+    async getDepartments() {
+        try {
+            const response = await axios.get('/api/employees/departments')
+            return response.data?.data || []
+        } catch (error) {
+            throw new Error(parseApiError(error, 'Gagal memuat data departemen'))
+        }
+    },
+
+    async updateDepartment(departmentId, payload) {
+        try {
+            const response = await axios.put(`/api/employees/departments/${departmentId}`, payload)
+            return response.data
+        } catch (error) {
+            throw new Error(parseApiError(error, 'Gagal mengubah departemen'))
+        }
+    },
+
+    async deleteDepartment(departmentId) {
+        try {
+            const response = await axios.delete(`/api/employees/departments/${departmentId}`)
+            return response.data
+        } catch (error) {
+            throw new Error(parseApiError(error, 'Gagal menghapus departemen'))
+        }
+    },
+
+    async createPosition(payload) {
+        try {
+            const response = await axios.post('/api/employees/positions', payload)
+            return response.data
+        } catch (error) {
+            throw new Error(parseApiError(error, 'Gagal menambah posisi'))
+        }
+    },
+
+    async getPositions() {
+        try {
+            const response = await axios.get('/api/employees/positions')
+            return response.data?.data || []
+        } catch (error) {
+            throw new Error(parseApiError(error, 'Gagal memuat data posisi'))
+        }
+    },
+
+    async getPositionsByDepartment(departmentId) {
+        try {
+            const response = await axios.get(`/api/positions/department/${departmentId}`)
+            return response.data?.data || []
+        } catch (error) {
+            throw new Error(parseApiError(error, 'Gagal memuat posisi departemen'))
+        }
+    },
+
+    async updatePosition(positionId, payload) {
+        try {
+            const response = await axios.put(`/api/employees/positions/${positionId}`, payload)
+            return response.data
+        } catch (error) {
+            throw new Error(parseApiError(error, 'Gagal mengubah posisi'))
+        }
+    },
+
+    async deletePosition(positionId) {
+        try {
+            const response = await axios.delete(`/api/employees/positions/${positionId}`)
+            return response.data
+        } catch (error) {
+            throw new Error(parseApiError(error, 'Gagal menghapus posisi'))
+        }
+    },
+
     async updateUser(userId, payload) {
         try {
             const response = await axios.put(`/api/auth/admin/users/${userId}`, payload)
