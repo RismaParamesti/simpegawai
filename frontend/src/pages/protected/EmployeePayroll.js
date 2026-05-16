@@ -5,20 +5,7 @@ import TitleCard from "../../components/Cards/TitleCard";
 import { pegawaiApi } from "../../features/pegawai/api";
 import Pagination from "../../components/Pagination/Pagination";
 
-const getFileTypeFromPath = (filePath) => {
-  if (!filePath) return "unknown";
-  const lowerPath = String(filePath).toLowerCase();
-  if (lowerPath.endsWith(".pdf")) return "pdf";
-  if (
-    lowerPath.endsWith(".jpg") ||
-    lowerPath.endsWith(".jpeg") ||
-    lowerPath.endsWith(".png") ||
-    lowerPath.endsWith(".webp")
-  ) {
-    return "image";
-  }
-  return "unknown";
-};
+// (removed unused helper getFileTypeFromPath for cleanliness)
 
 const getPayrollStatusLabel = (status) => {
   const normalizedStatus = String(status || "").toLowerCase();
@@ -282,6 +269,13 @@ function EmployeePayroll() {
     setSelectedPayroll(null);
   };
 
+  const resetPayrollFilters = () => {
+    setYearFilter("all");
+    setStatusFilter("all");
+    setAppealStatusFilter("all");
+    setCurrentPage(1);
+  };
+
   return (
     <>
       {error ? (
@@ -295,7 +289,7 @@ function EmployeePayroll() {
           <div>Memuat slip gaji...</div>
         ) : (
           <>
-            <div className="mb-4 grid grid-cols-1 gap-3 md:grid-cols-3">
+            <div className="mb-4 grid grid-cols-1 gap-3 md:grid-cols-4">
               <label className="form-control w-full">
                 <div className="label">
                   <span className="label-text">Filter Tahun</span>
@@ -349,6 +343,15 @@ function EmployeePayroll() {
                   ))}
                 </select>
               </label>
+              <div className="flex items-end justify-right mb-0">
+                <button
+                  type="button"
+                  className="btn btn-secondary rounded-full"
+                  onClick={resetPayrollFilters}
+                >
+                  Reset
+                </button>
+              </div>
             </div>
 
             <>

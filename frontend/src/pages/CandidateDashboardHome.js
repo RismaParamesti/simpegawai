@@ -42,21 +42,21 @@ export default function CandidateDashboardHome() {
     <div>
       {/* STATISTIK */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-        <TitleCard title="Total Permohonan" topMargin="mt-0">
+        <TitleCard title="Total Permohonan" topMargin="mt-0" to="app/candidate/status" linkState={{ initialStatus: 'all' }}>
           <div className="text-3xl font-bold">{stats.total}</div>
         </TitleCard>
 
-        <TitleCard title="Sedang Diproses" topMargin="mt-0">
+        <TitleCard title="Sedang Diproses" topMargin="mt-0" to="app/candidate/status" linkState={{ initialStatus: 'screening' }}>
           <div className="text-3xl font-bold">{stats.inProgress} posisi</div>
         </TitleCard>
 
-        <TitleCard title="Diterima" topMargin="mt-0">
+        <TitleCard title="Diterima" topMargin="mt-0" to="app/candidate/status" linkState={{ initialStatus: 'diterima' }}>
           <div className="text-3xl font-bold text-success">
             {stats.accepted} posisi
           </div>
         </TitleCard>
 
-        <TitleCard title="Ditolak" topMargin="mt-0">
+        <TitleCard title="Ditolak" topMargin="mt-0" to="app/candidate/status" linkState={{ initialStatus: 'ditolak' }}>
           <div className="text-3xl font-bold text-error">
             {stats.rejected} posisi
           </div>
@@ -224,6 +224,7 @@ export default function CandidateDashboardHome() {
                     <a
                       href={profile.linkedin}
                       target="_blank"
+                      rel="noopener noreferrer"
                       className="link link-primary"
                     >
                       Lihat Profil
@@ -239,6 +240,7 @@ export default function CandidateDashboardHome() {
                     <a
                       href={profile.portfolio}
                       target="_blank"
+                      rel="noopener noreferrer"
                       className="link link-primary"
                     >
                       Lihat Portfolio

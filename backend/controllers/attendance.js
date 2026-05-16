@@ -1584,7 +1584,7 @@ router.get(
             }
 
             let query = `
-                SELECT e.id as employee_id, e.employee_code, u.name as employee_name, p.department_id
+                SELECT e.id as employee_id, e.employee_code, u.name as employee_name, p.department_id, p.name as position_name, p.level as level
                 FROM employees e
                 JOIN positions p ON e.position_id = p.id
                 JOIN users u ON e.user_id = u.id

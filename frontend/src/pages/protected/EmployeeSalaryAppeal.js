@@ -202,6 +202,8 @@ function EmployeeSalaryAppeal() {
   const [currentPage, setCurrentPage] = useState(1);
   const formCardRef = useRef(null);
   const itemsPerPage = 10;
+  const [periodFilter, setPeriodFilter] = useState("");
+  const [appealStatusFilter, setAppealStatusFilter] = useState("");
 
   const publishedPayrolls = useMemo(() => {
     return payrolls.filter(
@@ -209,10 +211,42 @@ function EmployeeSalaryAppeal() {
     );
   }, [payrolls]);
 
-  const totalPages = Math.ceil(appeals.length / itemsPerPage);
+  const periodOptions = useMemo(() => {
+    const setVals = new Set();
+    appeals.forEach((a) => {
+      const pm = a?.period_month;
+      const py = a?.period_year;
+      if (pm && py) setVals.add(`${pm}/${py}`);
+    });
+    return Array.from(setVals).sort((a, b) => {
+      // sort descending by year then month
+      const [am, ay] = a.split("/").map(Number);
+      const [bm, by] = b.split("/").map(Number);
+      if (ay === by) return bm - am;
+      return by - ay;
+    });
+  }, [appeals]);
+
+  // fixed status options: pending, approved (disetujui), rejected (ditolak)
+
+  const filteredAppeals = useMemo(() => {
+    return appeals.filter((item) => {
+      const periodMatch = !periodFilter || `${item.period_month}/${item.period_year}` === periodFilter;
+      const statusMatch = !appealStatusFilter || String(item.status || "").toLowerCase() === String(appealStatusFilter || "").toLowerCase();
+      return periodMatch && statusMatch;
+    });
+  }, [appeals, periodFilter, appealStatusFilter]);
+
+  const totalPages = Math.ceil(filteredAppeals.length / itemsPerPage);
   const startIndex = (currentPage - 1) * itemsPerPage;
   const endIndex = startIndex + itemsPerPage;
-  const paginatedAppeals = appeals.slice(startIndex, endIndex);
+  const paginatedAppeals = filteredAppeals.slice(startIndex, endIndex);
+
+  const resetAppealFilters = () => {
+    setPeriodFilter("");
+    setAppealStatusFilter("");
+    setCurrentPage(1);
+  };
 
   const handleChangePage = (page) => {
     setCurrentPage(page);
@@ -720,6 +754,41 @@ function EmployeeSalaryAppeal() {
           <div>Memuat data banding gaji...</div>
         ) : (
           <>
+            <div className="flex justify-right mb-4 items-center gap-2">
+              <select
+                className="select select-bordered select-sm w-full max-w-xs"
+                value={periodFilter}
+                onChange={(e) => {
+                  setPeriodFilter(e.target.value);
+                  setCurrentPage(1);
+                }}
+              >
+                <option value="">Semua Periode</option>
+                {periodOptions.map((p) => (
+                  <option key={p} value={p}>
+                    {p}
+                  </option>
+                ))}
+              </select>
+
+              <select
+                className="select select-bordered select-sm w-full max-w-xs"
+                value={appealStatusFilter}
+                onChange={(e) => {
+                  setAppealStatusFilter(e.target.value);
+                  setCurrentPage(1);
+                }}
+              >
+                <option value="">Semua Status</option>
+                <option value="approved">disetujui</option>
+                <option value="rejected">ditolak</option>
+                <option value="pending">pending</option>
+              </select>
+
+              <button type="button" className="btn btn-secondary rounded-full" onClick={resetAppealFilters}>
+                Reset
+              </button>
+            </div>
             <div className="overflow-x-auto">
               <table className="table table-zebra">
                 <thead>
@@ -731,160 +800,92 @@ function EmployeeSalaryAppeal() {
                   </tr>
                 </thead>
                 <tbody>
-                  {paginatedAppeals.map((item) => (
-                    <tr key={item.id}>
-                      <td className="font-semibold">
-                        {item.period_month}/{item.period_year}
-                      </td>
-                      <td>
-                        <div className="overflow-x-auto">
-                          <table className="table table-compact table-sm bg-base-100">
-                            <thead>
-                              <tr className="bg-base-200">
-                                <th className="w-8">No</th>
-                                <th className="w-40">Komponen</th>
-                                <th className="w-48">Alasan Teks</th>
-                                <th className="w-32">Komponen Review</th>
-                                <th className="w-24">Status Review</th>
-                                <th className="flex-1">Nominal/Alasan</th>
-                              </tr>
-                            </thead>
-                            <tbody>
-                              {getAppealItems(item).length > 0 ? (
-                                getAppealItems(item).map((appealItem, idx) => {
-                                  const reviewNotes = parseReviewNotes(
-                                    item.review_notes,
-                                  );
-                                  const reviewNote = reviewNotes[idx] || "-";
-                                  const {
-                                    component: reviewComponent,
-                                    status: reviewStatus,
-                                    detail: reviewDetail,
-                                  } = parseReviewItem(reviewNote);
-
-                                  return (
-                                    <tr key={idx} className="border-b-0">
-                                      <td className="text-center font-semibold">
-                                        {idx + 1}
-                                      </td>
-                                      <td className="text-sm">
-                                        {appealItem.appeal_reason_label ||
-                                          appealItem.appeal_reason_item ||
-                                          "-"}
-                                      </td>
-                                      <td className="text-sm">
-                                        {appealItem.reason || "-"}
-                                      </td>
-                                      <td className="text-sm">
-                                        {reviewComponent}
-                                      </td>
-                                      <td className="text-sm">
-                                        <span
-                                          className={`badge badge-sm ${
-                                            reviewStatus === "disetujui"
-                                              ? "badge-success"
-                                              : reviewStatus === "ditolak"
-                                                ? "badge-error"
-                                                : reviewStatus === "pending"
-                                                  ? "badge-warning"
-                                                  : "badge-outline"
-                                          }`}
-                                        >
-                                          {reviewStatus}
-                                        </span>
-                                      </td>
-                                      <td className="text-sm">
-                                        {formatDetailWithCurrency(reviewDetail)}
-                                      </td>
-                                    </tr>
-                                  );
-                                })
-                              ) : (
-                                <tr>
-                                  <td
-                                    colSpan={6}
-                                    className="text-center text-sm opacity-70"
-                                  >
-                                    Tidak ada detail
-                                  </td>
+                  {paginatedAppeals.length > 0 ? (
+                    paginatedAppeals.map((item) => (
+                      <tr key={item.id}>
+                        <td className="font-semibold">
+                          {item.period_month}/{item.period_year}
+                        </td>
+                        <td>
+                          <div className="overflow-x-auto">
+                            <table className="table table-compact table-sm bg-base-100">
+                              <thead>
+                                <tr className="bg-base-200">
+                                  <th className="w-8">No</th>
+                                  <th className="w-40">Komponen</th>
+                                  <th className="w-48">Alasan Teks</th>
+                                  <th className="w-32">Komponen Review</th>
+                                  <th className="w-24">Status Review</th>
+                                  <th className="flex-1">Nominal/Alasan</th>
                                 </tr>
-                              )}
-                            </tbody>
-                          </table>
-                        </div>
-                      </td>
-                      <td>
-                        <span
-                          className={`badge ${
-                            APPEAL_STATUS_BADGE_CLASS[
-                              String(item.status || "").toLowerCase()
-                            ] || "badge-outline"
-                          }`}
-                        >
-                          {getAppealStatusLabel(item.status)}
-                        </span>
-                      </td>
-                      <td className="text-center">
-                        <div className="flex items-center justify-center gap-2">
-                          <button
-                            className="
-                              px-3 py-1 text-xs
-                              bg-gradient-to-b from-blue-400 to-blue-600
-                              text-white rounded-full
-                              shadow-md hover:shadow-lg
-                              border border-blue-600
-                              hover:from-blue-500 hover:to-blue-700
-                              transition-all duration-200
-                            "
-                            type="button"
-                            onClick={() => openViewModal(item)}
-                          >
-                            Lihat
-                          </button>
+                              </thead>
+                              <tbody>
+                                {getAppealItems(item).length > 0 ? (
+                                  getAppealItems(item).map((appealItem, idx) => {
+                                    const reviewNotes = parseReviewNotes(item.review_notes);
+                                    const reviewNote = reviewNotes[idx] || "-";
+                                    const { component: reviewComponent, status: reviewStatus, detail: reviewDetail } = parseReviewItem(reviewNote);
 
-                          {item.status === "pending" && (
-                            <>
-                              <button
-                                className="
-                                  px-3 py-1 text-xs
-                                  bg-gradient-to-b from-yellow-300 to-yellow-500
-                                  text-black rounded-full
-                                  shadow-md hover:shadow-lg
-                                  border border-yellow-500
-                                  hover:from-yellow-400 hover:to-yellow-600
-                                  transition-all duration-200
-                                "
-                                type="button"
-                                onClick={() => startEditFromForm(item)}
-                                disabled={submitting}
-                              >
-                                Edit
-                              </button>
+                                    return (
+                                      <tr key={idx} className="border-b-0">
+                                        <td className="text-center font-semibold">{idx + 1}</td>
+                                        <td className="text-sm">{appealItem.appeal_reason_label || appealItem.appeal_reason_item || "-"}</td>
+                                        <td className="text-sm">{appealItem.reason || "-"}</td>
+                                        <td className="text-sm">{reviewComponent}</td>
+                                        <td className="text-sm">
+                                          <span className={`badge badge-sm ${reviewStatus === "disetujui" ? "badge-success" : reviewStatus === "ditolak" ? "badge-error" : reviewStatus === "pending" ? "badge-warning" : "badge-outline"}`}>
+                                            {reviewStatus}
+                                          </span>
+                                        </td>
+                                        <td className="text-sm">{formatDetailWithCurrency(reviewDetail)}</td>
+                                      </tr>
+                                    );
+                                  })
+                                ) : (
+                                  <tr>
+                                    <td colSpan={6} className="text-center text-sm opacity-70">Tidak ada detail</td>
+                                  </tr>
+                                )}
+                              </tbody>
+                            </table>
+                          </div>
+                        </td>
+                        <td>
+                          <span className={`badge ${APPEAL_STATUS_BADGE_CLASS[String(item.status || "").toLowerCase()] || "badge-outline"}`}>
+                            {getAppealStatusLabel(item.status)}
+                          </span>
+                        </td>
+                        <td className="text-center">
+                          <div className="flex items-center justify-center gap-2">
+                            <button className="px-3 py-1 text-xs bg-gradient-to-b from-blue-400 to-blue-600 text-white rounded-full shadow-md hover:shadow-lg border border-blue-600 hover:from-blue-500 hover:to-blue-700 transition-all duration-200" type="button" onClick={() => openViewModal(item)}>
+                              Lihat
+                            </button>
 
-                              <button
-                                className="btn btn-xs btn-error text-white rounded-full"
-                                type="button"
-                                onClick={() => deleteAppeal(item)}
-                                disabled={submitting}
-                              >
-                                Hapus
-                              </button>
-                            </>
-                          )}
-                        </div>
-                      </td>
+                            {item.status === "pending" && (
+                              <>
+                                <button className="px-3 py-1 text-xs bg-gradient-to-b from-yellow-300 to-yellow-500 text-black rounded-full shadow-md hover:shadow-lg border border-yellow-500 hover:from-yellow-400 hover:to-yellow-600 transition-all duration-200" type="button" onClick={() => startEditFromForm(item)} disabled={submitting}>
+                                  Edit
+                                </button>
+
+                                <button className="btn btn-xs btn-error text-white rounded-full" type="button" onClick={() => deleteAppeal(item)} disabled={submitting}>
+                                  Hapus
+                                </button>
+                              </>
+                            )}
+                          </div>
+                        </td>
+                      </tr>
+                    ))
+                  ) : (
+                    <tr>
+                      <td colSpan={4} className="text-center py-10 opacity-70">tidak ada data riwayat banding gaji yang diajukan</td>
                     </tr>
-                  ))}
+                  )}
                 </tbody>
               </table>
             </div>
             {appeals.length > 0 && (
-              <Pagination
-                page={currentPage}
-                totalPages={totalPages}
-                onChangePage={handleChangePage}
-                itemsPerPage={itemsPerPage}
-              />
+              <Pagination page={currentPage} totalPages={totalPages} onChangePage={handleChangePage} itemsPerPage={itemsPerPage} />
             )}
           </>
         )}
@@ -916,12 +917,6 @@ function EmployeeSalaryAppeal() {
                   <p>
                     <span className="font-semibold">Status Payroll:</span>{" "}
                     {selectedAppeal.payroll_status || "-"}
-                  </p>
-                  <p>
-                    <span className="font-semibold">
-                      Status Appeal Payroll:
-                    </span>{" "}
-                    {selectedAppeal.appeal_status || "-"}
                   </p>
                 </div>
                 <div className="bg-base-200 rounded-lg p-3 space-y-1">

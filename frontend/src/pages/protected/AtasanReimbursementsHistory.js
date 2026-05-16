@@ -36,22 +36,21 @@ const getStatusBadge = (status) => {
     }
 }
 
-function AtasanReimbursements() {
+function AtasanReimbursementsHistory() {
     const dispatch = useDispatch()
     const location = useLocation()
     const itemsPerPage = 10
     const [loading, setLoading] = useState(true)
-    const [processingId, setProcessingId] = useState(null)
     const [filters, setFilters] = useState({
         name: '',
         type: '',
         date: '',
+        status: '',
     })
     const [allItems, setAllItems] = useState([])
-    const [pendingPage, setPendingPage] = useState(1)
+    const [historyPage, setHistoryPage] = useState(1)
     const [selectedItem, setSelectedItem] = useState(null)
     const [showDetailModal, setShowDetailModal] = useState(false)
-    const [reviewConfirm, setReviewConfirm] = useState(null)
 
     const loadData = useCallback(async () => {
         try {
@@ -74,8 +73,8 @@ function AtasanReimbursements() {
     }, [loadData])
 
     useEffect(() => {
-        setPendingPage(1)
-    }, [filters.name, filters.type, filters.date])
+        setHistoryPage(1)
+    }, [filters.name, filters.type, filters.date, filters.status])
 
     useEffect(() => {
         const reimbursementId = location.state?.reimbursementId
@@ -87,22 +86,6 @@ function AtasanReimbursements() {
             setShowDetailModal(true)
         }
     }, [allItems, location.state?.reimbursementId])
-
-    const handleReview = async (id, action) => {
-        try {
-            setProcessingId(id)
-            await atasanApi.reviewReimbursement(id, action)
-            dispatch(showNotification({
-                message: action === 'approve' ? 'Reimbursement berhasil disetujui' : 'Reimbursement berhasil ditolak',
-                status: 1
-            }))
-            loadData()
-        } catch (err) {
-            dispatch(showNotification({ message: err.message, status: 0 }))
-        } finally {
-            setProcessingId(null)
-        }
-    }
 
     const normalizeLocalDate = (value) => {
         if (!value) return ''
@@ -129,30 +112,9 @@ function AtasanReimbursements() {
         setShowDetailModal(false)
     }
 
-    const openReviewConfirm = (item, action) => {
-        setReviewConfirm({
-            item,
-            action,
-        })
-    }
+    const historyItems = allItems.filter((item) => {
+        if (item.status === 'pending') return false
 
-    const closeReviewConfirm = () => {
-        setReviewConfirm(null)
-    }
-
-    const confirmReviewAction = async () => {
-        const currentReview = reviewConfirm
-        if (!currentReview?.item || !currentReview?.action) return
-
-        closeReviewConfirm()
-        if (selectedItem && String(selectedItem.id) === String(currentReview.item.id)) {
-            closeDetailModal()
-        }
-
-        await handleReview(currentReview.item.id, currentReview.action)
-    }
-
-    const matchFilters = (item) => {
         const matchesName = filters.name
             ? (item.employee_name || '').toLowerCase().includes(filters.name.trim().toLowerCase())
             : true
@@ -165,54 +127,73 @@ function AtasanReimbursements() {
             ? normalizeLocalDate(item.created_at) === filters.date
             : true
 
-        return matchesName && matchesType && matchesDate
-    }
+        const matchesStatus = filters.status
+            ? item.status === filters.status
+            : true
 
-    const pendingItems = allItems.filter((item) => item.status === 'pending' && matchFilters(item))
-    const totalPendingPages = Math.ceil(pendingItems.length / itemsPerPage)
+        return matchesName && matchesType && matchesDate && matchesStatus
+    })
+    const totalHistoryPages = Math.ceil(historyItems.length / itemsPerPage)
 
     useEffect(() => {
-        if (pendingPage > totalPendingPages && totalPendingPages > 0) {
-            setPendingPage(totalPendingPages)
+        if (historyPage > totalHistoryPages && totalHistoryPages > 0) {
+            setHistoryPage(totalHistoryPages)
         }
-    }, [pendingPage, totalPendingPages])
+    }, [historyPage, totalHistoryPages])
 
-    const paginatedPendingItems = pendingItems.slice((pendingPage - 1) * itemsPerPage, pendingPage * itemsPerPage)
+    const paginatedHistoryItems = historyItems.slice((historyPage - 1) * itemsPerPage, historyPage * itemsPerPage)
+
+    const resetFilters = () => {
+        setFilters({
+            name: '',
+            type: '',
+            date: '',
+            status: '',
+        })
+    }
 
     return (
         <>
-            <TitleCard title="Persetujuan Reimbursement Bawahan" topMargin="mt-0">
-                <div className="grid md:grid-cols-4 grid-cols-1 gap-4 mb-6">
-                    <input
-                        className="input input-bordered"
-                        placeholder="Cari nama pegawai"
-                        value={filters.name}
-                        onChange={(e) => setFilters((prev) => ({ ...prev, name: e.target.value }))}
-                    />
-                    <input
-                        className="input input-bordered"
-                        placeholder="Cari jenis reimbursement"
-                        value={filters.type}
-                        onChange={(e) => setFilters((prev) => ({ ...prev, type: e.target.value }))}
-                    />
-                    <input
-                        className="input input-bordered"
-                        type="date"
-                        value={filters.date}
-                        onChange={(e) => setFilters((prev) => ({ ...prev, date: e.target.value }))}
-                    />
-                    <button
-                        className="btn-secondary rounded-full"
-                        onClick={() => setFilters({ name: '', type: '', date: '' })}
-                    >
-                        Reset Filter
-                    </button>
-                </div>
-
+            <TitleCard title="Riwayat Reimbursement Tim" topMargin="mt-6">
                 {loading ? (
                     <div className="text-center py-10">Memuat data reimbursement...</div>
                 ) : (
-                    <div className="overflow-x-auto">
+                    <>
+                        <div className="grid md:grid-cols-5 grid-cols-1 gap-4 mb-6">
+                            <input
+                                className="input input-bordered"
+                                placeholder="Cari nama pegawai"
+                                value={filters.name}
+                                onChange={(e) => setFilters((prev) => ({ ...prev, name: e.target.value }))}
+                            />
+                            <input
+                                className="input input-bordered"
+                                placeholder="Cari jenis reimbursement"
+                                value={filters.type}
+                                onChange={(e) => setFilters((prev) => ({ ...prev, type: e.target.value }))}
+                            />
+                            <input
+                                className="input input-bordered"
+                                type="date"
+                                value={filters.date}
+                                onChange={(e) => setFilters((prev) => ({ ...prev, date: e.target.value }))}
+                            />
+                            <select
+                                className="select select-bordered"
+                                value={filters.status}
+                                onChange={(e) => setFilters((prev) => ({ ...prev, status: e.target.value }))}
+                            >
+                                <option value="">Semua Status</option>
+                                <option value="approved">Approved</option>
+                                <option value="included_in_payroll">Included in Payroll</option>
+                                <option value="rejected">Rejected</option>
+                            </select>
+                            <button className="btn-secondary rounded-full" onClick={resetFilters}>
+                                Reset Filter
+                            </button>
+                        </div>
+
+                        <div className="overflow-x-auto">
                         <table className="table table-zebra">
                             <thead>
                                 <tr>
@@ -222,11 +203,10 @@ function AtasanReimbursements() {
                                     <th>Tanggal</th>
                                     <th>Status</th>
                                     <th>Lampiran</th>
-                                    <th>Aksi</th>
                                 </tr>
                             </thead>
                             <tbody>
-                                {paginatedPendingItems.map((item) => {
+                                {paginatedHistoryItems.map((item) => {
                                     const attachmentUrl = item.attachment
                                         ? `${process.env.REACT_APP_API_URL || 'http://localhost:5000'}/${item.attachment}`
                                         : ''
@@ -240,60 +220,44 @@ function AtasanReimbursements() {
                                             <td>{getReimbursementTypeLabel(item.reimbursement_type)}</td>
                                             <td className="font-semibold">Rp {(Number(item.amount) || 0).toLocaleString('id-ID')}</td>
                                             <td>{item.created_at ? new Date(item.created_at).toLocaleDateString('id-ID') : '-'}</td>
-                                           <td>
+                                            <td>
                                                 <span className={`badge ${getStatusBadge(item.status)}`}>
                                                     {getStatusLabel(item.status)}
                                                 </span>
                                             </td>
                                             <td>
-                                                {item.attachment ? (
-                                                    <a href={attachmentUrl} target="_blank" rel="noreferrer" className=" px-3 py-1 text-xs bg-gradient-to-b from-blue-400 to-blue-600 text-white rounded-full shadow-md hover:shadow-lg border border-blue-600 hover:from-blue-500 hover:to-blue-700 transition-all duration-200 ">Lihat</a>
+                                                <div className="flex gap-2 items-center">
+                                                    <button className="btn btn-ghost btn-xs" onClick={() => openDetailModal(item)}>
+                                                        Detail
+                                                    </button>
+                                                    {item.attachment ? (
+                                                    <a href={attachmentUrl} target="_blank" rel="noreferrer">
+                                                        <button className=" px-3 py-1 text-xs bg-gradient-to-b from-blue-400 to-blue-600 text-white rounded-full shadow-md hover:shadow-lg border border-blue-600 hover:from-blue-500 hover:to-blue-700 transition-all duration-200 ">Lihat</button>
+                                                    </a>
                                                 ) : (
                                                     <span className="text-xs opacity-60">-</span>
                                                 )}
-                                            </td>
-                                            <td>
-                                                <div className="flex gap-2">
-                                                    <button
-                                                        className="btn btn-ghost btn-xs"
-                                                        onClick={() => openDetailModal(item)}
-                                                    >
-                                                        Detail
-                                                    </button>
-                                                    <button
-                                                        className=" px-3 py-1 text-xs bg-gradient-to-b from-green-400 to-green-600 text-white rounded-full shadow-md hover:shadow-lg border border-green-600 hover:from-green-500 hover:to-green-700 transition-all duration-200 "
-                                                        onClick={() => openReviewConfirm(item, 'approve')}
-                                                        disabled={processingId === item.id}
-                                                    >
-                                                        Setujui
-                                                    </button>
-                                                    <button
-                                                        className={`btn btn-error btn-xs ${processingId === item.id ? 'loading' : ''}`}
-                                                        onClick={() => openReviewConfirm(item, 'reject')}
-                                                        disabled={processingId === item.id}
-                                                    >
-                                                        Tolak
-                                                    </button>
                                                 </div>
                                             </td>
                                         </tr>
                                     )
                                 })}
-                                {pendingItems.length === 0 && (
+                                {historyItems.length === 0 && (
                                     <tr>
-                                        <td colSpan={7} className="text-center opacity-70">Tidak ada reimbursement pending</td>
+                                        <td colSpan={6} className="text-center opacity-70">Belum ada riwayat reimbursement</td>
                                     </tr>
                                 )}
                             </tbody>
                         </table>
-                    </div>
+                        </div>
+                    </>
                 )}
 
-                {!loading && pendingItems.length > 0 && (
+                {!loading && historyItems.length > 0 && (
                     <Pagination
-                        page={pendingPage}
-                        totalPages={totalPendingPages}
-                        onChangePage={setPendingPage}
+                        page={historyPage}
+                        totalPages={totalHistoryPages}
+                        onChangePage={setHistoryPage}
                         itemsPerPage={itemsPerPage}
                     />
                 )}
@@ -371,61 +335,13 @@ function AtasanReimbursements() {
                                 <button className="btn" onClick={closeDetailModal}>
                                     Tutup
                                 </button>
-                                {selectedItem.status === 'pending' && (
-                                    <>
-                                        <button
-                                            className={`btn btn-success ${processingId === selectedItem.id ? 'loading' : ''}`}
-                                            onClick={async () => {
-                                                openReviewConfirm(selectedItem, 'approve')
-                                            }}
-                                            disabled={processingId === selectedItem.id}
-                                        >
-                                            Setujui
-                                        </button>
-                                        <button
-                                            className={`btn btn-error ${processingId === selectedItem.id ? 'loading' : ''}`}
-                                            onClick={async () => {
-                                                openReviewConfirm(selectedItem, 'reject')
-                                            }}
-                                            disabled={processingId === selectedItem.id}
-                                        >
-                                            Tolak
-                                        </button>
-                                    </>
-                                )}
-                            </div>
-                        </div>
-                    </div>
-                )}
-
-                {reviewConfirm?.item && (
-                    <div className="modal modal-open">
-                        <div className="modal-box max-w-md">
-                            <h3 className="font-bold text-lg mb-2">Konfirmasi Aksi</h3>
-                            <p className="text-sm opacity-80">
-                                Apakah Anda yakin ingin {reviewConfirm.action === 'approve' ? 'menyetujui' : 'menolak'} reimbursement milik{' '}
-                                <span className="font-semibold">{reviewConfirm.item.employee_name || '-'}</span>?
-                            </p>
-
-                            <div className="modal-action">
-                                <button className="btn btn-ghost" onClick={closeReviewConfirm} disabled={processingId === reviewConfirm.item.id}>
-                                    Batal
-                                </button>
-                                <button
-                                    className={`btn ${reviewConfirm.action === 'approve' ? 'btn-success' : 'btn-error'} ${processingId === reviewConfirm.item.id ? 'loading' : ''}`}
-                                    onClick={confirmReviewAction}
-                                    disabled={processingId === reviewConfirm.item.id}
-                                >
-                                    Ya, {reviewConfirm.action === 'approve' ? 'Setujui' : 'Tolak'}
-                                </button>
                             </div>
                         </div>
                     </div>
                 )}
             </TitleCard>
-
         </>
     )
 }
 
-export default AtasanReimbursements
+export default AtasanReimbursementsHistory
