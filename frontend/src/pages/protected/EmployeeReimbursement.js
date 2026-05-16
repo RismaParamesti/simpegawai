@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useState, useMemo } from "react";
 import { useDispatch } from "react-redux";
 import {
   setPageTitle,
@@ -94,6 +94,13 @@ const getAssetUrl = (filePath) => {
   return `${baseUrl}/${normalizedPath}`;
 };
 
+const formatAmountInput = (value) => {
+  if (!value) return "";
+  const numericValue = String(value).replace(/\D/g, "");
+  if (!numericValue) return "";
+  return new Intl.NumberFormat("id-ID").format(Number(numericValue));
+};
+
 function EmployeeReimbursement() {
   const dispatch = useDispatch();
   const [form, setForm] = useState(INITIAL_FORM);
@@ -103,6 +110,9 @@ function EmployeeReimbursement() {
   const [selectedAttachment, setSelectedAttachment] = useState(null);
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 10;
+    const [dateFilter, setDateFilter] = useState("");
+  const [typeFilter, setTypeFilter] = useState("");
+  const [statusFilter, setStatusFilter] = useState("");
 
   const loadData = useCallback(async () => {
     try {
@@ -138,10 +148,34 @@ function EmployeeReimbursement() {
     setSelectedAttachment(null);
   };
 
-  const totalPages = Math.ceil(items.length / itemsPerPage);
+  const filteredItems = useMemo(() => {
+    return items.filter((item) => {
+      // jenis/type filter
+      const rawType = item?.reimbursement_type || item?.type || "";
+      if (typeFilter && rawType !== typeFilter) return false;
+
+      // status filter
+      const rawStatus = (item?.status || "").toLowerCase();
+      if (statusFilter && rawStatus !== statusFilter) return false;
+
+        // single date filter (match same day)
+        if (dateFilter && item?.created_at) {
+          const itemDate = new Date(item.created_at);
+          const targetStart = new Date(dateFilter);
+          targetStart.setHours(0, 0, 0, 0);
+          const targetEnd = new Date(dateFilter);
+          targetEnd.setHours(23, 59, 59, 999);
+          if (itemDate < targetStart || itemDate > targetEnd) return false;
+        }
+
+      return true;
+    });
+  }, [items, typeFilter, statusFilter, dateFilter]);
+
+  const totalPages = Math.ceil(filteredItems.length / itemsPerPage);
   const startIndex = (currentPage - 1) * itemsPerPage;
   const endIndex = startIndex + itemsPerPage;
-  const paginatedItems = items.slice(startIndex, endIndex);
+  const paginatedItems = filteredItems.slice(startIndex, endIndex);
 
   const handleChangePage = (page) => {
     setCurrentPage(page);
@@ -214,6 +248,13 @@ function EmployeeReimbursement() {
     }
   };
 
+  const resetFilters = () => {
+    setDateFilter("");
+    setTypeFilter("");
+    setStatusFilter("");
+    setCurrentPage(1);
+  };
+
   return (
     <>
       <TitleCard title="Ajukan Reimbursement" topMargin="mt-0">
@@ -241,11 +282,13 @@ function EmployeeReimbursement() {
             <span className="text-primary font-semibold">Rp</span>
             <input
               className="grow bg-transparent"
-              type="number"
-              min="0"
+              type="text"
+              inputMode="numeric"
               placeholder="Nominal"
-              value={form.amount}
-              onChange={(e) => updateForm("amount", e.target.value)}
+              value={formatAmountInput(form.amount)}
+              onChange={(e) =>
+                updateForm("amount", e.target.value.replace(/\D/g, ""))
+              }
             />
           </label>
 
@@ -280,6 +323,63 @@ function EmployeeReimbursement() {
           <div>Memuat data reimbursement...</div>
         ) : (
           <>
+            <div className="flex flex-wrap gap-3 mb-3 items-center">
+              <div className="flex items-center gap-2">
+                      <label className="text-sm opacity-80">Tanggal</label>
+                      <input
+                        type="date"
+                        className="input input-bordered input-sm"
+                        value={dateFilter}
+                        onChange={(e) => {
+                          setDateFilter(e.target.value);
+                          setCurrentPage(1);
+                        }}
+                      />
+                    </div>
+
+              <div>
+                <select
+                  className="select select-bordered select-sm"
+                  value={typeFilter}
+                  onChange={(e) => {
+                    setTypeFilter(e.target.value);
+                    setCurrentPage(1);
+                  }}
+                >
+                  <option value="">Semua Jenis</option>
+                  {REIMBURSEMENT_TYPE_OPTIONS.map((option) => (
+                    <option key={option.value} value={option.value}>
+                      {option.label}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div>
+                <select
+                  className="select select-bordered select-sm"
+                  value={statusFilter}
+                  onChange={(e) => {
+                    setStatusFilter(e.target.value);
+                    setCurrentPage(1);
+                  }}
+                >
+                  <option value="">Semua Status</option>
+                  <option value="pending">pending</option>
+                  <option value="approved">approved</option>
+                  <option value="included_in_payroll">included payroll</option>
+                  <option value="rejected">rejected</option>
+                </select>
+              </div>
+
+                <button
+                  type="button"
+                  className="btn btn-secondary rounded-full"
+                  onClick={resetFilters}
+                >
+                  Reset
+                </button>
+            </div>
             <div className="overflow-x-auto">
               <table className="table table-zebra">
                 <thead>

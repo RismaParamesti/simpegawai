@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
+import { useLocation } from 'react-router-dom'
 import { useDispatch } from 'react-redux'
 import { setPageTitle } from '../../features/common/headerSlice'
 import TitleCard from '../../components/Cards/TitleCard'
@@ -98,6 +99,7 @@ const INITIAL_DOCUMENTS = {
 
 function AdminEmployees() {
     const dispatch = useDispatch()
+    const location = useLocation()
     const [employees, setEmployees] = useState([])
     const [users, setUsers] = useState([])
     const [positions, setPositions] = useState([])
@@ -192,6 +194,22 @@ function AdminEmployees() {
         dispatch(setPageTitle({ title: 'Manajemen Pegawai' }))
         loadData()
     }, [dispatch])
+
+    useEffect(() => {
+        const employeeId = location.state?.employeeId
+        if (!employeeId || !employees.length) return
+
+        const match = employees.find(
+            (employee) =>
+                String(employee.id) === String(employeeId) ||
+                String(employee.employee_id) === String(employeeId) ||
+                String(employee.employee_code) === String(employeeId)
+        )
+
+        if (match) {
+            setViewingEmployee(mapEmployeeToEditForm(match))
+        }
+    }, [employees, location.state?.employeeId])
 
     const applyAutoRoles = (nextFormState) => {
         return {

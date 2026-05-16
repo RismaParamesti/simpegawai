@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from "react";
 import { useDispatch } from "react-redux";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useLocation } from "react-router-dom";
 import { setPageTitle } from "../features/common/headerSlice";
 import TitleCard from "../components/Cards/TitleCard";
 import { NotificationManager } from "react-notifications";
@@ -25,6 +25,16 @@ export default function CandidateRequestsPage() {
     dispatch(setPageTitle({ title: "Permohonan Saya" }));
     fetchApplications();
   }, [dispatch]);
+
+  const location = useLocation();
+
+  useEffect(() => {
+    const initial = location?.state?.initialStatus;
+    if (initial && applications && applications.length > 0) {
+      handleFilterStatus(initial);
+      setSelectedStatus(initial);
+    }
+  }, [location, applications]);
 
   const fetchApplications = async () => {
     try {

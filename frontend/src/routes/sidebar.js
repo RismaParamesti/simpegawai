@@ -12,6 +12,12 @@ import BriefcaseIcon from "@heroicons/react/24/outline/BriefcaseIcon";
 import UserGroupIcon from "@heroicons/react/24/outline/UserGroupIcon";
 import ClipboardDocumentCheckIcon from "@heroicons/react/24/outline/ClipboardDocumentCheckIcon";
 import UserPlusIcon from "@heroicons/react/24/outline/UserPlusIcon";
+import {
+  ClockIcon,
+  ReceiptRefundIcon,
+  CheckBadgeIcon,
+  ScaleIcon,
+} from "@heroicons/react/24/outline";
 
 const iconClasses = `h-6 w-6`;
 
@@ -68,8 +74,8 @@ const pegawaiRoutes = [
   },
   {
     path: "/app/leave-requests",
-    icon: <DocumentTextIcon className={iconClasses} />,
-    name: "Cuti & Izin",
+    icon: <ClipboardDocumentListIcon className={iconClasses} />,
+    name: "Ajukan Cuti & Izin",
   },
   {
     path: "/app/payroll",
@@ -78,13 +84,13 @@ const pegawaiRoutes = [
   },
   {
     path: "/app/salary-appeals",
-    icon: <ReceiptPercentIcon className={iconClasses} />,
-    name: "Banding Gaji",
+    icon: <ScaleIcon className={iconClasses} />,
+    name: "Ajukan Banding Gaji",
   },
   {
     path: "/app/reimbursements",
-    icon: <WalletIcon className={iconClasses} />,
-    name: "Reimbursement",
+    icon: <ReceiptRefundIcon className={iconClasses} />,
+    name: "Ajukan Reimbursement",
   },
 ];
 
@@ -181,14 +187,38 @@ const atasanRoutes = [
     name: "Dashboard Atasan",
   },
   {
-    path: "/app/leave-requests",
-    icon: <DocumentTextIcon className={iconClasses} />,
-    name: "Persetujuan Cuti & Izin",
+    path: "",
+    icon: <CalendarDaysIcon className={iconClasses} />,
+    name: "Cuti dan Izin Anggota Tim",
+    submenu: [
+      {
+        path: "/app/leave-requests",
+        icon: <ClipboardDocumentCheckIcon className={iconClasses} />,
+        name: "Persetujuan Cuti & Izin",
+      },
+      {
+        path: "/app/leave-requests-history",
+        icon: <ClockIcon className={iconClasses} />,
+        name: "Riwayat Cuti & Izin",
+      },
+    ],
   },
   {
-    path: "/app/reimbursements",
-    icon: <WalletIcon className={iconClasses} />,
-    name: "Persetujuan Reimbursement",
+    path: "",
+    icon: <BanknotesIcon className={iconClasses} />,
+    name: "Reimbursement Anggota Tim",
+    submenu: [
+      {
+        path: "/app/reimbursements",
+        icon: <CheckBadgeIcon className={iconClasses} />,
+        name: "Persetujuan Reimbursement",
+      },
+      {
+        path: "/app/reimbursements-history",
+        icon: <ReceiptRefundIcon className={iconClasses} />,
+        name: "Riwayat Reimbursement",
+      },
+    ],
   },
   {
     path: "/app/team-attendance",

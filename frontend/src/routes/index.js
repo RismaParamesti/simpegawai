@@ -44,7 +44,9 @@ const HRHiredCandidateDetailModal = lazy(() => import("../pages/protected/HRHire
 // Atasan Pages
 const AtasanDashboard = lazy(() => import("../pages/protected/AtasanDashboard"),);
 const AtasanLeaveRequests = lazy(() => import("../pages/protected/AtasanLeaveRequests"),);
+const AtasanLeaveRequestsHistory = lazy(() => import("../pages/protected/AtasanLeaveRequestsHistory"),);
 const AtasanReimbursements = lazy(() => import("../pages/protected/AtasanReimbursements"),);
+const AtasanReimbursementsHistory = lazy(() => import("../pages/protected/AtasanReimbursementsHistory"),);
 const AtasanAttendance = lazy(() => import("../pages/protected/AtasanAttendance"),);
 
 // Finance Pages
@@ -58,6 +60,14 @@ const PositionSalary = lazy(() => import("../pages/protected/FinanceAllowanceAnd
 const FinanceReimbursements = lazy(() => import("../pages/protected/FinanceReimbursements"),);
 const FinanceSalaryAppeals = lazy(() => import("../pages/protected/FinanceSalaryAppeals"),);
 const FinanceReports = lazy(() => import("../pages/protected/FinanceReports"));
+
+//kandidat
+const CandidateDashboardHome = lazy(() => import("../pages/CandidateDashboardHome"));
+const CandidateJobList = lazy(() => import("../pages/CandidateOpeningPage"));
+const CandidateProfilePage = lazy(() => import("../pages/CandidateProfilePage"));
+const CandidateRequestsPage = lazy(() => import("../pages/CandidateRequestsPage"));
+const CandidateJobDetailPage = lazy(() => import("../pages/CandidateJobDetailPage"));
+const CandidateApplyPage = lazy(() => import("../pages/CandidateApplyPage"));
 
 const adminRoutes = [
   {
@@ -233,8 +243,16 @@ const atasanRoutes = [
     component: AtasanLeaveRequests,
   },
   {
+    path: "/leave-requests-history",
+    component: AtasanLeaveRequestsHistory,
+  },
+  {
     path: "/reimbursements",
     component: AtasanReimbursements,
+  },
+  {
+    path: "/reimbursements-history",
+    component: AtasanReimbursementsHistory,
   },
   {
     path: "/team-attendance",
@@ -305,9 +323,44 @@ const financeRoutes = [
   },
 ];
 
+const candidateRoutes = [
+  {
+    path: "/dashboard",
+    component: CandidateDashboardHome,
+  },
+  {
+    path: "/jobs",
+    component: CandidateJobList,
+  },
+  {
+    path: "/candidate/jobs/:jobId",
+    component: CandidateJobDetailPage,
+  },
+  {
+    path: "/candidate/apply/:jobId",
+    component: CandidateApplyPage,
+  },
+  {
+    path: "/profile",
+    component: CandidateProfilePage,
+  },
+  {
+    path: "/status",
+    component: CandidateRequestsPage,
+  },
+  {
+    path: "/404",
+    component: Page404,
+  },
+];
+
 export const getRoutesByRole = (activeRole) => {
   if (activeRole === "admin") {
     return adminRoutes;
+  }
+
+  if (activeRole === "candidate") {
+    return candidateRoutes;
   }
 
   if (activeRole === "hr") {

@@ -1,11 +1,33 @@
 import Subtitle from "../Typography/Subtitle";
+import { useNavigate } from "react-router-dom";
 
-function TitleCard({ title, children, topMargin, TopSideButtons }) {
+function TitleCard({ title, children, topMargin, TopSideButtons, to, linkState }) {
+  const navigate = useNavigate();
+  const clickable = !!to;
+
+  const handleClick = (e) => {
+    if (!clickable) return;
+    navigate(to, { state: linkState });
+  };
+
+  const handleKeyDown = (e) => {
+    if (!clickable) return;
+    if (e.key === "Enter" || e.key === " ") {
+      e.preventDefault();
+      navigate(to, { state: linkState });
+    }
+  };
+
   return (
     <div
+      onClick={handleClick}
+      onKeyDown={handleKeyDown}
+      role={clickable ? "button" : undefined}
+      tabIndex={clickable ? 0 : undefined}
       className={
         "app-card w-full rounded-[1.5rem] p-6 " +
-        (topMargin || "mt-6")
+        (topMargin || "mt-6") +
+        (clickable ? " cursor-pointer hover:shadow-md transition" : "")
       }
     >
       {/* Title for Card */}

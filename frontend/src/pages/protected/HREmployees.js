@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState, useCallback } from "react";
+import { useLocation } from "react-router-dom";
 import { useDispatch } from "react-redux";
 import {
   setPageTitle,
@@ -169,6 +170,7 @@ const buildEmployeeSearchOptions = (items = []) => {
 
 function HREmployees() {
   const dispatch = useDispatch();
+  const location = useLocation();
   const [loading, setLoading] = useState(true);
   const [employees, setEmployees] = useState([]);
   const [positions, setPositions] = useState([]);
@@ -299,6 +301,22 @@ function HREmployees() {
   useEffect(() => {
     loadEmployeeSearchOptions();
   }, [loadEmployeeSearchOptions]);
+
+  useEffect(() => {
+    const employeeId = location.state?.employeeId;
+    if (!employeeId || !employees.length) return;
+
+    const match = employees.find(
+      (employee) =>
+        String(employee.id) === String(employeeId) ||
+        String(employee.employee_id) === String(employeeId) ||
+        String(employee.employee_code) === String(employeeId),
+    );
+
+    if (match) {
+      setViewingEmployee(mapEmployeeToForm(match));
+    }
+  }, [employees, location.state?.employeeId]);
 
   const departments = useMemo(() => {
     const unique = Array.from(

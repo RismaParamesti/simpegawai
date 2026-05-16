@@ -146,16 +146,18 @@ router.get("/", verifyToken, verifyRole(["atasan"]), async (req, res) => {
       [...teamConditionParams2, managerEmployeeId],
     );
 
-    const [teamMembers] = await db.promise().query(
-      `SELECT e.id, e.employee_code, u.name as employee_name, p.name as position_name, 1 as is_self
+      const [teamMembers] = await db.promise().query(
+      `SELECT e.id, e.employee_code, u.name as employee_name, p.name as position_name, p.level as level, d.name as department_name, 1 as is_self
                          FROM employees e
                          JOIN positions p ON e.position_id = p.id
+                         LEFT JOIN departments d ON p.department_id = d.id
                          JOIN users u ON e.user_id = u.id
                          WHERE e.id = ?
                          UNION ALL
-                         SELECT e.id, e.employee_code, u.name as employee_name, p.name as position_name, 0 as is_self
+                         SELECT e.id, e.employee_code, u.name as employee_name, p.name as position_name, p.level as level, d.name as department_name, 0 as is_self
                          FROM employees e
                          JOIN positions p ON e.position_id = p.id
+                         LEFT JOIN departments d ON p.department_id = d.id
                          JOIN users u ON e.user_id = u.id
                          WHERE ${teamConditionSql2}
                              AND e.id <> ?
@@ -228,11 +230,99 @@ router.get("/", verifyToken, verifyRole(["atasan"]), async (req, res) => {
                             AND YEAR(a.date) = ?
                             AND ${teamConditionSql2}
                             AND e.id <> ?`,
-      [...teamConditionParams2, selectedMonth, selectedYear, managerEmployeeId],
+      [selectedMonth, selectedYear, ...teamConditionParams2, managerEmployeeId],
     );
 
-    // 6. Employees late today (structured for frontend late_per_day table)
-    const [lateTodayRows] = await db.promise().query(
+    const [attendanceHeatmapRows] = await db.promise().query(
+      `SELECT 
+            DAY(a.date) as day,
+            COUNT(*) as total_records,
+            SUM(CASE WHEN a.status = 'hadir' THEN 1 ELSE 0 END) as hadir,
+            SUM(CASE WHEN a.status = 'izin' THEN 1 ELSE 0 END) as izin,
+            SUM(CASE WHEN a.status = 'sakit' THEN 1 ELSE 0 END) as sakit,
+            SUM(CASE WHEN a.status = 'alpha' THEN 1 ELSE 0 END) as alpha,
+            SUM(CASE WHEN a.is_late = 1 THEN 1 ELSE 0 END) as late_count
+         FROM attendance a
+         JOIN employees e ON a.employee_id = e.id
+         JOIN positions p ON e.position_id = p.id
+         WHERE MONTH(a.date) = ?
+           AND YEAR(a.date) = ?
+           AND ${teamConditionSql2}
+           AND e.id <> ?
+         GROUP BY DAY(a.date)
+         ORDER BY DAY(a.date) ASC`,
+      [selectedMonth, selectedYear, ...teamConditionParams2, managerEmployeeId],
+    );
+
+    const attendanceHeatmapMap = new Map(
+      attendanceHeatmapRows.map((row) => [Number(row.day), row]),
+    );
+
+    const nowDate = new Date();
+    const isCurrentPeriod =
+      selectedYear === nowDate.getFullYear() &&
+      selectedMonth === nowDate.getMonth() + 1;
+    const isPastPeriod =
+      selectedYear < nowDate.getFullYear() ||
+      (selectedYear === nowDate.getFullYear() &&
+        selectedMonth < nowDate.getMonth() + 1);
+    const effectiveLastDay = isCurrentPeriod
+      ? nowDate.getDate()
+      : isPastPeriod
+        ? new Date(selectedYear, selectedMonth, 0).getDate()
+        : 0;
+    const teamMemberCount = Number(teamStats?.[0]?.total_team_members || 0);
+
+    const daysInMonth = new Date(selectedYear, selectedMonth, 0).getDate();
+    const attendanceHeatmap = Array.from({ length: daysInMonth }, (_, index) => {
+      const day = index + 1;
+      const dayData = attendanceHeatmapMap.get(day) || {};
+      const totalRecords = Number(dayData.total_records) || 0;
+      const hadir = Number(dayData.hadir) || 0;
+      const izin = Number(dayData.izin) || 0;
+      const sakit = Number(dayData.sakit) || 0;
+      const alpha = Number(dayData.alpha) || 0;
+      const lateCount = Number(dayData.late_count) || 0;
+
+      const currentDate = new Date(selectedYear, selectedMonth - 1, day);
+      const isSunday = currentDate.getDay() === 0;
+      const shouldInferAlpha =
+        teamMemberCount > 0 &&
+        !isSunday &&
+        day <= effectiveLastDay;
+
+      let status = "kosong";
+      if (totalRecords > 0) {
+        if (alpha > 0) {
+          status = "alpha";
+        } else if (lateCount > 0) {
+          status = "telat";
+        } else if (hadir > 0) {
+          status = "hadir";
+        } else if (sakit > 0) {
+          status = "sakit";
+        } else if (izin > 0) {
+          status = "izin";
+        }
+      } else if (shouldInferAlpha) {
+        status = "alpha";
+      }
+
+      return {
+        day,
+        date: `${selectedYear}-${String(selectedMonth).padStart(2, "0")}-${String(day).padStart(2, "0")}`,
+        status,
+        total_records: totalRecords,
+        hadir,
+        izin,
+        sakit,
+        alpha,
+        late_count: lateCount,
+      };
+    });
+
+    // 6. Top late employees for the selected month
+    const [lateMonthRows] = await db.promise().query(
       `SELECT 
             e.id,
             e.employee_code,
@@ -244,16 +334,17 @@ router.get("/", verifyToken, verifyRole(["atasan"]), async (req, res) => {
          JOIN positions p ON e.position_id = p.id
          JOIN users u ON e.user_id = u.id
          WHERE a.is_late = 1
-           AND a.date = CURDATE()
+           AND MONTH(a.date) = ?
+           AND YEAR(a.date) = ?
            AND ${teamConditionSql2}
            AND e.id <> ?
-         ORDER BY a.late_minutes DESC, u.name ASC
-         LIMIT 25`,
-      [...teamConditionParams2, managerEmployeeId],
+         ORDER BY a.late_minutes DESC, u.name ASC, a.date DESC
+         LIMIT 1000`,
+      [selectedMonth, selectedYear, ...teamConditionParams2, managerEmployeeId],
     );
 
     const topLateEmployeesMap = new Map();
-    for (const row of lateTodayRows) {
+    for (const row of lateMonthRows) {
       if (!topLateEmployeesMap.has(row.id)) {
         topLateEmployeesMap.set(row.id, {
           id: row.id,
@@ -278,6 +369,26 @@ router.get("/", verifyToken, verifyRole(["atasan"]), async (req, res) => {
     const topLateEmployees = Array.from(topLateEmployeesMap.values())
       .sort((a, b) => b.total_late_minutes - a.total_late_minutes)
       .slice(0, 10);
+
+    // 6b. Late rows for today (independent of selected month/year)
+    const [todayLateRows] = await db.promise().query(
+      `SELECT 
+            e.id,
+            e.employee_code,
+            u.name,
+            a.date,
+            a.late_minutes
+         FROM attendance a
+         JOIN employees e ON a.employee_id = e.id
+         JOIN positions p ON e.position_id = p.id
+         JOIN users u ON e.user_id = u.id
+         WHERE a.is_late = 1
+           AND a.date = CURDATE()
+           AND ${teamConditionSql2}
+           AND e.id <> ?
+         ORDER BY a.late_minutes DESC, u.name ASC`,
+      [...teamConditionParams2, managerEmployeeId],
+    );
 
     // 7. Recent Approved/Rejected Actions
     const [recentActions] = await db.promise().query(
@@ -330,9 +441,11 @@ router.get("/", verifyToken, verifyRole(["atasan"]), async (req, res) => {
         leaves: pendingLeaves,
         reimbursements: pendingReimbursements,
       },
+      attendance_heatmap: attendanceHeatmap,
       performance_alerts: {
         top_late_employees: topLateEmployees,
       },
+      attendance_today_rows: todayLateRows,
       recent_actions: recentActions,
     });
   } catch (error) {

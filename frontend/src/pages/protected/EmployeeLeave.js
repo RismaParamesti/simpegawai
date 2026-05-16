@@ -139,13 +139,41 @@ const getAssetUrl = (filePath) => {
   return `${baseUrl}/${normalizedPath}`;
 };
 
+const parseLocalDate = (dateValue) => {
+  if (!dateValue) return null;
+
+  if (dateValue instanceof Date) {
+    return new Date(
+      dateValue.getFullYear(),
+      dateValue.getMonth(),
+      dateValue.getDate(),
+    );
+  }
+
+  const dateString = String(dateValue);
+  return new Date(`${dateString}T00:00:00`);
+};
+
+const formatLocalDateKey = (dateValue) => {
+  const date = parseLocalDate(dateValue);
+  if (!date || Number.isNaN(date.getTime())) return "";
+
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+};
+
 // Initialize holiday detector for Indonesia
 const holidayCalendar = new Holidays("ID");
 
 // Get holiday info from date-holidays library
 const getHolidayInfo = (dateValue) => {
   try {
-    const result = holidayCalendar.isHoliday(new Date(dateValue));
+    const localDate = parseLocalDate(dateValue);
+    if (!localDate || Number.isNaN(localDate.getTime())) return null;
+
+    const result = holidayCalendar.isHoliday(localDate);
     if (!result) return null;
     if (Array.isArray(result)) return result[0] || null;
     return result;
@@ -177,11 +205,11 @@ const getWeekendDaysInRange = (startDate, endDate) => {
   if (!startDate || !endDate) return [];
   
   const holidays = [];
-  const current = new Date(`${startDate}T00:00:00`);
-  const end = new Date(`${endDate}T00:00:00`);
+  const current = parseLocalDate(startDate);
+  const end = parseLocalDate(endDate);
   
   while (current <= end) {
-    const dateKey = current.toISOString().split('T')[0];
+    const dateKey = formatLocalDateKey(current);
     const dayOfWeek = current.getDay();
     let type = null;
     let name = null;
@@ -242,9 +270,12 @@ function EmployeeLeave() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [successMessage, setSuccessMessage] = useState("");
+  const [showSuccessModal, setShowSuccessModal] = useState(false);
   const [requests, setRequests] = useState([]);
   const [allRequests, setAllRequests] = useState([]);
   const [statusFilter, setStatusFilter] = useState("");
+  const [submittedDateFilter, setSubmittedDateFilter] = useState("");
+  const [typeFilter, setTypeFilter] = useState("");
   const [profile, setProfile] = useState({});
   const [todayAttendance, setTodayAttendance] = useState({});
   const [selectedProof, setSelectedProof] = useState(null);
@@ -313,6 +344,10 @@ function EmployeeLeave() {
   }, []);
 
   const getEffectiveMaxDays = (leaveType, cutiKhususOptionKey) => {
+    if (leaveType === "cuti_tahunan") {
+      return Number(remainingLeaveQuota || 0);
+    }
+
     if (leavePolicy && leavePolicy.leave_type === leaveType) {
       if (leaveType === "cuti_khusus") {
         const opts = (leavePolicy.meta && leavePolicy.meta.options) || [];
@@ -367,7 +402,7 @@ function EmployeeLeave() {
   };
 
   const loadData = useCallback(
-    async (selectedStatus = statusFilter) => {
+    async (overrideStatus, overrideType, overrideDate) => {
       try {
         setLoading(true);
         setError("");
@@ -388,11 +423,26 @@ function EmployeeLeave() {
         if (requestsResult.status === "fulfilled") {
           const allData = requestsResult.value?.data || [];
           setAllRequests(allData);
-          setRequests(
-            selectedStatus
-              ? allData.filter((item) => item.status === selectedStatus)
-              : allData,
-          );
+
+          const selStatus =
+            overrideStatus !== undefined ? overrideStatus : statusFilter;
+          const selType = overrideType !== undefined ? overrideType : typeFilter;
+          const selDate =
+            overrideDate !== undefined ? overrideDate : submittedDateFilter;
+
+          let filtered = allData;
+          if (selStatus) filtered = filtered.filter((i) => i.status === selStatus);
+          if (selType) filtered = filtered.filter((i) => i.leave_type === selType);
+          if (selDate)
+            filtered = filtered.filter((i) => {
+              const created = i.created_at || "";
+              return (
+                created.startsWith(selDate) ||
+                (created.split && created.split("T")[0] === selDate)
+              );
+            });
+
+          setRequests(filtered);
         } else {
           setAllRequests([]);
           setRequests([]);
@@ -412,8 +462,16 @@ function EmployeeLeave() {
         setLoading(false);
       }
     },
-    [statusFilter],
+    [statusFilter, typeFilter, submittedDateFilter],
   );
+
+  const resetFilters = async () => {
+    setStatusFilter("");
+    setTypeFilter("");
+    setSubmittedDateFilter("");
+    setCurrentPage(1);
+    await loadData("", "", "");
+  };
 
   useEffect(() => {
     dispatch(setPageTitle({ title: "Cuti & Izin Pegawai" }));
@@ -461,6 +519,13 @@ function EmployeeLeave() {
     ) {
       setError(
         "Jenis cuti/izin, tanggal mulai, tanggal akhir, dan alasan wajib diisi",
+      );
+      return;
+    }
+
+    if (form.start_date < todayDateKey || effectiveEndDate < todayDateKey) {
+      setError(
+        "Tanggal pengajuan tidak boleh lebih kecil dari hari ini. Pilih tanggal hari ini atau setelahnya.",
       );
       return;
     }
@@ -571,6 +636,20 @@ function EmployeeLeave() {
       }
     }
 
+    if (form.leave_type === "cuti_tahunan") {
+      if (Number(remainingLeaveQuota || 0) <= 0) {
+        setError("Sisa kuota cuti tahunan sudah habis.");
+        return;
+      }
+
+      if (requestedDaysForSubmit > Number(remainingLeaveQuota || 0)) {
+        setError(
+          `Cuti Tahunan maksimal ${remainingLeaveQuota} hari sesuai sisa kuota yang tersedia.`,
+        );
+        return;
+      }
+    }
+
     const maxDaysForLeave = getEffectiveMaxDays(
       form.leave_type,
       form.cuti_khusus_option,
@@ -598,6 +677,7 @@ function EmployeeLeave() {
         leave_type: getLeaveTypesByMode(leaveMode, leaveTypeOptions)?.[0] || "",
       });
       setSuccessMessage("Pengajuan cuti/izin berhasil dikirim");
+      setShowSuccessModal(true);
       await loadData(statusFilter);
     } catch (err) {
       setError(err.message);
@@ -659,6 +739,11 @@ function EmployeeLeave() {
     setSelectedProof(null);
   };
 
+  const closeSuccessModal = () => {
+    setShowSuccessModal(false);
+    setSuccessMessage("");
+  };
+
   useEffect(() => {
     if (!form.start_date || !form.end_date || !maxEndDate) return;
     if (form.end_date > maxEndDate) {
@@ -686,12 +771,6 @@ function EmployeeLeave() {
       {error ? (
         <div className="alert alert-error mb-4">
           <span>{error}</span>
-        </div>
-      ) : null}
-
-      {successMessage ? (
-        <div className="alert alert-success mb-4">
-          <span>{successMessage}</span>
         </div>
       ) : null}
 
@@ -865,6 +944,7 @@ function EmployeeLeave() {
                   <input
                     className="input input-bordered border-base-300 bg-base-100 focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 w-full"
                     type="date"
+                    min={todayDateKey}
                     value={form.start_date}
                     onChange={(e) => updateForm("start_date", e.target.value)}
                   />
@@ -936,14 +1016,15 @@ function EmployeeLeave() {
                 <input
                   className="input input-bordered border-base-300 bg-base-100 focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
                   type="date"
+                  min={todayDateKey}
                   value={form.start_date}
                   onChange={(e) => updateForm("start_date", e.target.value)}
                 />
                 <input
                   className="input input-bordered border-base-300 bg-base-100 focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
                   type="date"
+                  min={form.start_date || todayDateKey}
                   value={form.end_date}
-                  min={form.start_date || undefined}
                   max={maxEndDate || undefined}
                   onChange={(e) => updateForm("end_date", e.target.value)}
                 />
@@ -994,6 +1075,10 @@ function EmployeeLeave() {
             <div className="md:col-span-2 text-xs opacity-70">
               {form.leave_type === "izin_terlambat"
                 ? "Izin terlambat/pulang cepat hanya untuk 1 tanggal pengajuan pada hari kerja."
+                : form.leave_type === "cuti_tahunan"
+                  ? remainingLeaveQuota > 0
+                    ? `Cuti Tahunan dapat diajukan dalam rentang berapa pun selama tidak melebihi sisa kuota ${remainingLeaveQuota} hari.`
+                    : "Sisa kuota cuti tahunan sudah habis."
                 : maxDaysForCurrentLeave > 0
                   ? `Rentang tanggal otomatis dibatasi maksimal ${maxDaysForCurrentLeave} hari sesuai peraturan izin dan cuti.`
                   : "Rentang tanggal mengikuti aturan izin dan cuti yang aktif. Pengajuan tidak berlaku pada hari libur nasional atau akhir pekan."}
@@ -1035,6 +1120,10 @@ function EmployeeLeave() {
 
                 if (requiresBuktiNow)
                   return "Bukti (surat dokter/dokumen) wajib untuk jenis ini.";
+                if (form.leave_type === "izin_lainnya")
+                  return "Jenis ini no paid.";
+                if (form.leave_type === "cuti_lainnya")
+                  return "Jenis ini no paid.";
                 if (form.leave_type === "izin_pribadi") {
                   const monthlyLimit =
                     (policy && policy.meta && policy.meta.monthly_limit) || 2;
@@ -1067,14 +1156,60 @@ function EmployeeLeave() {
         )}
       </TitleCard>
 
+      {showSuccessModal && successMessage ? (
+        <div className="modal modal-open">
+          <div className="modal-box max-w-md">
+            <h3 className="font-bold text-lg mb-2">Berhasil</h3>
+            <p className="text-sm opacity-80">{successMessage}</p>
+
+            <div className="modal-action">
+              <button className="btn btn-primary" onClick={closeSuccessModal}>
+                Tutup
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
+
       <TitleCard title="Riwayat Pengajuan Cuti / Izin" topMargin="mt-6">
-        <div className="flex justify-end mb-4">
+        <div className="flex justify-right mb-4 items-center gap-2">
+          <input
+            type="date"
+            className="input input-bordered input-sm max-w-xs"
+            value={submittedDateFilter}
+            onChange={async (e) => {
+              const nextDate = e.target.value;
+              setSubmittedDateFilter(nextDate);
+              setCurrentPage(1);
+              await loadData(undefined, undefined, nextDate);
+            }}
+          />
+
+          <select
+            className="select select-bordered select-sm w-full max-w-xs"
+            value={typeFilter}
+            onChange={async (e) => {
+              const nextType = e.target.value;
+              setTypeFilter(nextType);
+              setCurrentPage(1);
+              await loadData(undefined, nextType);
+            }}
+          >
+            <option value="">Semua Jenis</option>
+            {(Object.keys((leaveTypeOptions && leaveTypeOptions.labelMap) || LEAVE_TYPE_LABEL)).map((t) => (
+              <option key={t} value={t}>
+                {getLeaveTypeLabel(t, leaveTypeOptions)}
+              </option>
+            ))}
+          </select>
+
           <select
             className="select select-bordered select-sm w-full max-w-xs"
             value={statusFilter}
             onChange={async (e) => {
               const nextStatus = e.target.value;
               setStatusFilter(nextStatus);
+              setCurrentPage(1);
               await loadData(nextStatus);
             }}
           >
@@ -1083,6 +1218,10 @@ function EmployeeLeave() {
             <option value="approved">Approved</option>
             <option value="rejected">Rejected</option>
           </select>
+
+          <button type="button" className="btn btn-secondary btn-sm rounded-full" onClick={resetFilters}>
+            Reset
+          </button>
         </div>
 
         {loading ? (
