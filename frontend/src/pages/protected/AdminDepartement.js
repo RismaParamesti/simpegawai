@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useDispatch } from "react-redux";
 import { useNavigate } from "react-router-dom";
 import { setPageTitle } from "../../features/common/headerSlice";
@@ -30,6 +30,10 @@ function AdminDepartement() {
 
   const [departments, setDepartments] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [filters, setFilters] = useState({
+    search: "",
+    status: "",
+  });
 
   const [showModal, setShowModal] = useState(false);
   const [isEditMode, setIsEditMode] = useState(false);
@@ -45,6 +49,28 @@ function AdminDepartement() {
     description: "",
     status: "active",
   });
+
+  const filteredDepartments = useMemo(() => {
+    const query = filters.search.trim().toLowerCase();
+
+    return departments.filter((department) => {
+      const departmentStatusLabel =
+        department.status === "active" ? "aktif" : "nonaktif";
+      const matchesSearch =
+        !query ||
+        [
+          department.name,
+          department.code,
+          department.id,
+          department.status,
+          departmentStatusLabel,
+        ].some((value) => String(value || "").toLowerCase().includes(query));
+
+      const matchesStatus = !filters.status || department.status === filters.status;
+
+      return matchesSearch && matchesStatus;
+    });
+  }, [departments, filters.search, filters.status]);
 
   // Fetch departments from API
   const fetchDepartments = async () => {
@@ -90,6 +116,20 @@ function AdminDepartement() {
       ...prev,
       [name]: value,
     }));
+  };
+
+  const handleFilterChange = (field, value) => {
+    setFilters((prev) => ({
+      ...prev,
+      [field]: value,
+    }));
+  };
+
+  const handleResetFilters = () => {
+    setFilters({
+      search: "",
+      status: "",
+    });
   };
 
   const handleOpenModal = () => {
@@ -221,7 +261,8 @@ function AdminDepartement() {
   };
 
   const TopSideButtons = (
-    <button className="btn btn-primary btn-sm" onClick={handleOpenModal}>
+    <button className="btn btn-primary btn-sm gap-2" onClick={handleOpenModal}>
+      <span className="text-base leading-none font-bold">+</span>
       Tambah Departemen
     </button>
   );
@@ -241,19 +282,58 @@ function AdminDepartement() {
       )}
 
       <TitleCard title="Daftar Departemen" TopSideButtons={TopSideButtons}>
+        <div className="grid md:grid-cols-3 grid-cols-1 gap-4 mb-6">
+            <label className="form-control w-full">
+              <span className="label-text mb-1 text-sm font-medium text-base-content/70">
+                Cari Nama / ID / Kode
+              </span>
+
+              <input
+                type="search"
+                className="input input-bordered w-full"
+                placeholder="Contoh: HR, 01, atau Human Resource"
+                value={filters.search}
+                onChange={(e) => handleFilterChange("search", e.target.value)}
+              />
+            </label>
+
+            <label className="form-control w-full">
+              <span className="label-text mb-1 text-sm font-medium text-base-content/70">
+                Status
+              </span>
+
+              <select
+                className="select select-bordered w-full"
+                value={filters.status}
+                onChange={(e) => handleFilterChange("status", e.target.value)}
+              >
+                <option value="">Semua Status</option>
+                <option value="active">Aktif</option>
+                <option value="inactive">Nonaktif</option>
+              </select>
+            </label>
+
+          <button
+            className="btn btn-secondary rounded-full px-6 min-h-12 self-start md:self-end md:mt-6"
+            onClick={handleResetFilters}
+          >
+            Reset Filter
+          </button>
+        </div>
+
         {isLoading ? (
           <div className="flex justify-center items-center py-12">
             <span className="loading loading-spinner loading-lg"></span>
           </div>
-        ) : departments.length === 0 ? (
+        ) : filteredDepartments.length === 0 ? (
           <div className="text-center py-12">
             <p className="text-base-content/50">
-              Tidak ada departemen tersedia
+              Tidak ada departemen yang sesuai dengan filter
             </p>
           </div>
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-5">
-            {departments.map((department) => (
+            {filteredDepartments.map((department) => (
               <div
                 key={department.id}
                 className="border border-base-300 rounded-xl p-4 bg-base-100 hover:shadow-sm transition-all"

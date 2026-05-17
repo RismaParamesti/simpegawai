@@ -5,6 +5,7 @@ import TitleCard from "../components/Cards/TitleCard";
 import { getCandidateDashboardStats } from "../utils/candidateDashboard";
 import { getCandidateProfile } from "../utils/candidateProfile";
 import axios from "axios";
+import { useNavigate } from "react-router-dom";
 
 export default function CandidateDashboardHome() {
   const dispatch = useDispatch();
@@ -32,6 +33,8 @@ export default function CandidateDashboardHome() {
       .catch(() => {});
   }, [dispatch]);
 
+  const navigate = useNavigate();
+
   const invitationLetterUrl = candidateCall?.invitation_letter_file
     ? candidateCall.invitation_letter_file.startsWith("http")
       ? candidateCall.invitation_letter_file
@@ -42,21 +45,21 @@ export default function CandidateDashboardHome() {
     <div>
       {/* STATISTIK */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-        <TitleCard title="Total Permohonan" topMargin="mt-0" to="app/candidate/status" linkState={{ initialStatus: 'all' }}>
+        <TitleCard title="Total Permohonan" topMargin="mt-0" to="/candidate/requests" linkState={{ initialStatus: 'all' }}>
           <div className="text-3xl font-bold">{stats.total}</div>
         </TitleCard>
 
-        <TitleCard title="Sedang Diproses" topMargin="mt-0" to="app/candidate/status" linkState={{ initialStatus: 'screening' }}>
+        <TitleCard title="Sedang Diproses" topMargin="mt-0" to="/candidate/requests" linkState={{ initialStatus: 'screening' }}>
           <div className="text-3xl font-bold">{stats.inProgress} posisi</div>
         </TitleCard>
 
-        <TitleCard title="Diterima" topMargin="mt-0" to="app/candidate/status" linkState={{ initialStatus: 'diterima' }}>
+        <TitleCard title="Diterima" topMargin="mt-0" to="/candidate/requests" linkState={{ initialStatus: 'diterima' }}>
           <div className="text-3xl font-bold text-success">
             {stats.accepted} posisi
           </div>
         </TitleCard>
 
-        <TitleCard title="Ditolak" topMargin="mt-0" to="app/candidate/status" linkState={{ initialStatus: 'ditolak' }}>
+        <TitleCard title="Ditolak" topMargin="mt-0" to="/candidate/requests" linkState={{ initialStatus: 'ditolak' }}>
           <div className="text-3xl font-bold text-error">
             {stats.rejected} posisi
           </div>
@@ -115,9 +118,20 @@ export default function CandidateDashboardHome() {
                     </tr>
                   ) : (
                     stats.latest.map((app, idx) => (
-                      <tr key={idx}>
-                        <td>{app.position_name}</td>
-                        <td>
+                      <tr
+                        key={idx}
+                        role="button"
+                        tabIndex={0}
+                        onClick={() => navigate('/candidate/requests', { state: { initialAppId: app.id } })}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter' || e.key === ' ') {
+                            navigate('/candidate/requests', { state: { initialAppId: app.id } })
+                          }
+                        }}
+                        className="cursor-pointer hover:bg-base-200/60"
+                      >
+                          <td>{app.position_name}</td>
+                          <td>
                           {app.employment_type === "permanent" &&
                             "Pegawai Tetap"}
                           {app.employment_type === "contract" && "Kontrak"}

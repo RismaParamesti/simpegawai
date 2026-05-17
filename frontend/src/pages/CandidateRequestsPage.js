@@ -30,9 +30,19 @@ export default function CandidateRequestsPage() {
 
   useEffect(() => {
     const initial = location?.state?.initialStatus;
+    const initialAppId = location?.state?.initialAppId;
+
     if (initial && applications && applications.length > 0) {
       handleFilterStatus(initial);
       setSelectedStatus(initial);
+    }
+
+    if (initialAppId && applications && applications.length > 0) {
+      const found = applications.find((a) => a && (a.id === initialAppId || String(a.id) === String(initialAppId)));
+      if (found) {
+        setSelectedApp(found);
+        setIsModalOpen(true);
+      }
     }
   }, [location, applications]);
 

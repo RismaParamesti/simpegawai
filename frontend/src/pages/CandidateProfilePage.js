@@ -63,7 +63,7 @@ export default function CandidateProfilePage() {
           graduation_year: candidate.graduation_year || '',
           linkedin: candidate.linkedin || '',
           portfolio: candidate.portfolio || '',
-          expected_salary: candidate.expected_salary || '',
+          expected_salary: candidate.expected_salary ? String(candidate.expected_salary) : '',
         })
       }
     } catch (error) {
@@ -75,9 +75,16 @@ export default function CandidateProfilePage() {
   }
 
   const handleChange = (e) => {
+    const { name, value } = e.target
+    if (name === 'expected_salary') {
+      const digits = String(value).replace(/\D/g, '')
+      setForm({ ...form, expected_salary: digits })
+      return
+    }
+
     setForm({
       ...form,
-      [e.target.name]: e.target.value
+      [name]: value,
     })
   }
 
@@ -92,11 +99,14 @@ export default function CandidateProfilePage() {
     try {
       setSubmitting(true)
 
-      await axios.put('/api/candidates/profile', form)
+      const payload = { ...form }
+      if (payload.expected_salary) payload.expected_salary = parseInt(payload.expected_salary, 10)
+
+      await axios.put('/api/candidates/profile', payload)
 
       NotificationManager.success('Profil Anda berhasil disimpan', 'Sukses', 3000)
       fetchCandidateProfile()
-      
+
     } catch (error) {
       console.error('Failed to update profile:', error)
       NotificationManager.error(
@@ -107,6 +117,13 @@ export default function CandidateProfilePage() {
     } finally {
       setSubmitting(false)
     }
+  }
+
+  // Helper to format numbers with dot as thousand separator (Indonesian style)
+  function formatWithDots(numStr) {
+    if (numStr === null || numStr === undefined || numStr === '') return ''
+    const s = String(numStr).replace(/\D/g, '')
+    return s.replace(/\B(?=(\d{3})+(?!\d))/g, '.')
   }
 
   if (loading) {
@@ -183,7 +200,6 @@ export default function CandidateProfilePage() {
               <option value="">Pilih Jenis Kelamin</option>
               <option value="male">Laki-laki</option>
               <option value="female">Perempuan</option>
-              <option value="other">Lainnya</option>
             </select>
           </div>
 
@@ -411,12 +427,14 @@ export default function CandidateProfilePage() {
               <span className="label-text font-semibold">Ekspektasi Gaji Tahunan (Rp)</span>
             </label>
             <input
-              type="number"
+              type="text"
               name="expected_salary"
               className="input input-bordered"
               placeholder="Masukkan ekspektasi gaji tahunan"
-              value={form.expected_salary}
+              value={formatWithDots(form.expected_salary)}
               onChange={handleChange}
+              inputMode="numeric"
+              pattern="[0-9.]*"
             />
           </div>
 

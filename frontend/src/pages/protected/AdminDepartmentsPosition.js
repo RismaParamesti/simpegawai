@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { useDispatch } from "react-redux";
 import {
@@ -32,6 +32,11 @@ function AdminPosition() {
   const [submitting, setSubmitting] = useState(false);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [selectedDelete, setSelectedDelete] = useState(null);
+  const [filters, setFilters] = useState({
+    search: "",
+    level: "",
+    status: "",
+  });
 
   const [departmentMeta, setDepartmentMeta] = useState({ code: "", name: "" });
 
@@ -41,6 +46,39 @@ function AdminPosition() {
     level: "staff",
     status: "active",
   });
+
+  const filteredPositions = useMemo(() => {
+    const query = filters.search.trim().toLowerCase();
+
+    return positions.filter((position) => {
+      const matchesSearch =
+        !query ||
+        [position.name, position.level, position.id].some((value) =>
+          String(value || "").toLowerCase().includes(query),
+        );
+
+      const matchesLevel = !filters.level || position.level === filters.level;
+
+      const matchesStatus =
+        !filters.status || position.status === filters.status;
+
+      return matchesSearch && matchesLevel && matchesStatus;
+    });
+  }, [positions, filters.search, filters.level, filters.status]);
+
+  const availableLevels = useMemo(() => {
+    const levels = new Set();
+
+    positions.forEach((position) => {
+      const level = String(position.level || "").trim();
+
+      if (level) {
+        levels.add(level);
+      }
+    });
+
+    return Array.from(levels).sort((left, right) => left.localeCompare(right));
+  }, [positions]);
 
   const loadPositions = useCallback(async () => {
     try {
@@ -88,6 +126,21 @@ function AdminPosition() {
       ...prev,
       [name]: value,
     }));
+  };
+
+  const handleFilterChange = (field, value) => {
+    setFilters((prev) => ({
+      ...prev,
+      [field]: value,
+    }));
+  };
+
+  const handleResetFilters = () => {
+    setFilters({
+      search: "",
+      level: "",
+      status: "",
+    });
   };
 
   const handleOpenModal = () => {
@@ -192,10 +245,11 @@ function AdminPosition() {
   const TopSideButtons = (
     <div className="flex items-center gap-2">
       <button className="btn btn-primary btn-sm" onClick={handleOpenModal}>
+        <span className="text-base leading-none font-bold">+</span>
         Tambah Posisi
       </button>
       <button
-        className="btn btn-ghost btn-sm"
+        className="btn btn-ghost btn-sm gap-2"
         onClick={() => navigate("/app/positions")}
       >
         Kembali
@@ -209,6 +263,63 @@ function AdminPosition() {
         title={`Posisi - ${departmentMeta.name || departmentMeta.code || ""}`}
         TopSideButtons={TopSideButtons}
       >
+        <div className="grid md:grid-cols-4 grid-cols-1 gap-4 mb-6">
+          <label className="form-control w-full">
+            <span className="label-text mb-1 text-sm font-medium text-base-content/70">
+              Cari Nama
+            </span>
+
+            <input
+              type="search"
+              className="input input-bordered w-full"
+              placeholder="Contoh: Project Manager"
+              value={filters.search}
+              onChange={(e) => handleFilterChange("search", e.target.value)}
+            />
+          </label>
+
+            <label className="form-control w-full">
+              <span className="label-text mb-1 text-sm font-medium text-base-content/70">
+                Level
+              </span>
+
+              <select
+                className="select select-bordered w-full"
+                value={filters.level}
+                onChange={(e) => handleFilterChange("level", e.target.value)}
+              >
+                <option value="">Semua Level</option>
+                {availableLevels.map((level) => (
+                  <option key={level} value={level}>
+                    {level}
+                  </option>
+                ))}
+              </select>
+            </label>
+
+          <label className="form-control w-full">
+            <span className="label-text mb-1 text-sm font-medium text-base-content/70">
+              Status
+            </span>
+
+            <select
+              className="select select-bordered w-full"
+              value={filters.status}
+              onChange={(e) => handleFilterChange("status", e.target.value)}
+            >
+              <option value="">Semua Status</option>
+              <option value="active">Aktif</option>
+              <option value="inactive">Nonaktif</option>
+            </select>
+          </label>
+
+          <button
+            className="btn btn-secondary rounded-full px-6 min-h-12 self-start md:self-end md:mt-6"
+            onClick={handleResetFilters}
+          >
+            Reset Filter
+          </button>
+        </div>
         {loading ? (
           <div className="flex justify-center items-center py-8">
             <span className="loading loading-spinner loading-lg"></span>
@@ -227,17 +338,17 @@ function AdminPosition() {
               </thead>
 
               <tbody>
-                {positions.length === 0 ? (
+                {filteredPositions.length === 0 ? (
                   <tr>
                     <td
                       colSpan="8"
                       className="text-center text-base-content/60 py-8"
                     >
-                      Tidak ada posisi pada departemen ini
+                      Tidak ada posisi yang sesuai dengan filter
                     </td>
                   </tr>
                 ) : (
-                  positions.map((position, index) => (
+                  filteredPositions.map((position, index) => (
                     <tr key={position.id}>
                       <td>{index + 1}</td>
                       <td>{position.name}</td>

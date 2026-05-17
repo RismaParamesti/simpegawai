@@ -79,39 +79,42 @@ router.get("/", async (req, res) => {
   try {
     const { status, position_id } = req.query;
 
-    // Update otomatis status menjadi 'closed' jika deadline sudah lewat dan status masih 'open'
+    // Update otomatis lowongan menjadi shortlisting saat deadline sudah lewat.
     await db
       .promise()
       .query(
-        `UPDATE job_openings SET status = 'closed' WHERE status = 'open' AND deadline IS NOT NULL AND deadline < CURDATE()`,
+        `UPDATE job_openings SET status = 'closed', hiring_status = 'shortlisting' WHERE status = 'open' AND deadline IS NOT NULL AND deadline < CURDATE()`,
       );
 
     let query = `
-            SELECT 
-                jo.id,
-                jo.position_id,
-                jo.base_position,
-                jo.title,
-                jo.description,
-                jo.requirements,
-                jo.responsibilities,
-                jo.quota,
-                jo.employment_type,
-                jo.salary_range_min,
-                jo.salary_range_max,
-                jo.location,
-                jo.deadline,
-                jo.status,
-                jo.hiring_status,
-                jo.created_by,
-                jo.created_at,
-                p.name AS position_name,
-                p.level,
-                d.name AS department_name
-            FROM job_openings jo
-            JOIN positions p ON jo.position_id = p.id
-            JOIN departments d ON p.department_id = d.id
-        `;
+        SELECT 
+          jo.id,
+          jo.position_id,
+          jo.base_position,
+          jo.title,
+          jo.description,
+          jo.requirements,
+          jo.responsibilities,
+          jo.quota,
+          jo.employment_type,
+          jo.salary_range_min,
+          jo.salary_range_max,
+          jo.location,
+          jo.deadline,
+          jo.status,
+          jo.hiring_status,
+          jo.created_by,
+          jo.created_at,
+          p.name AS position_name,
+          p.level,
+          d.name AS department_name,
+          (
+            SELECT COUNT(*) FROM applications a WHERE a.job_opening_id = jo.id
+          ) AS applications_count
+        FROM job_openings jo
+        JOIN positions p ON jo.position_id = p.id
+        JOIN departments d ON p.department_id = d.id
+      `;
 
     const conditions = [];
     const params = [];
@@ -147,35 +150,38 @@ router.get("/:id", async (req, res) => {
   try {
     const { id } = req.params;
 
-    const query = `
-            SELECT 
-    jo.id,
-    jo.position_id,
-    jo.base_position,
-    jo.title,
-    jo.description,
-    jo.requirements,
-    jo.responsibilities,
-    jo.quota,
-    jo.employment_type,
-    jo.salary_range_min,
-    jo.salary_range_max,
-    jo.location,
-    jo.deadline,
-    jo.status,
-    jo.hiring_status,        
-    jo.created_by,
-    jo.created_at,
-    p.name AS position_name,
-    p.level,
-    p.base_salary,
-    d.name AS department_name,
-    d.description AS department_description
-FROM job_openings jo
-JOIN positions p ON jo.position_id = p.id
-JOIN departments d ON p.department_id = d.id
-WHERE jo.id = ?
-        `;
+        const query = `
+          SELECT 
+        jo.id,
+        jo.position_id,
+        jo.base_position,
+        jo.title,
+        jo.description,
+        jo.requirements,
+        jo.responsibilities,
+        jo.quota,
+        jo.employment_type,
+        jo.salary_range_min,
+        jo.salary_range_max,
+        jo.location,
+        jo.deadline,
+        jo.status,
+        jo.hiring_status,        
+        jo.created_by,
+        jo.created_at,
+        p.name AS position_name,
+        p.level,
+        p.base_salary,
+        d.name AS department_name,
+        d.description AS department_description,
+        (
+          SELECT COUNT(*) FROM applications a WHERE a.job_opening_id = jo.id
+        ) AS applications_count
+    FROM job_openings jo
+    JOIN positions p ON jo.position_id = p.id
+    JOIN departments d ON p.department_id = d.id
+    WHERE jo.id = ?
+      `;
 
     const [jobs] = await db.promise().query(query, [id]);
 
@@ -283,6 +289,34 @@ router.get("/:id/documents", async (req, res) => {
         totalOptional: optionalDocuments.length,
       },
     });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ message: "Server error" });
+  }
+});
+
+// ============================
+// BATCH GET APPLICANTS COUNTS
+// Example: GET /counts?ids=1,2,3
+// ============================
+router.get("/counts", async (req, res) => {
+  try {
+    const idsParam = req.query.ids;
+    if (!idsParam) return res.json({ counts: {} });
+
+    const ids = idsParam.split(",").map((s) => Number(s)).filter(Boolean);
+    if (ids.length === 0) return res.json({ counts: {} });
+
+    const placeholders = ids.map(() => "?").join(",");
+    const query = `SELECT job_opening_id, COUNT(*) AS c FROM applications WHERE job_opening_id IN (${placeholders}) GROUP BY job_opening_id`;
+    const [rows] = await db.promise().query(query, ids);
+    const counts = {};
+    ids.forEach((id) => (counts[id] = 0));
+    rows.forEach((r) => {
+      counts[r.job_opening_id] = r.c;
+    });
+
+    res.json({ counts });
   } catch (error) {
     console.error(error);
     res.status(500).json({ message: "Server error" });

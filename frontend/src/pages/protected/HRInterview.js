@@ -110,39 +110,39 @@ export default function HRInterview() {
       }
     }
 
-        // Cek apakah kandidat punya interview status canceled/cancelled
-        const canceledInterview = data.find(
-          (d) =>
-            d.application_id === candidate.id &&
-            ["canceled", "cancelled"].includes(d.status),
-        );
+    // Cek apakah kandidat punya interview status canceled/cancelled
+    const canceledInterview = data.find(
+      (d) =>
+        d.application_id === candidate.id &&
+        ["canceled", "cancelled"].includes(d.status),
+    );
 
-        if (canceledInterview) {
-          setMode("update");
-          setSelectedCandidate(canceledInterview);
-          setForm({
-            scheduled_date: canceledInterview.scheduled_date || "",
-            interview_stage: canceledInterview.stage || "HR",
-            interview_type: canceledInterview.interview_type || "Online",
-            duration_minutes: canceledInterview.duration_minutes || 60,
-            interviewer_id: canceledInterview.interviewer_id || "",
-            meeting_link: canceledInterview.meeting_link || "",
-            location: canceledInterview.location || "",
-          });
-        } else {
-          setMode("create");
-          setSelectedCandidate(candidate);
-          setForm((prev) => ({
-            ...prev,
-            scheduled_date: "",
-            interview_stage: "HR",
-            interview_type: "Online",
-            duration_minutes: 60,
-            interviewer_id: "",
-            meeting_link: "",
-            location: "",
-          }));
-        }
+    if (canceledInterview) {
+      setMode("update");
+      setSelectedCandidate(canceledInterview);
+      setForm({
+        scheduled_date: canceledInterview.scheduled_date || "",
+        interview_stage: canceledInterview.stage || "HR",
+        interview_type: canceledInterview.interview_type || "Online",
+        duration_minutes: canceledInterview.duration_minutes || 60,
+        interviewer_id: canceledInterview.interviewer_id || "",
+        meeting_link: canceledInterview.meeting_link || "",
+        location: canceledInterview.location || "",
+      });
+    } else {
+      setMode("create");
+      setSelectedCandidate(candidate);
+      setForm((prev) => ({
+        ...prev,
+        scheduled_date: "",
+        interview_stage: "HR",
+        interview_type: "Online",
+        duration_minutes: 60,
+        interviewer_id: "",
+        meeting_link: "",
+        location: "",
+      }));
+    }
     setIsModalOpen(true);
     setTimeout(() => {
       console.log("isModalOpen:", isModalOpen, "selectedCandidate:", candidate);
@@ -543,7 +543,8 @@ export default function HRInterview() {
                   <div className="divide-y">
                     {(showAll[job] ? list : list.slice(0, 1)).map(
                       (candidate, i) => {
-                        const isReschedule = canceledMap[candidate.application_id];
+                        const isReschedule =
+                          canceledMap[candidate.application_id];
                         return (
                           <div
                             key={candidate.id || i}
@@ -580,18 +581,31 @@ export default function HRInterview() {
                                     const canceledInterview = data.find(
                                       (d) =>
                                         d.application_id === candidate.id &&
-                                        ["canceled", "cancelled"].includes(d.status),
+                                        ["canceled", "cancelled"].includes(
+                                          d.status,
+                                        ),
                                     );
                                     if (canceledInterview) {
                                       setSelectedCandidate(canceledInterview);
                                       setForm({
-                                        scheduled_date: canceledInterview.scheduled_date || canceledInterview.date,
-                                        interview_stage: canceledInterview.stage,
-                                        interview_type: canceledInterview.interview_type || canceledInterview.type,
-                                        duration_minutes: canceledInterview.duration_minutes || 60,
-                                        interviewer_id: canceledInterview.interviewer_id || "",
-                                        meeting_link: canceledInterview.meeting_link || "",
-                                        location: canceledInterview.location || "",
+                                        scheduled_date:
+                                          canceledInterview.scheduled_date ||
+                                          canceledInterview.date,
+                                        interview_stage:
+                                          canceledInterview.stage,
+                                        interview_type:
+                                          canceledInterview.interview_type ||
+                                          canceledInterview.type,
+                                        duration_minutes:
+                                          canceledInterview.duration_minutes ||
+                                          60,
+                                        interviewer_id:
+                                          canceledInterview.interviewer_id ||
+                                          "",
+                                        meeting_link:
+                                          canceledInterview.meeting_link || "",
+                                        location:
+                                          canceledInterview.location || "",
                                       });
                                     } else {
                                       setSelectedCandidate(candidate);
@@ -868,7 +882,6 @@ export default function HRInterview() {
                             >
                               Gugurkan
                             </button>
-                           
                           </div>
                         </div>
                       </div>
@@ -1014,7 +1027,7 @@ export default function HRInterview() {
                           >
                             Detail Lowongan
                           </button>
-                          {/* Button Selesaikan Lowongan Ini, hanya tampil jika status/hiring_status TIDAK closed/completed/canceled */}
+                          {/* Button lanjut ke interview, hanya tampil saat shortlisting */}
                           {(() => {
                             // Ambil dari filteredHistory, bukan groupedData
                             const first = filteredHistory[job]?.[0];
@@ -1031,10 +1044,10 @@ export default function HRInterview() {
                             ).toLowerCase();
                             // Jangan render button apapun jika status/hiring_status masih kosong (belum sempat fetch)
                             if (!status || !hiringStatus) return null;
-                            // Button hanya tidak tampil jika status closed dan hiring_status completed/canceled
+                            // Hanya tampil saat shortlisting
                             if (
-                              status === "closed" &&
-                              ["completed", "canceled"].includes(hiringStatus)
+                              status !== "closed" ||
+                              hiringStatus !== "shortlisting"
                             )
                               return null;
                             return (
@@ -1047,21 +1060,23 @@ export default function HRInterview() {
                                   }
                                   if (
                                     !window.confirm(
-                                      "Yakin ingin menandai lowongan ini sebagai selesai?",
+                                      "Yakin ingin melanjutkan lowongan ini ke tahap interview?",
                                     )
                                   )
                                     return;
                                   try {
-                                    // Update status job_openings menjadi closed & completed
+                                    // Update hiring_status job_openings menjadi interview
                                     await axios.put(
-                                      `/api/job-openings/${jobOpeningId}/complete`,
+                                      `/api/job-openings/${jobOpeningId}/advance-to-interview`,
                                     );
-                                    alert("Lowongan berhasil diselesaikan.");
+                                    alert(
+                                      "Lowongan berhasil dipindah ke tahap interview.",
+                                    );
                                     // Refresh status di map
                                     fetchJobStatus(jobOpeningId);
                                   } catch (err) {
                                     alert(
-                                      "Gagal menyelesaikan lowongan: " +
+                                      "Gagal memindahkan lowongan ke interview: " +
                                         (err?.response?.data?.message ||
                                           err?.message ||
                                           JSON.stringify(err)),
@@ -1069,7 +1084,7 @@ export default function HRInterview() {
                                   }
                                 }}
                               >
-                                Selesaikan Lowongan Ini
+                                Pindah ke Interview
                               </button>
                             );
                           })()}
@@ -1246,9 +1261,15 @@ export default function HRInterview() {
             try {
               // Determine interview id: prefer selectedCandidate.id, fallback to interview_id, or find by application_id in data
               const interviewId =
-                (selectedCandidate && (selectedCandidate.id || selectedCandidate.interview_id)) ||
+                (selectedCandidate &&
+                  (selectedCandidate.id || selectedCandidate.interview_id)) ||
                 (selectedCandidate && selectedCandidate.application_id
-                  ? (data.find((d) => d.application_id === selectedCandidate.application_id) || {}).id
+                  ? (
+                      data.find(
+                        (d) =>
+                          d.application_id === selectedCandidate.application_id,
+                      ) || {}
+                    ).id
                   : null);
 
               if ((mode === "update" || mode === "reschedule") && interviewId) {
@@ -1282,7 +1303,10 @@ export default function HRInterview() {
                       scheduled_date: i.scheduled_date || i.date,
                       interview_type: i.interview_type || i.type || "-",
                       interviewer_name:
-                        i.interviewer_name || i.interviewer || i.full_name || "-",
+                        i.interviewer_name ||
+                        i.interviewer ||
+                        i.full_name ||
+                        "-",
                     })),
                   );
                 }
@@ -1403,31 +1427,40 @@ export default function HRInterview() {
             }
             try {
               // Set result = 'failed' and add notes; mark status completed so it appears in history
-              await axios.put(`/api/admin/interviews/${selectedCandidate.id}/result`, {
-                interviewer_notes: cancelNotes,
-                result: 'failed',
-                status: 'completed',
-              });
+              await axios.put(
+                `/api/admin/interviews/${selectedCandidate.id}/result`,
+                {
+                  interviewer_notes: cancelNotes,
+                  result: "failed",
+                  status: "completed",
+                },
+              );
 
               // Update local state: mark interview as completed/failed
               setData((prev) =>
                 prev.map((item) =>
                   item.id === selectedCandidate.id
-                    ? { ...item, status: 'completed', result: 'failed', interviewer_notes: cancelNotes }
+                    ? {
+                        ...item,
+                        status: "completed",
+                        result: "failed",
+                        interviewer_notes: cancelNotes,
+                      }
                     : item,
                 ),
               );
 
               // If currently in schedule view, move to history by switching menu
               setIsCancelModalOpen(false);
-              alert('Interview berhasil digugurkan dan dipindah ke riwayat.');
-              setActiveMenu('history');
+              alert("Interview berhasil digugurkan dan dipindah ke riwayat.");
+              setActiveMenu("history");
             } catch (err) {
-              let msg = 'Gagal menggugurkan interview.';
-              if (err?.response?.data?.message) msg += ' ' + err.response.data.message;
-              else if (err?.message) msg += ' ' + err.message;
+              let msg = "Gagal menggugurkan interview.";
+              if (err?.response?.data?.message)
+                msg += " " + err.response.data.message;
+              else if (err?.message) msg += " " + err.message;
               alert(msg);
-              console.error('[Gugurkan Interview Error]', err);
+              console.error("[Gugurkan Interview Error]", err);
             }
           }}
         />

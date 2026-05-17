@@ -14,6 +14,7 @@ export default function CandidateJobList() {
   const [jobs, setJobs] = useState([]);
   const [filteredJobs, setFilteredJobs] = useState([]);
   const [locations, setLocations] = useState([]);
+  const [applicantsCount, setApplicantsCount] = useState({});
 
   const [search, setSearch] = useState("");
   const [locationFilter, setLocationFilter] = useState("");
@@ -42,6 +43,34 @@ export default function CandidateJobList() {
       // Tidak filter status, tampilkan semua (open & closed)
       setJobs(jobsData);
       setFilteredJobs(jobsData);
+      // Prefer applications_count returned by the jobs API
+      const countsFromJobs = {};
+      jobsData.forEach((j) => {
+        const jid = j.id || j.job_opening_id || j.job_openingId || j.jobId;
+        if (typeof j.applications_count !== "undefined") {
+          countsFromJobs[jid] = Number(j.applications_count) || 0;
+        }
+      });
+      // If we have counts for all jobs, use them. Otherwise, fetch counts for visible jobs via batch endpoint.
+      const allHaveCounts = jobsData.every((j) => typeof j.applications_count !== "undefined");
+      if (allHaveCounts) {
+        setApplicantsCount(countsFromJobs);
+      } else {
+        // set known counts
+        setApplicantsCount(countsFromJobs);
+        // fetch counts only for visible (filtered) jobs to avoid N+1
+        try {
+          const visibleIds = jobsData.map((j) => j.id || j.job_opening_id || j.job_openingId || j.jobId).filter(Boolean);
+          if (visibleIds.length > 0) {
+            const res = await api.get(`/job-openings/counts?ids=${visibleIds.join(",")}`);
+            if (res.data && res.data.counts) {
+              setApplicantsCount((prev) => ({ ...prev, ...res.data.counts }));
+            }
+          }
+        } catch (e) {
+          // ignore
+        }
+      }
       // Extract unique locations
       const uniqueLocations = [
         ...new Set(jobsData.map((job) => job.location).filter(Boolean)),
@@ -197,7 +226,7 @@ export default function CandidateJobList() {
                 <div className="card-body">
                   {/* TITLE */}
                   <h2 className="card-title text-primary">
-                    Pegawai {job.position_name}
+                    {job.position_name}
                   </h2>
 
                   {/* LOCATION */}
@@ -219,6 +248,9 @@ export default function CandidateJobList() {
 
                   {/* QUOTA */}
                   <p className="text-sm">👥 Kuota: {job.quota || 1}</p>
+
+                  {/* APPLICANTS COUNT */}
+                  <p className="text-sm">👥 Jumlah Pelamar: {applicantsCount[job.id || job.job_opening_id || job.job_openingId || job.jobId] ?? "-"}</p>
 
                   {/* DEADLINE */}
                   <p className="text-sm text-warning">
@@ -244,9 +276,10 @@ export default function CandidateJobList() {
                   {/* BUTTON */}
                   <button
                     className="btn btn-primary btn-sm"
-                    onClick={() =>
-                      navigate(`/app/candidate/${job.id}?job_id=${job.id}`, { state: { job } })
-                    }
+                    onClick={() => {
+                      const jid = job.id || job.job_opening_id || job.job_openingId || job.jobId;
+                      navigate(`/app/candidate/${jid}?job_id=${jid}`, { state: { job } });
+                    }}
                   >
                     Lihat Lamaran
                   </button>

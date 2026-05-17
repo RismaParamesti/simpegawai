@@ -17,6 +17,7 @@ const defaultJobOpening = {
   location: "",
   deadline: "",
   status: "open",
+  hiring_status: "ongoing",
 };
 
 export default function HRJobOpenings() {
@@ -127,6 +128,13 @@ export default function HRJobOpenings() {
       setForm((f) => ({ ...f, developer_specialization: value }));
       return;
     }
+    // store salary inputs as digit-only strings, but display formatted
+    if (name === "salary_range_min" || name === "salary_range_max") {
+      const digits = String(value).replace(/\D/g, "");
+      setForm((f) => ({ ...f, [name]: digits }));
+      return;
+    }
+
     setForm((f) => ({ ...f, [name]: value }));
   }
 
@@ -136,9 +144,13 @@ export default function HRJobOpenings() {
     setError("");
     try {
       let payload = { ...form };
-      // Pastikan base_position dan developer_specialization tetap dikirim walau kosong
+      // Pastikan base_position, developer_specialization, dan hiring_status tetap dikirim walau kosong
       if (!payload.base_position) payload.base_position = "";
       if (!payload.developer_specialization) payload.developer_specialization = "";
+      if (!payload.hiring_status) payload.hiring_status = "ongoing";
+      // Convert salary fields to numbers if present (they are stored as digit-only strings)
+      if (payload.salary_range_min) payload.salary_range_min = parseInt(payload.salary_range_min, 10);
+      if (payload.salary_range_max) payload.salary_range_max = parseInt(payload.salary_range_max, 10);
       if (editMode && editId) {
         await jobService.updateJobOpening(editId, payload);
       } else {
@@ -211,6 +223,13 @@ export default function HRJobOpenings() {
     setEditId(null);
     setForm(defaultJobOpening);
     setShowForm(false); // ⬅️ tutup lagi
+  }
+
+  // Helper to format numbers with dot as thousand separator (Indonesian style)
+  function formatWithDots(numStr) {
+    if (numStr === null || numStr === undefined || numStr === "") return "";
+    const s = String(numStr).replace(/\D/g, "");
+    return s.replace(/\B(?=(\d{3})+(?!\d))/g, ".");
   }
 
   return (
@@ -398,11 +417,13 @@ export default function HRJobOpenings() {
                 Gaji Minimum
               </label>
               <input
-                type="number"
+                type="text"
                 name="salary_range_min"
-                value={form.salary_range_min}
+                value={formatWithDots(form.salary_range_min)}
                 onChange={handleChange}
                 className="input input-bordered w-full"
+                inputMode="numeric"
+                pattern="[0-9.]*"
               />
             </div>
             <div>
@@ -410,11 +431,13 @@ export default function HRJobOpenings() {
                 Gaji Maksimum
               </label>
               <input
-                type="number"
+                type="text"
                 name="salary_range_max"
-                value={form.salary_range_max}
+                value={formatWithDots(form.salary_range_max)}
                 onChange={handleChange}
                 className="input input-bordered w-full"
+                inputMode="numeric"
+                pattern="[0-9.]*"
               />
             </div>
             <div>
