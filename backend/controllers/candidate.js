@@ -1357,6 +1357,11 @@ router.get(
     try {
       const { status, job_opening_id } = req.query;
 
+      const hasCoverLetterFileColumn = await applicationsTableHasCoverLetterFile();
+      const coverLetterSelect = hasCoverLetterFileColumn
+        ? "a.cover_letter_file AS cover_letter_file"
+        : "a.cover_letter AS cover_letter_file";
+
       let query = `
             SELECT  
   a.id AS application_id,

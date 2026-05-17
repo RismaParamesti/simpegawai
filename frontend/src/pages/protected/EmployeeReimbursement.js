@@ -110,7 +110,7 @@ function EmployeeReimbursement() {
   const [selectedAttachment, setSelectedAttachment] = useState(null);
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 10;
-    const [dateFilter, setDateFilter] = useState("");
+  const [dateFilter, setDateFilter] = useState("");
   const [typeFilter, setTypeFilter] = useState("");
   const [statusFilter, setStatusFilter] = useState("");
 
@@ -158,15 +158,15 @@ function EmployeeReimbursement() {
       const rawStatus = (item?.status || "").toLowerCase();
       if (statusFilter && rawStatus !== statusFilter) return false;
 
-        // single date filter (match same day)
-        if (dateFilter && item?.created_at) {
-          const itemDate = new Date(item.created_at);
-          const targetStart = new Date(dateFilter);
-          targetStart.setHours(0, 0, 0, 0);
-          const targetEnd = new Date(dateFilter);
-          targetEnd.setHours(23, 59, 59, 999);
-          if (itemDate < targetStart || itemDate > targetEnd) return false;
-        }
+      // single date filter (match same day)
+      if (dateFilter && item?.created_at) {
+        const itemDate = new Date(item.created_at);
+        const targetStart = new Date(dateFilter);
+        targetStart.setHours(0, 0, 0, 0);
+        const targetEnd = new Date(dateFilter);
+        targetEnd.setHours(23, 59, 59, 999);
+        if (itemDate < targetStart || itemDate > targetEnd) return false;
+      }
 
       return true;
     });
@@ -325,17 +325,17 @@ function EmployeeReimbursement() {
           <>
             <div className="flex flex-wrap gap-3 mb-3 items-center">
               <div className="flex items-center gap-2">
-                      <label className="text-sm opacity-80">Tanggal</label>
-                      <input
-                        type="date"
-                        className="input input-bordered input-sm"
-                        value={dateFilter}
-                        onChange={(e) => {
-                          setDateFilter(e.target.value);
-                          setCurrentPage(1);
-                        }}
-                      />
-                    </div>
+                <label className="text-sm opacity-80">Tanggal</label>
+                <input
+                  type="date"
+                  className="input input-bordered input-sm"
+                  value={dateFilter}
+                  onChange={(e) => {
+                    setDateFilter(e.target.value);
+                    setCurrentPage(1);
+                  }}
+                />
+              </div>
 
               <div>
                 <select
@@ -372,13 +372,13 @@ function EmployeeReimbursement() {
                 </select>
               </div>
 
-                <button
-                  type="button"
-                  className="btn btn-secondary rounded-full"
-                  onClick={resetFilters}
-                >
-                  Reset
-                </button>
+              <button
+                type="button"
+                className="btn btn-secondary rounded-full"
+                onClick={resetFilters}
+              >
+                Reset
+              </button>
             </div>
             <div className="overflow-x-auto">
               <table className="table table-zebra">

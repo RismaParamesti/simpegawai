@@ -32,6 +32,20 @@ router.put('/job-openings/:jobId/complete', async (req, res) => {
   }
 });
 
+// Move job opening from shortlisting to interview
+router.put('/job-openings/:jobId/advance-to-interview', async (req, res) => {
+  const { jobId } = req.params;
+  try {
+    await db.promise().query(
+      `UPDATE job_openings SET hiring_status = 'interview' WHERE id = ?`,
+      [jobId]
+    );
+    res.json({ success: true });
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
+});
+
 // Update interviews: completed & pending result -> passed
 router.put('/admin/interviews/update-result-by-job', async (req, res) => {
   const { job_opening_id } = req.body;

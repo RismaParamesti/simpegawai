@@ -11,14 +11,22 @@ import axios from "axios"
 import { useNavigate } from "react-router-dom"
 import { Link, useLocation, NavLink } from "react-router-dom"
 import XMarkIcon from "@heroicons/react/24/outline/XMarkIcon"
+import Squares2X2Icon from "@heroicons/react/24/outline/Squares2X2Icon"
+import BriefcaseIcon from "@heroicons/react/24/outline/BriefcaseIcon"
+import ClipboardDocumentListIcon from "@heroicons/react/24/outline/ClipboardDocumentListIcon"
+import DocumentTextIcon from "@heroicons/react/24/outline/DocumentTextIcon"
+import ClipboardDocumentCheckIcon from "@heroicons/react/24/outline/ClipboardDocumentCheckIcon"
+import IdentificationIcon from "@heroicons/react/24/outline/IdentificationIcon"
+
+const iconClasses = `h-6 w-6`;
 
 const kandidatMenu = [
-  { label: 'Dashboard', path: '/candidate/dashboard' },
-  { label: 'Lowongan Pekerjaan', path: '/candidate/opening' },
-  { label: 'Ajukan Lamaran', path: '/candidate/apply' },
-  { label: 'Wawancara', path: '/candidate/interview' },
-  { label: 'Permohonan Saya', path: '/candidate/requests' },
-  { label: 'Data Diri', path: '/candidate/profile' },
+  { label: 'Dashboard', path: '/candidate/dashboard', icon: <Squares2X2Icon className={iconClasses} /> },
+  { label: 'Lowongan Pekerjaan', path: '/candidate/opening', icon: <BriefcaseIcon className={iconClasses} /> },
+  { label: 'Ajukan Lamaran', path: '/candidate/apply', icon: <ClipboardDocumentListIcon className={iconClasses} /> },
+  { label: 'Wawancara', path: '/candidate/interview', icon: <DocumentTextIcon className={iconClasses} /> },
+  { label: 'Permohonan Saya', path: '/candidate/requests', icon: <ClipboardDocumentCheckIcon className={iconClasses} /> },
+  { label: 'Data Diri', path: '/candidate/profile', icon: <IdentificationIcon className={iconClasses} /> },
 ];
 
 const isProfilBelumLengkap = (payload) => {
@@ -50,6 +58,8 @@ const isProfilBelumLengkap = (payload) => {
 
 function LeftSidebarKandidat() {
   const location = useLocation();
+  const isRouteActive = (path) =>
+    location.pathname === path || location.pathname.startsWith(`${path}/`);
 
   const close = (e) => {
     const drawer = document.getElementById("left-sidebar-drawer");
@@ -59,7 +69,7 @@ function LeftSidebarKandidat() {
   return (
     <div className="drawer-side z-30">
       <label htmlFor="left-sidebar-drawer" className="drawer-overlay"></label>
-      <ul className="menu pt-2 w-72 sm:w-80 bg-base-100 min-h-full text-base-content overflow-y-auto">
+      <ul className="menu relative min-h-full w-72 overflow-y-auto border-r border-base-300/70 bg-base-100/95 pt-2 text-base-content shadow-[16px_0_40px_rgba(15,23,42,0.08)] backdrop-blur-xl sm:w-80">
         <li className="mb-6">
           <div className="flex w-full justify-center">
             <Link to={"/candidate/dashboard"}>
@@ -80,16 +90,25 @@ function LeftSidebarKandidat() {
         {kandidatMenu.map((item) => (
           <li key={item.path}>
             <NavLink
+              end
               to={item.path}
               onClick={() => close()}
-              className={({ isActive }) =>
-                `${isActive ? "font-semibold bg-base-200" : "font-normal"}`
+              className={() =>
+                `relative mb-1 rounded-2xl px-4 py-3 font-medium transition-all duration-200 ${
+                  isRouteActive(item.path)
+                    ? "bg-primary/10 text-primary shadow-sm ring-1 ring-primary/15"
+                    : "text-base-content/80 hover:bg-base-200/80 hover:text-base-content"
+                }`
               }
             >
-              {item.label}
-              {location.pathname === item.path ? (
+              <span className="flex items-center gap-3">
+                <span className="text-lg">{item.icon}</span>
+                <span>{item.label}</span>
+              </span>
+
+              {isRouteActive(item.path) ? (
                 <span
-                  className="absolute inset-y-0 left-0 w-1 rounded-tr-md rounded-br-md bg-primary"
+                  className="absolute inset-y-2 left-2 w-1 rounded-full bg-primary shadow-[0_0_0_4px_rgba(234,107,47,0.12)]"
                   aria-hidden="true"
                 ></span>
               ) : null}
