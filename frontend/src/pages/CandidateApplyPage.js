@@ -392,9 +392,18 @@ function CandidateApplyPage() {
 
   // ========== FORM HANDLERS ==========
   const handleCandidateChange = (e) => {
+    const { name, value } = e.target;
+    if (name === "nik") {
+      const digits = String(value).replace(/\D/g, "").slice(0, 16);
+      setCandidateData({
+        ...candidateData,
+        nik: digits,
+      });
+      return;
+    }
     setCandidateData({
       ...candidateData,
-      [e.target.name]: e.target.value,
+      [name]: value,
     });
   };
 
@@ -496,16 +505,23 @@ function CandidateApplyPage() {
       );
     } catch (error) {
       console.error("Failed to save candidate data:", error);
-      const errorMsg =
-        error.response?.data?.message ||
-        error.message ||
-        "Gagal menyimpan data diri";
+      const apiMessage = error.response?.data?.message || "";
+      const apiErrors = error.response?.data?.errors;
+
+      if (apiErrors?.nik) {
+        NotificationManager.error("nik sudah terpakai", "Gagal", 5000);
+      } else if (/nik/i.test(apiMessage) && /sudah|used|already|exists|dipakai/i.test(apiMessage)) {
+        NotificationManager.error("nik sudah terpakai", "Gagal", 5000);
+      } else {
+        const errorMsg = apiMessage || error.message || 'Gagal menyimpan data diri';
+        NotificationManager.error(errorMsg, 'Gagal', 3000);
+      }
+
       console.error("Error details:", {
         status: error.response?.status,
         message: error.response?.data?.message,
         data: error.response?.data,
       });
-      NotificationManager.error(errorMsg, "Gagal", 3000);
       throw error;
     }
   };
