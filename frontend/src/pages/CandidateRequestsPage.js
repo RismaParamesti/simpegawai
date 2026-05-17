@@ -38,7 +38,10 @@ export default function CandidateRequestsPage() {
     }
 
     if (initialAppId && applications && applications.length > 0) {
-      const found = applications.find((a) => a && (a.id === initialAppId || String(a.id) === String(initialAppId)));
+      const found = applications.find(
+        (a) =>
+          a && (a.id === initialAppId || String(a.id) === String(initialAppId)),
+      );
       if (found) {
         setSelectedApp(found);
         setIsModalOpen(true);
@@ -284,9 +287,7 @@ export default function CandidateRequestsPage() {
                     </button>
 
                     <div className="flex gap-2">
-                      {["submitted", "screening", "wawancara"].includes(
-                        app.status,
-                      ) && (
+                      {["submitted", "screening"].includes(app.status) && (
                         <button
                           className={`btn btn-sm btn-error ${
                             withdrawingId === app.id ? "loading" : ""
@@ -320,7 +321,10 @@ export default function CandidateRequestsPage() {
             <h3 className="text-lg font-semibold mb-2">
               Alasan Pembatalan Lamaran
             </h3>
-            <p>Jika membatalkan pengajuan lamaran ini anda tidak dapat mengajukan ulang!!</p>
+            <p>
+              Jika membatalkan pengajuan lamaran ini anda tidak dapat mengajukan
+              ulang!!
+            </p>
             <textarea
               className="textarea textarea-bordered w-full mb-4"
               rows={3}

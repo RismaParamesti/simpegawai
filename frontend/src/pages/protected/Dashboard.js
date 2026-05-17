@@ -88,14 +88,13 @@ function InternalPage(){
     const recentUsers = dashboard?.recent_activity?.new_users || []
     const recentEmployees = dashboard?.recent_activity?.new_employees || []
     const departmentStats = dashboard?.departments || []
-    const positionStats = dashboard?.positions || []
     const shiftStats = dashboard?.shifts || []
 
     const statCards = [
         { title: 'Total Pegawai', value: employees.total_employees || 0, path: '/app/employees' },
         { title: 'Total User', value: users.total_users || 0, path: '/app/users' },
-        { title: 'User Aktif', value: users.active_users || 0, path: '/app/users' },
-        { title: 'User Nonaktif', value: users.inactive_users || 0, path: '/app/users' },
+        { title: 'User Aktif', value: users.active_users || 0, path: '/app/users?status=active' },
+        { title: 'User Nonaktif', value: users.inactive_users || 0, path: '/app/users?status=inactive' },
     ]
 
     return(
@@ -124,19 +123,23 @@ function InternalPage(){
                                     <th>Departemen</th>
                                     <th>Posisi</th>
                                     <th>Jumlah Pegawai</th>
-                                    <th>Rata-rata Gaji</th>
+                                    <th>Tanggal Bergabung</th>
                                 </tr>
                             </thead>
                             <tbody>
                                 {departmentStats.slice(0, 5).map((department) => (
-                                    <tr key={department.id || `${department.name}-${department.code}`}>
+                                    <tr
+                                        key={department.id || `${department.name}-${department.code}`}
+                                        onClick={() => navigate(department.id ? `/app/positions/${department.id}` : '/app/positions')}
+                                        className="cursor-pointer hover:bg-base-200/40"
+                                    >
                                         <td>
                                             <div className="font-semibold">{department.name}</div>
                                             <div className="text-xs opacity-70">{department.code || '-'}</div>
                                         </td>
                                         <td>{department.position_count || 0}</td>
                                         <td>{department.employee_count || 0}</td>
-                                        <td>Rp {(Number(department.avg_salary) || 0).toLocaleString('id-ID')}</td>
+                                        <td>{department.created_at ? new Date(department.created_at).toLocaleDateString('id-ID') : '-'}</td>
                                     </tr>
                                 ))}
                                 {departmentStats.length === 0 && (
@@ -150,7 +153,7 @@ function InternalPage(){
                     {departmentStats.length > 5 ? (
                         <div className="text-right mt-3">
                             <button className="btn btn-ghost btn-sm" onClick={() => navigate('/app/positions')}>
-                                Lihat Semua
+                                Lihat Selengkapnya
                             </button>
                         </div>
                     ) : null}
@@ -187,7 +190,7 @@ function InternalPage(){
                     {shiftStats.length > 5 ? (
                         <div className="text-right mt-3">
                             <button className="btn btn-ghost btn-sm" onClick={() => navigate('/app/attendance')}>
-                                Lihat Semua
+                                Lihat Selengkapnya
                             </button>
                         </div>
                     ) : null}
@@ -224,7 +227,7 @@ function InternalPage(){
                     {recentUsers.length > 5 ? (
                         <div className="text-right mt-3">
                             <button className="btn btn-ghost btn-sm" onClick={() => navigate('/app/users')}>
-                                Lihat Semua
+                                Lihat Selengkapnya
                             </button>
                         </div>
                     ) : null}
@@ -259,7 +262,7 @@ function InternalPage(){
                     {recentEmployees.length > 5 ? (
                         <div className="text-right mt-3">
                             <button className="btn btn-ghost btn-sm" onClick={() => navigate('/app/employees')}>
-                                Lihat Semua
+                                Lihat Selengkapnya
                             </button>
                         </div>
                     ) : null}

@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { useDispatch } from "react-redux";
+import { useLocation } from "react-router-dom";
 import { setPageTitle } from "../../features/common/headerSlice";
 import TitleCard from "../../components/Cards/TitleCard";
 import { adminApi } from "../../features/admin/api";
@@ -76,6 +77,7 @@ const getEffectiveAutoRolesForEdit = (formState, allPositions) => {
 
 function AdminUsers() {
   const dispatch = useDispatch();
+  const location = useLocation();
   const [users, setUsers] = useState([]);
   const [employees, setEmployees] = useState([]);
   const [positions, setPositions] = useState([]);
@@ -231,6 +233,29 @@ function AdminUsers() {
     dispatch(setPageTitle({ title: "Manajemen Pengguna" }));
     loadData();
   }, [dispatch]);
+
+  // Initialize filters from query params (e.g. /app/users?status=inactive)
+  useEffect(() => {
+    try {
+      const params = new URLSearchParams(location.search || "");
+      const status = params.get("status") || "";
+      const department = params.get("department") || "";
+      const position = params.get("position") || "";
+      const role = params.get("role") || "";
+
+      if (status || department || position || role) {
+        setFilters((prev) => ({
+          ...prev,
+          status,
+          department,
+          position,
+          role,
+        }));
+      }
+    } catch (err) {
+      // ignore malformed query
+    }
+  }, [location.search]);
 
   const applyAutoRolesForEdit = (nextFormState, previousFormState) => {
     const prevState = previousFormState || nextFormState;

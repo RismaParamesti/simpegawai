@@ -99,6 +99,45 @@ function CandidateApplyPage() {
   const [allSteps, setAllSteps] = useState([]);
   const [jobOpenings, setJobOpenings] = useState([]);
   const [selectedJob, setSelectedJob] = useState(jobFromPage || null);
+  // Preview modal state for file viewing
+  const [previewUrl, setPreviewUrl] = useState(null);
+  const [previewName, setPreviewName] = useState("");
+  const [previewType, setPreviewType] = useState(null);
+  const [previewScale, setPreviewScale] = useState(1);
+
+  const openPreview = (fileObj, fileName) => {
+    if (!fileObj) return;
+    try {
+      const url = URL.createObjectURL(fileObj);
+      setPreviewUrl(url);
+      setPreviewName(fileName || fileObj.name || "File");
+      setPreviewType(fileObj.type || null);
+      setPreviewScale(1);
+    } catch (err) {
+      console.error("Failed to create preview URL", err);
+    }
+  };
+
+  const closePreview = () => {
+    if (previewUrl) {
+      try {
+        URL.revokeObjectURL(previewUrl);
+      } catch (e) {}
+    }
+    setPreviewUrl(null);
+    setPreviewName("");
+    setPreviewType(null);
+    setPreviewScale(1);
+  };
+
+  const zoomIn = () => setPreviewScale((s) => Math.min(3, +(s + 0.25).toFixed(2)));
+  const zoomOut = () => setPreviewScale((s) => Math.max(0.25, +(s - 0.25).toFixed(2)));
+  const resetZoom = () => setPreviewScale(1);
+  const handleResetFilters = () => {
+    setJobFilter("");
+    setJobTypeFilter("");
+    setDetailJobId(null);
+  };
   // State untuk filter lowongan
   const [jobFilter, setJobFilter] = useState("");
   const [jobTypeFilter, setJobTypeFilter] = useState("");
@@ -1092,7 +1131,7 @@ function CandidateApplyPage() {
 
           {/* Filter input */}
           <div className="bg-base-200 rounded-xl p-4 mb-6 shadow-sm">
-            <div className="grid md:grid-cols-2 gap-4">
+            <div className="grid md:grid-cols-3 gap-4">
               {/* Search */}
               <div className="form-control">
                 <label className="label">
@@ -1129,6 +1168,12 @@ function CandidateApplyPage() {
                   <option value="intern">Intern</option>
                 </select>
               </div>
+              <button
+            className="btn btn-secondary rounded-full px-6 min-h-12 self-start md:self-end md:mt-6"
+              onClick={handleResetFilters}
+            >
+              Reset Filter
+            </button>
             </div>
           </div>
 
@@ -1398,26 +1443,16 @@ function CandidateApplyPage() {
                                     <button
                                       type="button"
                                       className="btn btn-xs btn-outline"
-                                      onClick={() =>
-                                        window.open(
-                                          URL.createObjectURL(fileObj),
-                                          "_blank",
-                                        )
-                                      }
+                                      onClick={() => openPreview(fileObj, fileName)}
                                     >
-                                      Lihat Gambar
+                                      Lihat file
                                     </button>
                                   </>
                                 ) : (
                                   <button
                                     type="button"
                                     className="btn btn-xs btn-outline"
-                                    onClick={() =>
-                                      window.open(
-                                        URL.createObjectURL(fileObj),
-                                        "_blank",
-                                      )
-                                    }
+                                    onClick={() => openPreview(fileObj, fileName)}
                                   >
                                     Download / Lihat Dokumen
                                   </button>
@@ -1507,14 +1542,9 @@ function CandidateApplyPage() {
                                     <button
                                       type="button"
                                       className="btn btn-xs btn-outline"
-                                      onClick={() =>
-                                        window.open(
-                                          URL.createObjectURL(fileObj),
-                                          "_blank",
-                                        )
-                                      }
+                                      onClick={() => openPreview(fileObj, fileName)}
                                     >
-                                      Lihat Gambar
+                                      Lihat File
                                     </button>
                                   </>
                                 ) : (
@@ -1786,12 +1816,7 @@ function CandidateApplyPage() {
                           <button
                             type="button"
                             className="btn btn-xs btn-outline"
-                            onClick={() =>
-                              window.open(
-                                URL.createObjectURL(fileObj),
-                                "_blank",
-                              )
-                            }
+                            onClick={() => openPreview(fileObj, fileName)}
                           >
                             {isImage ? "Lihat Gambar" : "Lihat File"}
                           </button>
@@ -1855,12 +1880,7 @@ function CandidateApplyPage() {
                             <button
                               type="button"
                               className="btn btn-xs btn-outline"
-                              onClick={() =>
-                                window.open(
-                                  URL.createObjectURL(fileObj),
-                                  "_blank",
-                                )
-                              }
+                              onClick={() => openPreview(fileObj, fileName)}
                             >
                               {isImage ? "Lihat Gambar" : "Lihat File"}
                             </button>
@@ -1892,12 +1912,7 @@ function CandidateApplyPage() {
                         <button
                           type="button"
                           className="btn btn-xs btn-outline"
-                          onClick={() =>
-                            window.open(
-                              URL.createObjectURL(files.cover_letter_file),
-                              "_blank",
-                            )
-                          }
+                          onClick={() => openPreview(files.cover_letter_file, fileNames.cover_letter_file)}
                         >
                           Lihat File
                         </button>
@@ -2067,6 +2082,60 @@ function CandidateApplyPage() {
           )}
         </div>
       </div>
+      {/* Preview Modal */}
+      {previewUrl && (
+        <dialog className="modal modal-open">
+          <div className="modal-box relative w-11/12 max-w-5xl max-h-[90vh] overflow-hidden p-0">
+            <button
+              className="btn btn-sm btn-error text-white absolute right-3 top-3 z-50"
+              onClick={closePreview}
+              aria-label="Tutup preview"
+            >
+              ✕
+            </button>
+            <div className="flex items-center justify-between p-2 border-b gap-2">
+              <div className="flex items-center gap-2">
+                <div className="font-semibold truncate max-w-[45vw]">{previewName}</div>
+                <div className="flex items-center gap-1">
+                  <button className="btn btn-sm btn-ghost" onClick={zoomOut} aria-label="Perkecil">−</button>
+                  <button className="btn btn-sm btn-ghost" onClick={zoomIn} aria-label="Perbesar">+</button>
+                  <button className="btn btn-sm btn-ghost" onClick={resetZoom} aria-label="Reset Zoom">Reset</button>
+                </div>
+              </div>
+              <div className="flex items-center gap-2">
+                <a
+                  href={previewUrl}
+                  download={previewName}
+                  className="btn btn-sm btn-outline"
+                >
+                  Download
+                </a>
+                <button className="btn btn-sm btn-ghost" onClick={closePreview}>
+                  ✕
+                </button>
+              </div>
+            </div>
+            <div className="p-4 overflow-auto">
+              {previewType && previewType.startsWith("image") ? (
+                <div className="w-full flex justify-center">
+                  <img
+                    src={previewUrl}
+                    alt={previewName}
+                    style={{ transform: `scale(${previewScale})`, transformOrigin: "center top" }}
+                    className="max-w-full h-auto"
+                  />
+                </div>
+              ) : (
+                <iframe
+                  src={previewUrl}
+                  title={previewName}
+                  className="w-full h-[70vh] border"
+                />
+              )}
+            </div>
+          </div>
+        </dialog>
+      )}
     </TitleCard>
   );
 }

@@ -7,8 +7,11 @@ export async function getCandidateDashboardStats() {
 
   // Total semua aplikasi
   const total = apps.length;
-  // Sedang diproses: status submitted, screening, wawancara
-  const inProgress = apps.filter(a => ["submitted", "screening", "wawancara"].includes(a.status)).length;
+  // Sedang diproses: status submitted, screening, lolos_dokumen, wawancara
+  const inProgress = apps.filter(a => ["submitted", "screening", "lolos_dokumen", "wawancara"].includes((a.status || "").toString())).length;
+  // Hitung khusus untuk status "lolos_dokumen" dan "wawancara"
+  const lolosDokumen = apps.filter(a => a.status === "lolos_dokumen").length;
+  const wawancara = apps.filter(a => a.status === "wawancara").length;
   // Diterima: status diterima
   const accepted = apps.filter(a => a.status === "diterima").length;
   // Ditolak: status ditolak
@@ -22,6 +25,8 @@ export async function getCandidateDashboardStats() {
     inProgress,
     accepted,
     rejected,
-    latest
+    latest,
+    lolosDokumen,
+    wawancara
   };
 }
