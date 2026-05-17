@@ -17,6 +17,7 @@ import {
   ReceiptRefundIcon,
   CheckBadgeIcon,
   ScaleIcon,
+  BuildingOffice2Icon,
 } from "@heroicons/react/24/outline";
 
 const iconClasses = `h-6 w-6`;
@@ -29,7 +30,7 @@ const adminRoutes = [
   },
   {
     path: "/app/positions",
-    icon: <UsersIcon className={iconClasses} />,
+    icon: <BuildingOffice2Icon className={iconClasses} />,
     name: "Derpartemen & Jabatan",
   },
   {
@@ -188,7 +189,7 @@ const atasanRoutes = [
   },
   {
     path: "",
-    icon: <CalendarDaysIcon className={iconClasses} />,
+    icon: <ClipboardDocumentListIcon className={iconClasses} />,
     name: "Cuti dan Izin Anggota Tim",
     submenu: [
       {

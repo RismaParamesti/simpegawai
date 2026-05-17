@@ -1,13 +1,37 @@
 import React, { useEffect, useState } from "react";
 import axios from "axios";
+import { createPortal } from "react-dom";
 
-export default function ApplicationDetailModal({
-  isOpen,
-  onClose,
-  app,
-}) {
+export default function ApplicationDetailModal({ isOpen, onClose, app }) {
   const [jobDetail, setJobDetail] = useState(null);
   const [loadingJob, setLoadingJob] = useState(false);
+  // Preview modal state
+  const [previewUrl, setPreviewUrl] = useState(null);
+  const [previewName, setPreviewName] = useState("");
+  const [previewIsImage, setPreviewIsImage] = useState(false);
+  const [previewScale, setPreviewScale] = useState(1);
+
+  const openPreviewUrl = (url, name) => {
+    if (!url) return;
+    setPreviewUrl(url);
+    setPreviewName(name || url.split("/").pop() || "File");
+    const lower = (url.split("?")[0] || "").toLowerCase();
+    setPreviewIsImage(/\.(png|jpe?g|gif|webp|bmp)$/i.test(lower));
+    setPreviewScale(1);
+  };
+
+  const closePreview = () => {
+    setPreviewUrl(null);
+    setPreviewName("");
+    setPreviewIsImage(false);
+    setPreviewScale(1);
+  };
+
+  const zoomIn = () =>
+    setPreviewScale((s) => Math.min(3, +(s + 0.25).toFixed(2)));
+  const zoomOut = () =>
+    setPreviewScale((s) => Math.max(0.25, +(s - 0.25).toFixed(2)));
+  const resetZoom = () => setPreviewScale(1);
   const jobOpeningId =
     app?.job_opening_id || app?.job_openingId || app?.job_id || app?.jobId;
 
@@ -32,10 +56,42 @@ export default function ApplicationDetailModal({
       year: "numeric",
     });
 
+  const getStatusBadgeClass = (status) => {
+    const map = {
+      submitted: "bg-blue-100 text-blue-700",
+      screening: "bg-purple-100 text-purple-700",
+      lolos_dokumen: "bg-indigo-100 text-indigo-700",
+      wawancara: "bg-cyan-100 text-cyan-700",
+      interview_rescheduled: "bg-orange-100 text-orange-700",
+      interview_completed: "bg-green-100 text-green-700",
+      interview_cancelled: "bg-red-100 text-red-700",
+      diterima: "bg-green-100 text-green-700",
+      ditolak: "bg-red-100 text-red-700",
+      withdrawn: "bg-gray-100 text-gray-600",
+    };
+    return map[status] || "bg-gray-100 text-gray-600";
+  };
+
+  const getStatusLabel = (status) => {
+    const map = {
+      submitted: "Terkirim",
+      screening: "Review",
+      lolos_dokumen: "Lolos Dokumen",
+      wawancara: "Interview",
+      interview_rescheduled: "Interview Reschedule",
+      interview_completed: "Interview Selesai",
+      interview_cancelled: "Interview Dibatalkan",
+      diterima: "Diterima",
+      ditolak: "Ditolak",
+      withdrawn: "Dibatalkan",
+    };
+    return map[status] || status;
+  };
+
   // Progress bar: jika withdrawn, hanya tampil satu step "Dibatalkan"
   let steps, currentStep;
-  if (app.status === 'withdrawn') {
-    steps = ['withdrawn'];
+  if (app.status === "withdrawn") {
+    steps = ["withdrawn"];
     currentStep = 0;
   } else {
     // Samakan urutan dan value steps progress dengan status lamaran utama
@@ -99,6 +155,35 @@ export default function ApplicationDetailModal({
     return path;
   }
 
+  function normalizeDocumentValue(value) {
+    if (!value) return "";
+    if (typeof value === "string") return value;
+    if (Array.isArray(value)) return normalizeDocumentValue(value[0]);
+    if (typeof value === "object") {
+      if (value.type === "Buffer" && Array.isArray(value.data)) {
+        try {
+          return new TextDecoder("utf-8").decode(new Uint8Array(value.data)).trim();
+        } catch (e) {
+          return "";
+        }
+      }
+      if (typeof value.data === "string") return value.data;
+      if (Array.isArray(value.data)) {
+        try {
+          return new TextDecoder("utf-8").decode(new Uint8Array(value.data)).trim();
+        } catch (e) {
+          return "";
+        }
+      }
+      if (typeof value.path === "string") return value.path;
+      if (typeof value.url === "string") return value.url;
+      if (typeof value.file === "string") return value.file;
+    }
+    return "";
+  }
+
+  const coverLetterPath = normalizeDocumentValue(app?.cover_letter_file);
+
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-base-300/80 p-4">
       <div className="bg-base-100 text-base-content w-full max-w-4xl rounded-2xl shadow-xl overflow-hidden max-h-screen overflow-y-auto border border-base-300">
@@ -114,7 +199,10 @@ export default function ApplicationDetailModal({
                 (jobDetail?.location || app.location)}
             </p>
           </div>
-          <button className="btn btn-sm btn-ghost text-base-content hover:bg-base-200" onClick={onClose}>
+          <button
+            className="btn btn-sm btn-ghost text-base-content hover:bg-base-200"
+            onClick={onClose}
+          >
             ✕
           </button>
         </div>
@@ -122,35 +210,44 @@ export default function ApplicationDetailModal({
         {/* PROGRESS */}
         <div className="px-6 pt-4">
           <div className="flex items-center w-full">
-            {steps[0] === 'withdrawn' ? (
+            {steps[0] === "withdrawn" ? (
               <div className="flex flex-col items-center w-full">
                 <div className="w-9 h-9 rounded-full flex items-center justify-center text-base font-bold border-2 bg-red-500 text-white border-red-500">
                   1
                 </div>
-                <p className="text-xs mt-2 capitalize opacity-90 text-red-600 font-medium text-center" style={{ minWidth: 70 }}>
+                <p
+                  className="text-xs mt-2 capitalize opacity-90 text-red-600 font-medium text-center"
+                  style={{ minWidth: 70 }}
+                >
                   Dibatalkan
                 </p>
               </div>
             ) : (
               steps.map((step, i) => {
                 // Warna step: sudah lewat = oranye, aktif = biru, belum = abu
-                let circleClass = '';
+                let circleClass = "";
                 if (i < currentStep) {
-                  circleClass = 'bg-orange-500 text-white border-orange-500';
+                  circleClass = "bg-orange-500 text-white border-orange-500";
                 } else if (i === currentStep) {
-                  circleClass = 'bg-blue-500 text-white border-blue-500';
+                  circleClass = "bg-blue-500 text-white border-blue-500";
                 } else {
-                  circleClass = 'bg-gray-100 text-gray-400 border-gray-300';
+                  circleClass = "bg-gray-100 text-gray-400 border-gray-300";
                 }
                 return (
                   <React.Fragment key={i}>
-                    <div className="flex flex-col items-center relative" style={{ minWidth: 80 }}>
+                    <div
+                      className="flex flex-col items-center relative"
+                      style={{ minWidth: 80 }}
+                    >
                       <div
                         className={`w-9 h-9 rounded-full flex items-center justify-center text-base font-bold border-2 transition-all duration-200 ${circleClass}`}
                       >
                         {i + 1}
                       </div>
-                      <p className="text-xs mt-2 capitalize opacity-90 text-base-content font-medium text-center" style={{ minWidth: 70 }}>
+                      <p
+                        className="text-xs mt-2 capitalize opacity-90 text-base-content font-medium text-center"
+                        style={{ minWidth: 70 }}
+                      >
                         {(() => {
                           const map = {
                             submitted: "Terkirim",
@@ -177,10 +274,10 @@ export default function ApplicationDetailModal({
                         style={{
                           background:
                             i < currentStep - 1
-                              ? '#f97316'
+                              ? "#f97316"
                               : i === currentStep - 1
-                              ? '#3b82f6'
-                              : '#e5e7eb',
+                                ? "#3b82f6"
+                                : "#e5e7eb",
                           minWidth: 24,
                           borderRadius: 2,
                           marginTop: 16,
@@ -198,7 +295,9 @@ export default function ApplicationDetailModal({
           {/* DATA DIRI */}
           <div className="card bg-base-200 text-base-content border border-base-300">
             <div className="card-body">
-              <h3 className="card-title text-lg text-base-content">Data Diri Lengkap</h3>
+              <h3 className="card-title text-lg text-base-content">
+                Data Diri
+              </h3>
               <div className="grid md:grid-cols-2 gap-4 text-sm">
                 {biodataFields.map((f) => (
                   <div key={f.key}>
@@ -234,7 +333,9 @@ export default function ApplicationDetailModal({
           {/* LOWONGAN */}
           <div className="card bg-base-200 text-base-content border border-base-300">
             <div className="card-body">
-              <h3 className="card-title text-lg text-base-content">Lowongan yang Dilamar</h3>
+              <h3 className="card-title text-lg text-base-content">
+                Lowongan yang Dilamar
+              </h3>
               {loadingJob ? (
                 <div className="py-6 text-center text-sm text-base-content/60">
                   Memuat detail lowongan...
@@ -376,11 +477,13 @@ export default function ApplicationDetailModal({
           {/* DOKUMEN */}
           <div className="card bg-base-200 text-base-content border border-base-300">
             <div className="card-body">
-              <h3 className="card-title text-lg text-base-content">📄 Dokumen</h3>
+              <h3 className="card-title text-lg text-base-content">
+                📄 Dokumen
+              </h3>
 
               <div className="divide-y divide-base-300 border border-base-300 rounded-lg overflow-hidden">
                 {dokumenFields.map((doc, idx) => {
-                  const val = app[doc.key];
+                  const val = normalizeDocumentValue(app[doc.key]);
                   if (!val) return null;
 
                   return (
@@ -394,17 +497,18 @@ export default function ApplicationDetailModal({
                         <p className="text-xs text-base-content/70 font-semibold">
                           {doc.label}
                         </p>
-                        <p className="font-semibold break-all text-base-content">{val}</p>
+                        <p className="font-semibold break-all text-base-content">
+                          {val}
+                        </p>
                       </div>
 
-                      <a
-                        href={getDocumentUrl(val)}
-                        target="_blank"
-                        rel="noreferrer"
-                        className="btn btn-xs btn-outline border-base-300 text-base-content hover:bg-base-300"
+                      <button
+                        type="button"
+                        onClick={() => openPreviewUrl(getDocumentUrl(val), val)}
+                        className="px-3 py-1 text-xs bg-gradient-to-b from-blue-400 to-blue-600 text-white rounded-full shadow-md hover:shadow-lg border border-blue-600 hover:from-blue-500 hover:to-blue-700 transition-all duration-200"
                       >
                         Lihat
-                      </a>
+                      </button>
                     </div>
                   );
                 })}
@@ -413,19 +517,32 @@ export default function ApplicationDetailModal({
           </div>
 
           {/* COVER LETTER */}
-          {app.cover_letter_file && (
+          {coverLetterPath && (
             <div className="card bg-base-200 text-base-content border border-base-300">
               <div className="card-body">
-                <h3 className="card-title text-lg text-base-content">💌 Surat Lamaran</h3>
+                <h3 className="card-title text-lg text-base-content">
+                  💌 Surat Lamaran
+                </h3>
                 <div className="bg-base-100 p-4 rounded border border-base-300 text-sm text-base-content">
-                  <a
-                    href={getDocumentUrl(app.cover_letter_file)}
-                    target="_blank"
-                    rel="noreferrer"
-                    className="font-semibold break-all text-base-content hover:underline"
-                  >
-                    {app.cover_letter_file}
-                  </a>
+                  <div className="flex items-center justify-between">
+                    <div className="font-semibold break-all text-base-content">
+                      {coverLetterPath}
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <button
+                        type="button"
+                        onClick={() =>
+                          openPreviewUrl(
+                            getDocumentUrl(coverLetterPath),
+                            coverLetterPath,
+                          )
+                        }
+                        className="px-3 py-1 text-xs bg-gradient-to-b from-blue-400 to-blue-600 text-white rounded-full shadow-md hover:shadow-lg border border-blue-600 hover:from-blue-500 hover:to-blue-700 transition-all duration-200"
+                      >
+                        Lihat
+                      </button>
+                    </div>
+                  </div>
                 </div>
               </div>
             </div>
@@ -435,7 +552,11 @@ export default function ApplicationDetailModal({
           <div className="card bg-base-200 text-base-content border border-base-300">
             <div className="card-body text-sm">
               <h3 className="card-title text-lg text-base-content">Status Lamaran</h3>
-              <p>📌 {app.status === 'withdrawn' ? 'Dibatalkan' : app.status}</p>
+              <div>
+                <span className={`inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-semibold ${getStatusBadgeClass(app.status)}`}>
+                  {getStatusLabel(app.status)}
+                </span>
+              </div>
               <p>📅 Apply: {formatDate(app.submitted_at)}</p>
               {app.reviewed_at && (
                 <p>✔ Review: {formatDate(app.reviewed_at)}</p>
@@ -445,8 +566,98 @@ export default function ApplicationDetailModal({
               )}
             </div>
           </div>
+          {/* Preview Modal */}
+          {previewUrl &&
+            createPortal(
+              <div className="fixed inset-0 z-[9999] bg-black/60 backdrop-blur-sm">
+                <button
+                  type="button"
+                  className="absolute inset-0 w-full h-full cursor-default"
+                  onClick={closePreview}
+                  aria-label="Tutup backdrop"
+                />
+                <div className="relative z-10 h-full overflow-y-auto p-4 md:p-8 flex items-start justify-center">
+                  <div className="w-full max-w-5xl bg-base-100 rounded-2xl shadow-2xl overflow-hidden">
+                    <div className="relative p-6 border-b border-base-300">
+                      <button
+                        type="button"
+                        className="btn btn-sm btn-circle absolute right-4 top-4"
+                        onClick={closePreview}
+                        aria-label="Tutup preview"
+                      >
+                        ✕
+                      </button>
+                      <h3 className="font-semibold text-xl mb-1 pr-12">
+                        Lampiran Lamaran
+                      </h3>
+                      <p className="text-sm opacity-70 truncate pr-12">
+                        {previewName}
+                      </p>
+                    </div>
+
+                    <div className="p-6">
+                      <div className="w-full min-h-[420px] bg-base-200 rounded-lg overflow-auto flex items-center justify-center">
+                        {previewIsImage ? (
+                          <img
+                            src={previewUrl}
+                            alt={previewName}
+                            style={{
+                              transform: `scale(${previewScale})`,
+                              transformOrigin: "center center",
+                            }}
+                            className="max-h-[70vh] max-w-full object-contain"
+                          />
+                        ) : (
+                          <iframe
+                            src={previewUrl}
+                            title={previewName}
+                            className="w-full h-[70vh] border-0"
+                          />
+                        )}
+                      </div>
+
+                      <div className="mt-4 flex flex-wrap items-center justify-end gap-2">
+                        <button
+                          type="button"
+                          className="btn btn-sm btn-ghost"
+                          onClick={zoomOut}
+                          aria-label="Perkecil"
+                        >
+                          -
+                        </button>
+                        <button
+                          type="button"
+                          className="btn btn-sm btn-ghost"
+                          onClick={zoomIn}
+                          aria-label="Perbesar"
+                        >
+                          +
+                        </button>
+                        <button
+                          type="button"
+                          className="btn btn-sm btn-ghost"
+                          onClick={resetZoom}
+                          aria-label="Reset Zoom"
+                        >
+                          Reset
+                        </button>
+                        <a
+                          href={previewUrl}
+                          download={previewName}
+                          className="btn btn-sm btn-outline"
+                        >
+                          Download
+                        </a>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>,
+              document.body,
+            )}
         </div>
       </div>
     </div>
   );
 }
+

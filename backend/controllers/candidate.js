@@ -1199,13 +1199,65 @@ router.get(
 
       const [applications] = await db.promise().query(query, [candidateId]);
 
-      // Tambahkan field has_interview untuk setiap aplikasi
+      // Helper function to map database status to frontend status
+      const mapStatusToFrontend = (dbStatus, hasRealInterview) => {
+        const statusMap = {
+          'submitted': 'submitted',
+          'reviewing': 'screening',
+          'shortlisted': 'lolos_dokumen',
+          'interview_scheduled': 'wawancara',
+          'interviewed': hasRealInterview ? 'wawancara' : 'lolos_dokumen', // Fallback ke lolos_dokumen jika tidak ada interview data
+          'accepted': 'diterima',
+          'rejected': 'ditolak',
+          'withdrawn': 'withdrawn',
+          'canceled_by_company': 'ditolak',
+        };
+        return statusMap[dbStatus] || dbStatus;
+      };
+
+      // Helper function to determine last_stage for timeline (accept raw dbStatus)
+      const determineLastStage = (dbStatus, hasRealInterview) => {
+        if (dbStatus === 'rejected') {
+          return hasRealInterview ? 'wawancara' : 'screening';
+        }
+
+        if (dbStatus === 'interviewed') {
+          return hasRealInterview ? 'wawancara' : 'lolos_dokumen';
+        }
+
+        if (dbStatus === 'interview_scheduled') {
+          return 'wawancara';
+        }
+
+        if (dbStatus === 'shortlisted') {
+          return 'lolos_dokumen';
+        }
+
+        if (dbStatus === 'reviewing') {
+          return 'screening';
+        }
+
+        return mapStatusToFrontend(dbStatus, hasRealInterview);
+      };
+
+      // Attach interview rows and compute fields for each application
       for (const app of applications) {
-        const [interviews] = await db.promise().query(
-          'SELECT COUNT(*) as cnt FROM interviews WHERE application_id = ?',
+        const [interviewRows] = await db.promise().query(
+          'SELECT * FROM interviews WHERE application_id = ? ORDER BY scheduled_date DESC, id DESC',
           [app.id]
         );
-        app.has_interview = interviews[0].cnt > 0;
+        app.interviews = interviewRows;
+        const hasRealInterview = interviewRows.length > 0;
+        app.has_interview = hasRealInterview;
+
+        // keep raw DB status for debugging
+        app.db_status = app.status;
+
+        // Map status ke format frontend (dengan mempertimbangkan real interview data)
+        app.status = mapStatusToFrontend(app.status, hasRealInterview);
+
+        // Tentukan last_stage untuk timeline berdasarkan raw db_status
+        app.last_stage = determineLastStage(app.db_status, hasRealInterview);
       }
       res.json({ applications, total: applications.length });
     } catch (error) {
@@ -1266,14 +1318,67 @@ router.get(
         return res.status(404).json({ message: "Application not found" });
       }
 
-      // Tambahkan field has_interview untuk aplikasi detail
+      // Helper function to map database status to frontend status
+      const mapStatusToFrontend = (dbStatus, hasRealInterview) => {
+        const statusMap = {
+          'submitted': 'submitted',
+          'reviewing': 'screening',
+          'shortlisted': 'lolos_dokumen',
+          'interview_scheduled': 'wawancara',
+          'interviewed': hasRealInterview ? 'wawancara' : 'lolos_dokumen', // Fallback ke lolos_dokumen jika tidak ada interview data
+          'accepted': 'diterima',
+          'rejected': 'ditolak',
+          'withdrawn': 'withdrawn',
+          'canceled_by_company': 'ditolak',
+        };
+        return statusMap[dbStatus] || dbStatus;
+      };
+
+      // Helper function to determine last_stage for timeline (accept raw dbStatus)
+      const determineLastStage = (dbStatus, hasRealInterview) => {
+        if (dbStatus === 'rejected') {
+          return hasRealInterview ? 'wawancara' : 'screening';
+        }
+
+        if (dbStatus === 'interviewed') {
+          return hasRealInterview ? 'wawancara' : 'lolos_dokumen';
+        }
+
+        if (dbStatus === 'interview_scheduled') {
+          return 'wawancara';
+        }
+
+        if (dbStatus === 'shortlisted') {
+          return 'lolos_dokumen';
+        }
+
+        if (dbStatus === 'reviewing') {
+          return 'screening';
+        }
+
+        return mapStatusToFrontend(dbStatus, hasRealInterview);
+      };
+
+      // Tambahkan interview rows, has_interview, status frontend, dan last_stage untuk aplikasi detail
       if (applications.length > 0) {
         const app = applications[0];
-        const [interviews] = await db.promise().query(
-          'SELECT COUNT(*) as cnt FROM interviews WHERE application_id = ?',
+        const [interviewRows] = await db.promise().query(
+          'SELECT * FROM interviews WHERE application_id = ? ORDER BY scheduled_date DESC, id DESC',
           [app.id]
         );
-        app.has_interview = interviews[0].cnt > 0;
+        app.interviews = interviewRows;
+        const hasRealInterview = interviewRows.length > 0;
+        app.has_interview = hasRealInterview;
+
+        // Keep raw DB status
+        app.db_status = app.status;
+
+        // Map status ke format frontend (dengan mempertimbangkan real interview data)
+        app.status = mapStatusToFrontend(app.status, hasRealInterview);
+
+        // Tentukan last_stage untuk timeline berdasarkan raw db_status
+        app.last_stage = determineLastStage(app.db_status, hasRealInterview);
+
         res.json({ application: app });
       } else {
         res.status(404).json({ message: "Application not found" });

@@ -317,6 +317,12 @@ function AdminEmployees() {
       return;
     }
 
+    // Password minimum length
+    if (String(createForm.password).length < 6) {
+      setError("Password minimal 6 karakter");
+      return;
+    }
+
     if (
       !createForm.department_name ||
       !createForm.position_id ||

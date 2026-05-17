@@ -112,6 +112,12 @@ export default function CandidateJobList() {
     setOpenModal(true);
   };
 
+  const handleResetFilters = () => {
+    setSearch("");
+    setLocationFilter("");
+    setFilteredJobs(jobs);
+  };
+
   return (
     <div>
       <TitleCard title="Lowongan Pekerjaan Tersedia" topMargin="mt-0">
@@ -149,6 +155,12 @@ export default function CandidateJobList() {
                 ))}
               </select>
             </div>
+            <button
+            className="btn btn-secondary rounded-full px-6 min-h-12 self-start md:self-end md:mt-6"
+              onClick={handleResetFilters}
+            >
+              Reset Filter
+            </button>
         </div>
 
         {/* LOADING */}
@@ -227,8 +239,9 @@ export default function CandidateJobList() {
                     </button>
 
                     <button
-                      className="btn btn-primary btn-sm"
-                      disabled={appliedJobIds.includes(job.id)}
+                      className={appliedJobIds.includes(job.id) ? 'btn btn-primary btn-sm opacity-90 cursor-not-allowed' : 'btn btn-primary btn-sm'}
+                      aria-disabled={appliedJobIds.includes(job.id)}
+                      tabIndex={appliedJobIds.includes(job.id) ? -1 : 0}
                       onClick={() => {
                         if (appliedJobIds.includes(job.id)) {
                           NotificationManager.info('Anda sudah pernah melamar posisi ini. Tidak bisa melamar dua kali.', 'Sudah Melamar', 4000);
@@ -361,8 +374,9 @@ export default function CandidateJobList() {
             {/* FOOTER */}
             <div className="modal-action p-6 border-t">
               <button
-                className="btn btn-primary"
-                disabled={appliedJobIds.includes(selectedJob.id)}
+                className={appliedJobIds.includes(selectedJob.id) ? 'btn btn-primary opacity-90 cursor-not-allowed' : 'btn btn-primary'}
+                aria-disabled={appliedJobIds.includes(selectedJob.id)}
+                tabIndex={appliedJobIds.includes(selectedJob.id) ? -1 : 0}
                 onClick={() => {
                   if (appliedJobIds.includes(selectedJob.id)) {
                     NotificationManager.info('Anda sudah pernah melamar posisi ini. Tidak bisa melamar dua kali.', 'Sudah Melamar', 4000);

@@ -29,7 +29,12 @@ router.get("/", verifyToken, verifyRole(["admin"]), async (req, res) => {
                 COUNT(*) as total_users,
                 SUM(CASE WHEN status = 'active' THEN 1 ELSE 0 END) as active_users,
                 SUM(CASE WHEN status = 'inactive' THEN 1 ELSE 0 END) as inactive_users
-            FROM users
+            FROM users u
+            WHERE u.id NOT IN (
+                SELECT ur.user_id FROM user_roles ur
+                JOIN roles r ON ur.role_id = r.id
+                WHERE r.name = 'kandidat'
+            )
         `);
 
         // 3. Attendance Today
@@ -145,9 +150,14 @@ router.get("/", verifyToken, verifyRole(["admin"]), async (req, res) => {
 
         // 9. System Activity (recent actions)
         const [recentUsers] = await db.promise().query(
-            `SELECT id, name, email, status, created_at 
-             FROM users 
-             ORDER BY created_at DESC 
+            `SELECT u.id, u.name, u.email, u.status, u.created_at 
+             FROM users u
+             WHERE u.id NOT IN (
+                SELECT ur.user_id FROM user_roles ur
+                JOIN roles r ON ur.role_id = r.id
+                WHERE r.name = 'kandidat'
+             )
+             ORDER BY u.created_at DESC 
              LIMIT 5`
         );
 

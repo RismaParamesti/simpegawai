@@ -121,6 +121,11 @@ router.post(
             });
         }
 
+        // Password minimum length validation
+        if (String(password).length < 6) {
+            return res.status(400).json({ message: "Password minimal 6 karakter" });
+        }
+
         // Validasi input untuk employee
         if (!position_id || !join_date) {
             return res.status(400).json({
@@ -350,6 +355,11 @@ router.post("/register/candidate", uploadSinglePhoto, async (req, res) => {
         return res.status(400).json({
             message: "Name, email, username, and password are required",
         });
+    }
+
+    // Password minimum length validation for candidate registration
+    if (String(password).length < 6) {
+        return res.status(400).json({ message: "Password minimal 6 karakter" });
     }
 
     try {
