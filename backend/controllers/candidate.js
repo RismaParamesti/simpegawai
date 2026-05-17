@@ -855,6 +855,21 @@ router.put(
       res.json({ message: "Profile updated successfully" });
     } catch (error) {
       console.error(error);
+
+      const duplicateNik =
+        error?.code === "ER_DUP_ENTRY" &&
+        /\bnik\b/i.test(`${error?.sqlMessage || ""} ${error?.message || ""}`);
+
+      if (duplicateNik) {
+        return res.status(409).json({
+          message: "nik sudah terpakai",
+          errors: {
+            nik: ["nik sudah terpakai"],
+          },
+          code: error.code,
+        });
+      }
+
       res.status(500).json({ message: "Server error" });
     }
   },
@@ -1183,7 +1198,7 @@ router.get(
                i.meeting_link,
                i.location AS interview_location,
                i.duration_minutes,
-               i.result,
+               CASE WHEN jo.hiring_status = 'completed' THEN i.result ELSE 'pending' END AS interview_result,
                i.status AS interview_status,
              c.name, c.email, c.phone, c.gender, c.birth_place, c.date_of_birth, c.marital_status, c.nationality, c.address, c.nik, c.npwp, c.education_level, c.university, c.major, c.graduation_year, c.linkedin, c.portfolio, c.expected_salary,
              ${coverLetterSelect}
@@ -1242,10 +1257,25 @@ router.get(
 
       // Attach interview rows and compute fields for each application
       for (const app of applications) {
+        const jobIdForApp = app.job_opening_id;
+        // Fetch hiring_status for the job and interviews normally, then mask fields in JS if job not completed
+        const [jobRows] = await db.promise().query(
+          `SELECT hiring_status FROM job_openings WHERE id = ?`,
+          [jobIdForApp],
+        );
+        const hiringStatus = jobRows && jobRows[0] ? jobRows[0].hiring_status : null;
         const [interviewRows] = await db.promise().query(
           'SELECT * FROM interviews WHERE application_id = ? ORDER BY scheduled_date DESC, id DESC',
-          [app.id]
+          [app.id],
         );
+        // If the job isn't completed, hide result/rating/interviewer_notes from candidate view
+        if (hiringStatus !== 'completed') {
+          interviewRows.forEach((ir) => {
+            ir.result = ir.result || 'pending';
+            ir.rating = null;
+            ir.interviewer_notes = null;
+          });
+        }
         app.interviews = interviewRows;
         const hasRealInterview = interviewRows.length > 0;
         app.has_interview = hasRealInterview;

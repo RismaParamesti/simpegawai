@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from "react";
 import axios from "axios";
+import { NotificationManager } from "react-notifications";
 
 export default function InterviewModal({
   isFormOpen,
@@ -145,6 +146,39 @@ export default function InterviewModal({
     // eslint-disable-next-line
   }, [isFormOpen, mode, selectedCandidate]);
 
+  const handleFormSubmit = () => {
+    // Pastikan scheduled_date ada dan tidak sebelum sekarang
+    if (!form.scheduled_date) {
+      NotificationManager.error("Tanggal & waktu harus diisi", "Validasi Gagal", 3000);
+      return;
+    }
+    const selected = new Date(form.scheduled_date);
+    const now = new Date();
+    if (isNaN(selected.getTime())) {
+      NotificationManager.error("Format tanggal/waktu tidak valid", "Validasi Gagal", 3000);
+      return;
+    }
+    if (selected < now) {
+      NotificationManager.error("Tanggal & waktu tidak boleh sebelum saat ini", "Validasi Gagal", 4000);
+      return;
+    }
+
+    
+    const selHour = selected.getHours();
+    const selMin = selected.getMinutes();
+    if (selHour < 7 || selHour > 20 || (selHour === 20 && selMin > 0)) {
+      NotificationManager.error(
+        "Waktu wawancara harus antara 07:00 dan 20:00",
+        "Validasi Gagal",
+        5000,
+      );
+      return;
+    }
+
+    // Passed validation -> submit
+    if (typeof onSubmit === "function") onSubmit();
+  };
+
   return (
     <>
       {/* ================= MODAL FORM (ASLI) ================= */}
@@ -221,6 +255,7 @@ export default function InterviewModal({
                 type="datetime-local"
                 className="input input-bordered"
                 value={form.scheduled_date}
+                min={toDatetimeLocal(new Date())}
                 onChange={(e) =>
                   setForm({ ...form, scheduled_date: e.target.value })
                 }
@@ -293,7 +328,7 @@ export default function InterviewModal({
                 Batal
               </button>
 
-              <button className="btn btn-primary" onClick={onSubmit}>
+              <button className="btn btn-primary" onClick={handleFormSubmit}>
                 {mode === "create" ? "Simpan Jadwal" : "Update Jadwal"}
               </button>
             </div>

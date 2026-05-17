@@ -17,7 +17,13 @@ export default function CandidateInterviewPage() {
   useEffect(() => {
     dispatch(setPageTitle({ title: "Wawancara" }));
     fetchApplicationsAndInterviews();
+    const handler = async () => {
+      await fetchApplicationsAndInterviews();
+      NotificationManager.info("Hasil wawancara telah dipublish.", "Informasi", 5000);
+    };
+    window.addEventListener("interviewsPublished", handler);
     // eslint-disable-next-line
+    return () => window.removeEventListener("interviewsPublished", handler);
   }, [dispatch]);
 
   const fetchApplicationsAndInterviews = async () => {
@@ -137,93 +143,99 @@ export default function CandidateInterviewPage() {
         subtitle={`Total ${appsWithInterview.length} wawancara`}
       >
         {/* Filter Section */}
-        <div className="mb-6 p-6 rounded-2xl border bg-base-100 shadow-sm">
-          <div className="w-full flex flex-col gap-4">
-            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4 w-full">
-              {/* STATUS */}
-              <div className="form-control">
-                <label className="label pb-1">
-                  <span className="label-text text-xs font-semibold">
-                    Status Wawancara
-                  </span>
-                </label>
-                <select
-                  className="select select-bordered select-sm w-full"
-                  value={filterStatus}
-                  onChange={(e) => setFilterStatus(e.target.value)}
-                >
-                  <option value="">Semua Status</option>
-                  <option value="scheduled">Dijadwalkan</option>
-                  <option value="completed">Selesai</option>
-                  <option value="cancelled">Dibatalkan</option>
-                  <option value="rescheduled">Dijadwalkan Ulang</option>
-                </select>
-              </div>
+        <div className="mb-6 p-5 rounded-2xl border bg-base-100 shadow-sm">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4 items-end">
+            {/* STATUS */}
+            <div className="form-control">
+              <label className="label pb-1">
+                <span className="label-text text-xs font-semibold">
+                  Status Wawancara
+                </span>
+              </label>
 
-              {/* TIPE */}
-              <div className="form-control">
-                <label className="label pb-1">
-                  <span className="label-text text-xs font-semibold">
-                    Tipe Wawancara
-                  </span>
-                </label>
-                <select
-                  className="select select-bordered select-sm w-full"
-                  value={filterType}
-                  onChange={(e) => setFilterType(e.target.value)}
-                >
-                  <option value="">Semua Tipe</option>
-                  <option value="online">Online</option>
-                  <option value="offline">Offline</option>
-                </select>
-              </div>
-
-              {/* TANGGAL MULAI */}
-              <div className="form-control">
-                <label className="label pb-1">
-                  <span className="label-text text-xs font-semibold">
-                    Tanggal Mulai
-                  </span>
-                </label>
-                <input
-                  type="date"
-                  className="input input-bordered input-sm w-full"
-                  value={filterDateStart}
-                  onChange={e => setFilterDateStart(e.target.value)}
-                  max={filterDateEnd || undefined}
-                />
-              </div>
-
-              {/* TANGGAL AKHIR */}
-              <div className="form-control">
-                <label className="label pb-1">
-                  <span className="label-text text-xs font-semibold">
-                    Tanggal Akhir
-                  </span>
-                </label>
-                <input
-                  type="date"
-                  className="input input-bordered input-sm w-full"
-                  value={filterDateEnd}
-                  onChange={e => setFilterDateEnd(e.target.value)}
-                  min={filterDateStart || undefined}
-                />
-              </div>
+              <select
+                className="select select-bordered select-sm w-full"
+                value={filterStatus}
+                onChange={(e) => setFilterStatus(e.target.value)}
+              >
+                <option value="">Semua Status</option>
+                <option value="scheduled">Dijadwalkan</option>
+                <option value="completed">Selesai</option>
+                <option value="cancelled">Dibatalkan</option>
+                <option value="rescheduled">Dijadwalkan Ulang</option>
+              </select>
             </div>
-            <div className="flex w-full justify-end">
-              {(filterStatus || filterType || filterDateStart || filterDateEnd) && (
-                <button
-                  className="btn btn-sm btn-outline"
-                  onClick={() => {
-                    setFilterStatus("");
-                    setFilterType("");
-                    setFilterDateStart("");
-                    setFilterDateEnd("");
-                  }}
-                >
-                  Reset Filter
-                </button>
-              )}
+
+            {/* TIPE */}
+            <div className="form-control">
+              <label className="label pb-1">
+                <span className="label-text text-xs font-semibold">
+                  Tipe Wawancara
+                </span>
+              </label>
+
+              <select
+                className="select select-bordered select-sm w-full"
+                value={filterType}
+                onChange={(e) => setFilterType(e.target.value)}
+              >
+                <option value="">Semua Tipe</option>
+                <option value="online">Online</option>
+                <option value="offline">Offline</option>
+              </select>
+            </div>
+
+            {/* TANGGAL MULAI */}
+            <div className="form-control">
+              <label className="label pb-1">
+                <span className="label-text text-xs font-semibold">
+                  Tanggal Mulai
+                </span>
+              </label>
+
+              <input
+                type="date"
+                className="input input-bordered input-sm w-full"
+                value={filterDateStart}
+                onChange={(e) => setFilterDateStart(e.target.value)}
+                max={filterDateEnd || undefined}
+              />
+            </div>
+
+            {/* TANGGAL AKHIR */}
+            <div className="form-control">
+              <label className="label pb-1">
+                <span className="label-text text-xs font-semibold">
+                  Tanggal Akhir
+                </span>
+              </label>
+
+              <input
+                type="date"
+                className="input input-bordered input-sm w-full"
+                value={filterDateEnd}
+                onChange={(e) => setFilterDateEnd(e.target.value)}
+                min={filterDateStart || undefined}
+              />
+            </div>
+
+            {/* RESET */}
+            <div className="form-control">
+              <label className="label pb-1 invisible">
+                <span>Reset</span>
+              </label>
+
+              <button
+                className="btn btn-secondary rounded-full w-full"
+                onClick={() => {
+                  setFilterStatus("");
+                  setFilterType("");
+                  setFilterDateStart("");
+                  setFilterDateEnd("");
+                }}
+              >
+                Reset Filter
+              </button>
             </div>
           </div>
         </div>
@@ -256,6 +268,11 @@ export default function CandidateInterviewPage() {
             {appsWithInterview.map((app, idx) => (
               <div key={idx} className="card bg-base-200 shadow-md">
                 <div className="card-body">
+                  {(() => {
+                    // normalize interview fields: server returns interviews[] on each app
+                    const interview = app.interviews && app.interviews.length > 0 ? app.interviews[0] : null;
+                    app._interview = interview;
+                  })()}
                   {/* Header */}
                   <div className="flex justify-between items-start gap-4 flex-wrap">
                     <div>
@@ -265,17 +282,11 @@ export default function CandidateInterviewPage() {
                       </p>
                     </div>
                     <div className="flex gap-2 flex-wrap justify-end">
-                      <div
-                        className={
-                          getInterviewTypeBadge(app.interview_type).class
-                        }
-                      >
-                        {getInterviewTypeBadge(app.interview_type).label}
+                      <div className={getInterviewTypeBadge(app.interview_type || app._interview?.interview_type).class}>
+                        {getInterviewTypeBadge(app.interview_type || app._interview?.interview_type).label}
                       </div>
-                      <div
-                        className={getStatusBadge(app.interview_status).class}
-                      >
-                        {getStatusBadge(app.interview_status).label}
+                      <div className={getStatusBadge((app.interview_status || app._interview?.status)).class}>
+                        {getStatusBadge((app.interview_status || app._interview?.status)).label}
                       </div>
                     </div>
                   </div>
@@ -298,14 +309,14 @@ export default function CandidateInterviewPage() {
                       )}
                     </div>
 
-                    {app.interview_type === "video" && app.meeting_link && (
+                    {((app.interview_type || app._interview?.interview_type) === "online") && (app.meeting_link || app._interview?.meeting_link) && (
                       <div>
                         <p className="text-xs text-gray-600 font-semibold">
                           Link Wawancara
                         </p>
                         <button
                           className="btn btn-sm btn-primary"
-                          onClick={() => handleOpenLink(app.meeting_link)}
+                          onClick={() => handleOpenLink(app.meeting_link || app._interview?.meeting_link)}
                         >
                           Buka Link
                         </button>
@@ -332,7 +343,26 @@ export default function CandidateInterviewPage() {
                     <div className="flex items-center gap-2">
                       {app.interview_status === "scheduled" && (
                         <>
-                          <span className="loading loading-spinner loading-sm"></span>
+                          <svg
+                            className="w-5 h-5 text-warning"
+                            fill="none"
+                            viewBox="0 0 24 24"
+                          >
+                            <path
+                              stroke="currentColor"
+                              strokeLinecap="round"
+                              strokeLinejoin="round"
+                              strokeWidth="2"
+                              d="M12 8v4l3 3"
+                            ></path>
+                            <path
+                              stroke="currentColor"
+                              strokeLinecap="round"
+                              strokeLinejoin="round"
+                              strokeWidth="2"
+                              d="M12 21a9 9 0 110-18 9 9 0 010 18z"
+                            ></path>
+                          </svg>
                           <span>Terjadwal</span>
                         </>
                       )}
@@ -384,27 +414,27 @@ export default function CandidateInterviewPage() {
                   </div>
 
                   {/* Interview Result */}
-                  {app.interview_status === "completed" &&
-                    app.interview_result !== "pending" && (
+                  {((app.interview_status || app._interview?.status) === "completed") &&
+                    ((app.interview_result || app._interview?.result) !== "pending") && (
                       <div className="mt-4 p-3 bg-base-100 rounded-lg">
                         <p className="text-xs text-gray-600 font-semibold mb-2">
                           Hasil Wawancara
                         </p>
-                        {app.interview_result === "passed" && (
+                        {(app.interview_result || app._interview?.result) === "passed" && (
                           <div className="alert alert-success py-2">
                             <span>
                               Selamat! Anda lolos tahap wawancara ini.
                             </span>
                           </div>
                         )}
-                        {app.interview_result === "failed" && (
+                        {(app.interview_result || app._interview?.result) === "failed" && (
                           <div className="alert alert-error py-2">
                             <span>
                               Mohon maaf, Anda tidak lolos tahap wawancara ini.
                             </span>
                           </div>
                         )}
-                        {app.interview_result === "no_show" && (
+                        {(app.interview_result || app._interview?.result) === "no_show" && (
                           <div className="alert alert-warning py-2">
                             <span>
                               Anda tidak hadir pada jadwal wawancara yang telah
@@ -416,12 +446,12 @@ export default function CandidateInterviewPage() {
                     )}
 
                   {/* Interview Rating */}
-                  {app.rating && (
+                  {((app.rating || app._interview?.rating) && (
                     <div className="mt-4 p-3 bg-base-100 rounded-lg">
                       <p className="text-xs text-gray-600 font-semibold mb-2">
                         Rating Wawancara
                       </p>
-                      <p className="text-sm">Rating: {app.rating}/5</p>
+                      <p className="text-sm">Rating: {(app.rating || app._interview?.rating)}/5</p>
                       <div className="rating rating-sm mt-1">
                         {[1, 2, 3, 4, 5].map((i) => (
                           <input
@@ -429,21 +459,21 @@ export default function CandidateInterviewPage() {
                             type="radio"
                             name={`rating-${app.id}`}
                             className="mask mask-star-2 bg-orange-400"
-                            checked={parseInt(app.rating) === i}
+                            checked={parseInt((app.rating || app._interview?.rating) || 0) === i}
                             disabled
                           />
                         ))}
                       </div>
                     </div>
-                  )}
+                  ))}
 
                   {/* Interview Notes */}
-                  {app.interviewer_notes && (
+                  {(app.interviewer_notes || app._interview?.interviewer_notes) && (
                     <div className="mt-4 p-3 bg-base-100 rounded-lg">
                       <p className="text-xs text-gray-600 font-semibold mb-2">
                         Catatan Pewawancara
                       </p>
-                      <p className="text-sm">{app.interviewer_notes}</p>
+                      <p className="text-sm">{app.interviewer_notes || app._interview?.interviewer_notes}</p>
                     </div>
                   )}
 

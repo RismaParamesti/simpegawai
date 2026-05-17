@@ -81,6 +81,11 @@ export default function CandidateProfilePage() {
       setForm({ ...form, expected_salary: digits })
       return
     }
+    if (name === 'nik') {
+      const digits = String(value).replace(/\D/g, '').slice(0, 16)
+      setForm({ ...form, nik: digits })
+      return
+    }
 
     setForm({
       ...form,
@@ -109,11 +114,30 @@ export default function CandidateProfilePage() {
 
     } catch (error) {
       console.error('Failed to update profile:', error)
-      NotificationManager.error(
-        error.response?.data?.message || 'Gagal menyimpan profil',
-        'Gagal',
-        3000
-      )
+      const apiMessage = error.response?.data?.message || ''
+      const apiErrors = error.response?.data?.errors
+      const apiCode = error.response?.data?.code || error.code || ''
+      const diagnosticText = [
+        apiMessage,
+        JSON.stringify(apiErrors || {}),
+        error.response?.data?.error || '',
+        error.message || '',
+        apiCode,
+      ]
+        .join(' ')
+        .toLowerCase()
+
+      const isNikDuplicate =
+        !!apiErrors?.nik ||
+        (diagnosticText.includes('nik') &&
+          /(sudah|used|already|exists|dipakai|terpakai|duplicate|dup entry)/i.test(diagnosticText)) ||
+        (String(apiCode).toUpperCase() === 'ER_DUP_ENTRY' && diagnosticText.includes('nik'))
+
+      if (isNikDuplicate) {
+        NotificationManager.error('NIK sudah digunakan oleh pengguna lain', 'Gagal', 5000)
+      } else {
+        NotificationManager.error(apiMessage || 'Gagal menyimpan profil', 'Gagal', 3000)
+      }
     } finally {
       setSubmitting(false)
     }

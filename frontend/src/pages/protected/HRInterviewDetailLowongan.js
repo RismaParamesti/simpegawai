@@ -470,6 +470,7 @@ export default function InterviewModal({
                                         interviewer_notes: evaluation.interviewer_notes,
                                         result: evaluation.result,
                                         status: "completed",
+                                        publish: false,
                                       },
                                     );
                                     alert("Berhasil menyimpan hasil wawancara");
@@ -582,7 +583,7 @@ export default function InterviewModal({
                                 className="btn btn-primary"
                                 onClick={async () => {
                                   try {
-                                    // Update interview result
+                                    // Update interview result (save internally, do not publish)
                                     await axios.put(
                                       `/api/candidates/admin/interviews/${selectedCandidate.id}/result`,
                                       {
@@ -591,22 +592,9 @@ export default function InterviewModal({
                                         interviewer_notes: evaluation.interviewer_notes,
                                         result: evaluation.result,
                                         status: "completed",
+                                        publish: false,
                                       },
                                     );
-                                    // Jika ada application_id, update juga status di applications
-                                    if (selectedCandidate.application_id) {
-                                      let appStatus = "";
-                                      if (evaluation.recommendation === "hire" && evaluation.result === "passed") {
-                                        appStatus = "diterima";
-                                      } else if (evaluation.recommendation === "reject" && evaluation.result === "failed") {
-                                        appStatus = "ditolak";
-                                      }
-                                      if (appStatus) {
-                                        await axios.put(`/api/candidates/admin/applications/${selectedCandidate.application_id}/status`, {
-                                          status: appStatus,
-                                        });
-                                      }
-                                    }
                                     alert("Berhasil menyimpan hasil wawancara");
                                     // Refresh data interview di halaman utama jika ada
                                     if (

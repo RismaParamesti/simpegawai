@@ -6,6 +6,7 @@ import HRInterviewDetailLowongan from "./HRInterviewDetailLowongan";
 import TitleCard from "../../components/Cards/TitleCard";
 import axios from "axios";
 import { useRef } from "react";
+import { NotificationManager } from "react-notifications";
 
 export default function HRInterview() {
   const [activeMenu, setActiveMenu] = useState("schedule");
@@ -1042,41 +1043,153 @@ export default function HRInterview() {
                             const hiringStatus = (
                               jobStatus.hiring_status || ""
                             ).toLowerCase();
-                            // Jangan render button apapun jika status/hiring_status masih kosong (belum sempat fetch)
-                            if (!status || !hiringStatus) return null;
-                            // Hanya tampil saat shortlisting
-                            if (
-                              status !== "closed" ||
-                              hiringStatus !== "shortlisting"
-                            )
-                              return null;
+                            // Tampilkan tombol selalu; state `disabled` akan mengontrol apakah bisa diklik
+                            // Determine if all interviews for this job have been graded
+                            const interviewsForJob = filteredHistory[job] || [];
+                            const allGraded =
+                              interviewsForJob.length > 0 &&
+                              interviewsForJob.every(
+                                (it) => it.result && it.result !== "pending",
+                              );
+
                             return (
                               <button
                                 className="btn btn-success btn-xs"
+                                disabled={!allGraded}
+                                title={
+                                  allGraded
+                                    ? "Selesaikan lowongan dan publish hasil interview ke kandidat"
+                                    : "Semua interview harus dinilai terlebih dahulu"
+                                }
                                 onClick={async () => {
                                   if (!jobOpeningId) {
                                     alert("ID lowongan tidak ditemukan!");
                                     return;
                                   }
+                                  if (!allGraded) return; // safety
                                   if (
                                     !window.confirm(
-                                      "Yakin ingin melanjutkan lowongan ini ke tahap interview?",
+                                      "Yakin ingin menyelesaikan lowongan ini dan mempublish hasil interview ke kandidat?",
                                     )
                                   )
                                     return;
                                   try {
-                                    // Update hiring_status job_openings menjadi interview
+                                    // Mark job_openings as complete (backend expected to publish results)
                                     await axios.put(
-                                      `/api/job-openings/${jobOpeningId}/advance-to-interview`,
+                                      `/api/job-openings/${jobOpeningId}/complete`,
                                     );
-                                    alert(
-                                      "Lowongan berhasil dipindah ke tahap interview.",
-                                    );
+                                    // Try calling explicit publish endpoint if backend exposes it.
+                                    // This is a no-op if the endpoint does not exist or fails.
+                                    let publishSucceeded = false;
+                                    try {
+                                      await axios.post(
+                                        `/api/job-openings/${jobOpeningId}/publish-interviews`,
+                                      );
+                                      publishSucceeded = true;
+                                    } catch (e) {
+                                      // publish endpoint absent or failed. We'll attempt a frontend fallback below.
+                                      publishSucceeded = false;
+                                      NotificationManager.info(
+                                        "Publish endpoint not available; attempting per-application updates.",
+                                        "Info",
+                                        4000,
+                                      );
+                                    }
+                                    alert("Lowongan berhasil diselesaikan dan hasil interview dipublish.");
                                     // Refresh status di map
                                     fetchJobStatus(jobOpeningId);
+                                    // Optimistic UI update: mark job as completed locally
+                                    setJobStatusMap((prev) => ({
+                                      ...prev,
+                                      [jobOpeningId]: { status: "closed", hiring_status: "completed" },
+                                    }));
+                                    setData((prev) =>
+                                      (prev || []).map((it) =>
+                                        (it.job_opening_id || it.position_id || it.id) === jobOpeningId
+                                          ? { ...it, status: "completed" }
+                                          : it,
+                                      ),
+                                    );
+                                    // Notify other parts of the app to refresh (e.g., candidate view)
+                                    if (typeof window !== "undefined" && window.dispatchEvent) {
+                                      window.dispatchEvent(new Event("interviewsPublished"));
+                                    }
+                                    // Switch to history view and refresh history data so published results appear
+                                    setActiveMenu("history");
+                                    try {
+                                      const resp = await axios.get("/api/hr/interviews/history-combined");
+                                      const interviews = (resp.data.history || []).map((i) => ({
+                                        ...i,
+                                        job_title: i.job_title || i.position_name || i.base_position || "Lainnya",
+                                        id: i.id || i.interview_id,
+                                        candidate_name: i.candidate_name || i.name || "-",
+                                        scheduled_date: i.scheduled_date || i.date,
+                                        interview_type: i.interview_type || i.type || "-",
+                                        interviewer_name: i.interviewer_name || i.interviewer || i.full_name || "-",
+                                        status: i.status || i.interview_status || "completed",
+                                      }));
+                                      setData(interviews);
+                                    } catch (e) {
+                                      // ignore fetch errors here
+                                    }
+                                    // If publish endpoint wasn't available, fallback: update application statuses per-interview
+                                    if (!publishSucceeded) {
+                                      try {
+                                        const publishErrors = [];
+                                        let successCount = 0;
+                                        for (const it of interviewsForJob) {
+                                          const appId = it.application_id;
+                                          if (!appId) continue;
+                                          let appStatus = "";
+                                          if (it.recommendation === "hire" && it.result === "passed") {
+                                            appStatus = "diterima";
+                                          } else if (it.recommendation === "reject" && it.result === "failed") {
+                                            appStatus = "ditolak";
+                                          } else {
+                                            continue;
+                                          }
+                                          try {
+                                            const res = await axios.put(`/api/hr/applications/${appId}/status`, { status: appStatus });
+                                            successCount++;
+                                            console.log(`Updated application ${appId} => ${appStatus}`, res.data);
+                                            NotificationManager.success(
+                                              `Status aplikasi ${appId} diupdate ke ${appStatus}`,
+                                              "Sukses",
+                                              3000,
+                                            );
+                                          } catch (err) {
+                                            publishErrors.push({ appId, err });
+                                            console.error(`Failed update application ${appId}`, err);
+                                            NotificationManager.error(
+                                              `Gagal update status aplikasi ${appId}: ${err?.response?.data?.message || err?.message || JSON.stringify(err)}`,
+                                              "Publish Error",
+                                              6000,
+                                            );
+                                          }
+                                        }
+                                        if (successCount > 0) {
+                                          NotificationManager.info(`${successCount} aplikasi berhasil dipublish.`, "Info", 4000);
+                                        }
+                                        if (publishErrors.length > 0) {
+                                          console.warn("Some application status updates failed:", publishErrors);
+                                          NotificationManager.error(
+                                            "Beberapa update status aplikasi gagal. Cek console/network untuk detail.",
+                                            "Error",
+                                            8000,
+                                          );
+                                        }
+                                      } catch (err) {
+                                        console.error("Fallback publish failed", err);
+                                        NotificationManager.error(
+                                          `Fallback publish failed: ${err?.message || JSON.stringify(err)}`,
+                                          "Error",
+                                          8000,
+                                        );
+                                      }
+                                    }
                                   } catch (err) {
                                     alert(
-                                      "Gagal memindahkan lowongan ke interview: " +
+                                      "Gagal menyelesaikan lowongan: " +
                                         (err?.response?.data?.message ||
                                           err?.message ||
                                           JSON.stringify(err)),
@@ -1084,7 +1197,7 @@ export default function HRInterview() {
                                   }
                                 }}
                               >
-                                Pindah ke Interview
+                                Selesaikan Lowongan Ini
                               </button>
                             );
                           })()}

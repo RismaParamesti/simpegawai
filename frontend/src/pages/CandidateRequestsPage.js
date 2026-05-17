@@ -14,6 +14,11 @@ export default function CandidateRequestsPage() {
   const [applications, setApplications] = useState([]);
   const [filteredApplications, setFilteredApplications] = useState([]);
   const [selectedStatus, setSelectedStatus] = useState("all");
+  const [jobTitleFilter, setJobTitleFilter] = useState("");
+  const [positionFilter, setPositionFilter] = useState("");
+  const [levelFilter, setLevelFilter] = useState("");
+  const [applyDateFilter, setApplyDateFilter] = useState("");
+  const [locationFilter, setLocationFilter] = useState("");
   const [withdrawingId, setWithdrawingId] = useState(null);
   const [showWithdrawModal, setShowWithdrawModal] = useState(false);
   const [withdrawReason, setWithdrawReason] = useState("");
@@ -74,6 +79,85 @@ export default function CandidateRequestsPage() {
         applications.filter((app) => app && app.status === status),
       );
     }
+  };
+
+  // Apply all filters (status + advanced fields)
+  const applyFilters = () => {
+    let result = applications.filter((app) => app);
+
+    if (selectedStatus && selectedStatus !== "all") {
+      result = result.filter((app) => app.status === selectedStatus);
+    }
+
+    if (jobTitleFilter) {
+      const s = jobTitleFilter.toLowerCase();
+      result = result.filter((app) =>
+        (app.job_title || "").toLowerCase().includes(s),
+      );
+    }
+
+    if (positionFilter) {
+      const s = positionFilter.toLowerCase();
+      result = result.filter((app) =>
+        (app.position_name || "").toLowerCase().includes(s),
+      );
+    }
+
+    if (levelFilter) {
+      const s = levelFilter.toLowerCase();
+      result = result.filter((app) =>
+        (app.level || "").toLowerCase().includes(s),
+      );
+    }
+
+    if (applyDateFilter) {
+      // compare only date portion (yyyy-mm-dd)
+      result = result.filter((app) => {
+        try {
+          const d = app.submitted_at ? new Date(app.submitted_at) : null;
+          if (!d) return false;
+          const y = d.getFullYear();
+          const m = String(d.getMonth() + 1).padStart(2, "0");
+          const day = String(d.getDate()).padStart(2, "0");
+          return `${y}-${m}-${day}` === applyDateFilter;
+        } catch (e) {
+          return false;
+        }
+      });
+    }
+
+    if (locationFilter) {
+      const s = locationFilter.toLowerCase();
+      result = result.filter((app) =>
+        (app.location || "").toLowerCase().includes(s),
+      );
+    }
+
+    setFilteredApplications(result);
+  };
+
+  // Re-apply filters when source data or any filter changes
+  useEffect(() => {
+    applyFilters();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [
+    applications,
+    selectedStatus,
+    jobTitleFilter,
+    positionFilter,
+    levelFilter,
+    applyDateFilter,
+    locationFilter,
+  ]);
+
+  const resetFilters = () => {
+    setSelectedStatus("all");
+    setJobTitleFilter("");
+    setPositionFilter("");
+    setLevelFilter("");
+    setApplyDateFilter("");
+    setLocationFilter("");
+    setFilteredApplications(applications.slice());
   };
 
   const handleWithdraw = async (id, reason) => {
@@ -184,6 +268,57 @@ export default function CandidateRequestsPage() {
         subtitle={`${applications.length} Lamaran`}
       >
         <div className="mb-6">
+          {/* Advanced filters: nama lowongan, posisi, level, tanggal apply, lokasi penempatan */}
+          <div className="mb-4 p-4 bg-base-200 rounded-xl shadow-sm">
+            <div className="grid grid-cols-1 md:grid-cols-6 gap-2 items-center">
+              <input
+                type="text"
+                placeholder="Nama Lowongan"
+                className="input input-bordered input-sm w-full"
+                value={jobTitleFilter}
+                onChange={(e) => setJobTitleFilter(e.target.value)}
+              />
+
+              <input
+                type="text"
+                placeholder="Posisi Lowongan"
+                className="input input-bordered input-sm w-full"
+                value={positionFilter}
+                onChange={(e) => setPositionFilter(e.target.value)}
+              />
+
+              <input
+                type="text"
+                placeholder="Level"
+                className="input input-bordered input-sm w-full"
+                value={levelFilter}
+                onChange={(e) => setLevelFilter(e.target.value)}
+              />
+
+              <input
+                type="date"
+                className="input input-bordered input-sm w-full"
+                value={applyDateFilter}
+                onChange={(e) => setApplyDateFilter(e.target.value)}
+              />
+
+              <input
+                type="text"
+                placeholder="Posisi Penempatan"
+                className="input input-bordered input-sm w-full"
+                value={locationFilter}
+                onChange={(e) => setLocationFilter(e.target.value)}
+              />
+
+              <button
+                className="btn btn-sm btn-secondary rounded-full w-full min-h-0 h-8"
+                onClick={resetFilters}
+              >
+                Reset Filter
+              </button>
+            </div>
+          </div>
+
           <div className="grid grid-cols-9 bg-base-200 rounded-xl p-1 gap-1">
             {statusOptions.map((s) => (
               <button
