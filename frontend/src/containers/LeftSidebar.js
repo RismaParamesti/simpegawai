@@ -8,7 +8,7 @@ function LeftSidebar() {
   const activeRole = localStorage.getItem("activeRole") || "";
   const routes = getSidebarByRole(activeRole);
   const isRouteActive = (path) =>
-    location.pathname === path || location.pathname.startsWith(`${path}/`);
+    location.pathname === path;
 
   const close = (e) => {
     const drawer = document.getElementById("left-sidebar-drawer");

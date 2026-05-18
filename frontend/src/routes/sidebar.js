@@ -18,6 +18,7 @@ import {
   CheckBadgeIcon,
   ScaleIcon,
   BuildingOffice2Icon,
+  CalculatorIcon,
 } from "@heroicons/react/24/outline";
 
 const iconClasses = `h-6 w-6`;
@@ -69,7 +70,7 @@ const pegawaiRoutes = [
       {
         path: "/app/warning-letters",
         icon: <DocumentTextIcon className={iconClasses} />,
-        name: "Disiplin Kehadiran",
+        name: "Aturan Kehadiran",
       },
     ],
   },
@@ -151,7 +152,7 @@ const hrRoutes = [
       {
         path: "/app/warning-letters",
         icon: <DocumentTextIcon className={iconClasses} />,
-        name: "Disiplin Kehadiran",
+        name: "Aturan Kehadiran",
       },
     ],
   },
@@ -236,7 +237,7 @@ const financeRoutes = [
   },
   {
     path: "/app/payroll/component",
-    icon: <BanknotesIcon className={iconClasses} />,
+    icon: <DocumentTextIcon className={iconClasses} />,
     name: "Komponen Payroll",
   },
   {
@@ -246,7 +247,7 @@ const financeRoutes = [
   },
   {
     path: "/app/payroll",
-    icon: <BanknotesIcon className={iconClasses} />,
+    icon: <CalculatorIcon className={iconClasses} />,
     name: "Kelola Payroll",
   },
   {

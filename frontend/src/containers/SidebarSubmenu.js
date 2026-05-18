@@ -6,7 +6,7 @@ function SidebarSubmenu({ submenu, name, icon }) {
   const location = useLocation();
   const [isExpanded, setIsExpanded] = useState(false);
   const isActiveChild = submenu.some(
-    (item) => location.pathname === item.path || location.pathname.startsWith(`${item.path}/`),
+    (item) => location.pathname === item.path,
   );
 
   const closeDrawerOnMobile = () => {

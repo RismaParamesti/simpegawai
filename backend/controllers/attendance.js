@@ -24,10 +24,28 @@ const MANAGER_POSITION_NAMES = [
 
 const ALPHA_SANCTION_LEVEL = {
     NONE: "none",
-    SP1: "sp1",
-    SP2: "sp2",
-    SP3: "sp3",
-    EVALUASI_HR: "evaluasi_hr",
+};
+
+const normalizeSanctionLevel = (value) => {
+    const raw = String(value || "").toLowerCase().trim();
+    if (!raw) return null;
+    if (raw === "none" || raw === "0" || raw === "-") return "none";
+
+    if (/^\d+$/.test(raw)) {
+        const num = Number.parseInt(raw, 10);
+        return Number.isFinite(num) && num > 0 ? `sp${num}` : null;
+    }
+
+    const spMatch = raw.match(/^sp\s*[-_]?\s*(\d+)$/i);
+    if (spMatch) {
+        return `sp${Number.parseInt(spMatch[1], 10)}`;
+    }
+
+    const slug = raw
+        .replace(/[^a-z0-9]+/g, "_")
+        .replace(/^_+|_+$/g, "");
+
+    return slug || null;
 };
 
 function timeStringToSeconds(timeStr) {
@@ -74,17 +92,31 @@ function formatDateOnly(date) {
 
 // Function untuk calculate late minutes
 const calculateLateMinutes = (checkInTime, standardCheckInTime) => {
-    const [checkInHour, checkInMin, checkInSec] = checkInTime
-        .split(":")
-        .map(Number);
-    const [standardHour, standardMin, standardSec] = standardCheckInTime
-        .split(":")
-        .map(Number);
+    const parseTimeToSeconds = (timeValue) => {
+        if (!timeValue) return null;
 
-    const checkInTotalSeconds =
-        checkInHour * 3600 + checkInMin * 60 + checkInSec;
-    const standardTotalSeconds =
-        standardHour * 3600 + standardMin * 60 + standardSec;
+        const [hour, minute, second = 0] = String(timeValue)
+            .split(":")
+            .map(Number);
+
+        if ([hour, minute, second].some((part) => Number.isNaN(part))) {
+            return null;
+        }
+
+        return hour * 3600 + minute * 60 + second;
+    };
+
+    const checkInTotalSeconds = parseTimeToSeconds(checkInTime);
+    const standardTotalSeconds = parseTimeToSeconds(standardCheckInTime);
+
+    if (
+        checkInTotalSeconds === null ||
+        standardTotalSeconds === null ||
+        !Number.isFinite(checkInTotalSeconds) ||
+        !Number.isFinite(standardTotalSeconds)
+    ) {
+        return 0;
+    }
 
     const diffSeconds = checkInTotalSeconds - standardTotalSeconds;
 
@@ -523,34 +555,62 @@ const ensureAlphaAttendanceByDate = async (employeeId, dateObj) => {
     return false;
 };
 
-const getSanctionLevelFromAlphaCounts = ({
+// Determine sanction level based on active attendance_warning_rules in DB.
+// This allows HR to add/change rules (e.g., SP4) without code changes.
+const getSanctionLevelFromAlphaCounts = async ({
     alphaConsecutiveDays,
     alphaAccumulatedDays,
+    lateConsecutiveDays,
+    lateAccumulatedDays,
 }) => {
     const consecutive = Number(alphaConsecutiveDays || 0);
     const accumulated = Number(alphaAccumulatedDays || 0);
+    const lateConsecutive = Number(lateConsecutiveDays || 0);
+    const lateAccum = Number(lateAccumulatedDays || 0);
 
-    if (consecutive >= 7) {
-        return ALPHA_SANCTION_LEVEL.EVALUASI_HR;
+    try {
+        const [rules] = await db.promise().query(
+            `SELECT * FROM attendance_warning_rules WHERE is_active = 1 ORDER BY GREATEST(COALESCE(min_consecutive_alpha,0), COALESCE(min_accumulated_alpha,0), COALESCE(min_consecutive_late,0), COALESCE(min_accumulated_late,0)) DESC, id DESC`
+        );
+
+        for (const rule of rules) {
+            const minConsec = Number(rule.min_consecutive_alpha || 0);
+            const minAccum = Number(rule.min_accumulated_alpha || 0);
+            const minConsecLate = Number(rule.min_consecutive_late || 0);
+            const minAccumLate = Number(rule.min_accumulated_late || 0);
+            const normalizedRuleLevel = normalizeSanctionLevel(rule.sanction_level) || ALPHA_SANCTION_LEVEL.NONE;
+
+            if (minConsec > 0 && consecutive >= minConsec) {
+                return {
+                    level: normalizedRuleLevel,
+                    label: rule.sanction_label || null,
+                };
+            }
+            if (minAccum > 0 && accumulated >= minAccum) {
+                return {
+                    level: normalizedRuleLevel,
+                    label: rule.sanction_label || null,
+                };
+            }
+
+            if (minConsecLate > 0 && lateConsecutive >= minConsecLate) {
+                return {
+                    level: normalizedRuleLevel,
+                    label: rule.sanction_label || null,
+                };
+            }
+            if (minAccumLate > 0 && lateAccum >= minAccumLate) {
+                return {
+                    level: normalizedRuleLevel,
+                    label: rule.sanction_label || null,
+                };
+            }
+        }
+    } catch (error) {
+        console.error("Failed to load attendance_warning_rules:", error?.message || error);
     }
 
-    if (accumulated >= 7) {
-        return ALPHA_SANCTION_LEVEL.EVALUASI_HR;
-    }
-
-    if (consecutive >= 6 || accumulated >= 6) {
-        return ALPHA_SANCTION_LEVEL.SP3;
-    }
-
-    if (consecutive >= 5 || accumulated >= 5) {
-        return ALPHA_SANCTION_LEVEL.SP2;
-    }
-
-    if (consecutive >= 3 || accumulated >= 3) {
-        return ALPHA_SANCTION_LEVEL.SP1;
-    }
-
-    return ALPHA_SANCTION_LEVEL.NONE;
+    return { level: ALPHA_SANCTION_LEVEL.NONE, label: null };
 };
 
 const evaluateAlphaDisciplineForEmployee = async (employeeId) => {
@@ -570,15 +630,17 @@ const evaluateAlphaDisciplineForEmployee = async (employeeId) => {
 
     const employeeCreatedDate = employeeData[0].created_at;
 
-    const [attendanceRows] = await db.promise().query(
-        `SELECT status, date
-         FROM attendance
-         WHERE employee_id = ?
-           AND date >= DATE(?) 
-           AND date <= CURDATE()
-         ORDER BY date DESC`,
-        [employeeId, employeeCreatedDate]
-    );
+        // For disciplinary counts we consider only the current calendar year
+        const yearStart = `${new Date().getFullYear()}-01-01`;
+        const [attendanceRows] = await db.promise().query(
+                `SELECT status, date
+                 FROM attendance
+                 WHERE employee_id = ?
+                     AND date >= DATE(?)
+                     AND date <= CURDATE()
+                 ORDER BY date DESC`,
+                [employeeId, yearStart]
+        );
 
     const alphaAccumulatedDays = attendanceRows.reduce((total, row) => {
         return total + (row.status === "alpha" ? 1 : 0);
@@ -598,10 +660,31 @@ const evaluateAlphaDisciplineForEmployee = async (employeeId) => {
         break;
     }
 
-    const sanctionLevel = getSanctionLevelFromAlphaCounts({
+    // compute late metrics used by some rules
+    const lateAccumulatedDays = attendanceRows.reduce((total, row) => {
+        const isLate = Number(row.late_minutes || 0) > 0 || Boolean(row.is_late);
+        return total + (isLate ? 1 : 0);
+    }, 0);
+
+    let lateConsecutiveDays = 0;
+    for (const row of attendanceRows) {
+        const isLate = Number(row.late_minutes || 0) > 0 || Boolean(row.is_late);
+        if (isLate) {
+            lateConsecutiveDays += 1;
+            continue;
+        }
+        break;
+    }
+
+    const sanctionResult = await getSanctionLevelFromAlphaCounts({
         alphaConsecutiveDays,
         alphaAccumulatedDays,
+        lateConsecutiveDays,
+        lateAccumulatedDays,
     });
+
+    const sanctionLevel = sanctionResult && sanctionResult.level ? sanctionResult.level : ALPHA_SANCTION_LEVEL.NONE;
+    const sanctionLabelFromRule = sanctionResult && sanctionResult.label ? String(sanctionResult.label).trim() : null;
 
     await db.promise().query(
         `UPDATE employees
@@ -622,7 +705,10 @@ const evaluateAlphaDisciplineForEmployee = async (employeeId) => {
     return {
         alpha_consecutive_days: alphaConsecutiveDays,
         alpha_accumulated_days: alphaAccumulatedDays,
+        late_consecutive_days: lateConsecutiveDays,
+        late_accumulated_days: lateAccumulatedDays,
         alpha_sanction_level: sanctionLevel,
+        alpha_sanction_label_from_rule: sanctionLabelFromRule,
         account_locked: false,
     };
 };
@@ -860,8 +946,10 @@ router.post(
             const lateThresholdTime = approvedTimeFromLeave && isLeaveTerlambat
                 ? approvedTimeFromLeave
                 : workingHoursWindow.check_in_time;
-            const lateMinutes = calculateLateMinutes(checkInTime, lateThresholdTime);
-            const latePolicy = getLatePolicy(lateMinutes);
+            const latePolicy = getLatePolicy(
+                calculateLateMinutes(checkInTime, lateThresholdTime)
+            );
+            const lateMinutes = latePolicy.late_minutes;
             const isLate = latePolicy.is_penalized_late;
 
             // Insert atau update attendance record
@@ -1471,6 +1559,34 @@ router.get(
                 employeeId
             );
 
+            // Generate label and badge dynamically so backend handles new levels (e.g., sp4)
+            const makeLabel = (lvl) => {
+                const raw = String(lvl || "").trim();
+                if (!raw || raw.toLowerCase() === "none") return "Belum Ada SP";
+                const spMatch = raw.match(/^\s*sp\s*[-_]?\s*(\d+)\s*$/i);
+                if (spMatch) return `SP${spMatch[1]}`;
+                return raw.replace(/[-_]+/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
+            };
+
+            const makeBadge = (lvl) => {
+                const m = String(lvl || "").toLowerCase();
+                if (!m || m === "none") return "badge-ghost";
+                const palette = ["badge-info", "badge-warning", "badge-error", "badge-secondary", "badge-success", "badge-neutral", "badge-ghost"];
+                let hash = 0;
+                for (let i = 0; i < m.length; i++) hash = (hash << 5) - hash + m.charCodeAt(i);
+                return palette[Math.abs(hash) % palette.length];
+            };
+
+            const finalLabel = disciplineSnapshot.alpha_sanction_label_from_rule
+                ? String(disciplineSnapshot.alpha_sanction_label_from_rule)
+                : makeLabel(disciplineSnapshot.alpha_sanction_level);
+
+            const disciplineWithLabel = {
+                ...disciplineSnapshot,
+                alpha_sanction_label: finalLabel,
+                alpha_sanction_badge: disciplineSnapshot.alpha_sanction_badge || makeBadge(disciplineSnapshot.alpha_sanction_level),
+            };
+
             res.status(200).json({
                 message: "Attendance summary retrieved successfully",
                 period: month && year ? `${month}/${year}` : "all",
@@ -1485,7 +1601,7 @@ router.get(
                     salary_penalty_units: Math.floor(
                         lateDays / salaryPenaltyThreshold
                     ),
-                    alpha_discipline: disciplineSnapshot,
+                    alpha_discipline: disciplineWithLabel,
                 },
             });
         } catch (error) {
