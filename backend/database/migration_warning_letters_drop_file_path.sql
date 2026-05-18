@@ -1,7 +1,7 @@
 -- ============================================================
--- MIGRATION: Add evaluasi_hr to sp_level ENUM in warning_letters
--- Date: March 13, 2026
+-- MIGRATION: Drop file_path from warning_letters (PDF no longer used)
+-- Date: May 19, 2026
 -- ============================================================
 
 ALTER TABLE `warning_letters`
-  MODIFY COLUMN `sp_level` VARCHAR(50) NOT NULL;
+  DROP COLUMN `file_path`;

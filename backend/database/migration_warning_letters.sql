@@ -6,7 +6,7 @@
 CREATE TABLE IF NOT EXISTS `warning_letters` (
   `id` INT AUTO_INCREMENT PRIMARY KEY,
   `letter_number` VARCHAR(100) NOT NULL,
-  `sp_level` ENUM('sp1','sp2','sp3') NOT NULL,
+  `sp_level` VARCHAR(50) NOT NULL,
   `employee_id` INT NOT NULL,
   `issued_by_user_id` INT NOT NULL,
   `issued_by_role` ENUM('hr','admin') NOT NULL,

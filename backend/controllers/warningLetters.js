@@ -3,61 +3,64 @@ const router = express.Router();
 const db = require("../config/db");
 const { verifyToken, verifyRole } = require("../middleware/authMiddleware");
 const { resolveManagerScope } = require("../utils/managerScope");
-const fs = require("fs");
-const path = require("path");
-const PDFDocument = require("pdfkit");
 
 const COMPANY_NAME = "PT OTAK KANAN";
 const COMPANY_ADDRESS =
     "Graha Pena, Ruang 1503, Jl. Ahmad Yani No.88, Ketintang, Kec. Gayungan, Surabaya, Jawa Timur 60234";
 
-const VALID_SP_LEVELS = ["sp1", "sp2", "sp3"];
 const ALPHA_SANCTION_LEVEL = {
     NONE: "none",
-    SP1: "sp1",
-    SP2: "sp2",
-    SP3: "sp3",
-    EVALUASI_HR: "evaluasi_hr",
 };
-const WARNING_LETTER_UPLOAD_SUBDIR = "warning_letters";
-const COMPANY_LOGO_PATH = path.join(
-    __dirname,
-    "../../frontend/src/assets/logo1.svg"
-);
 
-const getSanctionLevelFromAlphaCounts = ({
+const normalizeSpLevel = (value) => {
+    const raw = String(value || "").toLowerCase().trim();
+    if (!raw) return null;
+    if (raw === "none" || raw === "0" || raw === "-") return "none";
+
+    if (/^\d+$/.test(raw)) {
+        const num = Number.parseInt(raw, 10);
+        return Number.isFinite(num) && num > 0 ? `sp${num}` : null;
+    }
+
+    const spMatch = raw.match(/^sp\s*[-_]?\s*(\d+)$/i);
+    if (spMatch) {
+        return `sp${Number.parseInt(spMatch[1], 10)}`;
+    }
+
+    const slug = raw
+        .replace(/[^a-z0-9]+/g, "_")
+        .replace(/^_+|_+$/g, "");
+
+    return slug || null;
+};
+
+const getSanctionLevelFromAlphaCounts = async ({
     alphaConsecutiveDays,
     alphaAccumulatedDays,
 }) => {
     const consecutive = Number(alphaConsecutiveDays || 0);
     const accumulated = Number(alphaAccumulatedDays || 0);
 
-    if (consecutive >= 7 || accumulated >= 7) {
-        return ALPHA_SANCTION_LEVEL.EVALUASI_HR;
-    }
-
-    if (consecutive >= 6 || accumulated >= 6) {
-        return ALPHA_SANCTION_LEVEL.SP3;
-    }
-
-    if (consecutive >= 5 || accumulated >= 5) {
-        return ALPHA_SANCTION_LEVEL.SP2;
-    }
-
-    if (consecutive >= 3 || accumulated >= 3) {
-        return ALPHA_SANCTION_LEVEL.SP1;
-    }
-
-    return ALPHA_SANCTION_LEVEL.NONE;
-};
-
-const getCompanyLogoDataUri = () => {
     try {
-        const svg = fs.readFileSync(COMPANY_LOGO_PATH, "utf8");
-        return `data:image/svg+xml;base64,${Buffer.from(svg).toString("base64")}`;
+        const [rules] = await db.promise().query(
+            `SELECT sanction_level, min_consecutive_alpha, min_accumulated_alpha
+             FROM attendance_warning_rules
+             WHERE is_active = 1
+             ORDER BY GREATEST(COALESCE(min_consecutive_alpha, 0), COALESCE(min_accumulated_alpha, 0)) DESC, id DESC`
+        );
+
+        for (const rule of rules) {
+            const minConsec = Number(rule.min_consecutive_alpha || 0);
+            const minAccum = Number(rule.min_accumulated_alpha || 0);
+
+            if ((minConsec > 0 && consecutive >= minConsec) || (minAccum > 0 && accumulated >= minAccum)) {
+                return normalizeSpLevel(rule.sanction_level) || ALPHA_SANCTION_LEVEL.NONE;
+            }
+        }
     } catch (error) {
-        return "";
+        console.error("Failed to infer sanction level from attendance_warning_rules:", error?.message || error);
     }
+
 };
 
 const isAdminContext = (req) => {
@@ -70,19 +73,16 @@ const isHrContext = (req) => {
     return (req.user.roles || []).includes("hr") && activeRole === "hr";
 };
 
-const normalizeSpLevel = (value) => {
-    const normalized = String(value || "").toLowerCase().trim();
-    if (VALID_SP_LEVELS.includes(normalized)) {
-        return normalized;
-    }
-    return null;
-};
-
 const toReadableSpLabel = (spLevel) => {
     const normalized = normalizeSpLevel(spLevel) || "sp1";
-    if (normalized === "sp1") return "SURAT PERINGATAN PERTAMA (SP1)";
-    if (normalized === "sp2") return "SURAT PERINGATAN KEDUA (SP2)";
-    return "SURAT PERINGATAN KETIGA (SP3)";
+    if (normalized === "none") return "SURAT PERINGATAN";
+
+    const spMatch = normalized.match(/^sp(\d+)$/i);
+    if (spMatch) {
+        return `SURAT PERINGATAN (SP${spMatch[1]})`;
+    }
+
+    return normalized.replace(/[_-]+/g, " ").replace(/\b\w/g, (char) => char.toUpperCase());
 };
 
 const monthRoman = (monthNumber) => {
@@ -122,7 +122,6 @@ const buildLetterHtmlDocument = ({
         issuedDate,
         closingLines = [],
 }) => {
-        const logoDataUri = getCompanyLogoDataUri();
         const detailHtml = (detailRows || [])
                 .map(
                         (row) => `
@@ -165,14 +164,10 @@ const buildLetterHtmlDocument = ({
     <body>
         <div class="sheet">
             <div class="header">
-                <div class="header-row">
-                    <div class="logo">${logoDataUri ? `<img src="${logoDataUri}" alt="Logo" style="width: 150px; height: auto;" />` : "<div style='font-weight:700;font-size:18px;'>PT OTAK KANAN</div>"}</div>
-                    <div class="company">
-                        <div class="company-name">PT OTAK KANAN</div>
-                        <div style="font-size: 13px;">Graha Pena Building Lt.15 Suite 1503</div>
-                        <div style="font-size: 13px;">Jl. Ahmad Yani No.88 Surabaya</div>
-                        <div style="font-size: 13px;">Telp: (031) 8286155</div>
-                    </div>
+                <div class="company-name">PT OTAK KANAN</div>
+                <div style="font-size: 13px;">Graha Pena Building Lt.15 Suite 1503</div>
+                <div style="font-size: 13px;">Jl. Ahmad Yani No.88 Surabaya</div>
+                <div style="font-size: 13px;">Telp: (031) 8286155</div>
                 </div>
             </div>
             <div style="text-align: right; margin-bottom: 24px;">Surabaya, ${formatDateForLetter(issuedDate)}</div>
@@ -202,9 +197,6 @@ const buildWarningLetterContent = ({
     letterNumber,
     spLevel,
     employee,
-    violationDate,
-    violationDateEnd,
-    consecutiveAlphaDays,
     reason,
     issuedDate,
     signedTitle,
@@ -286,7 +278,7 @@ const buildEvaluasiHRContent = ({
         },
         bodyParagraphs: [
             "Dengan hormat,",
-            "Sehubungan dengan catatan pelanggaran kedisiplinan kehadiran yang telah mencapai tahap Surat Peringatan III (SP3), dengan ini Saudara diminta untuk menghadiri sesi Evaluasi HR.",
+            "Sehubungan dengan catatan pelanggaran kedisiplinan kehadiran yang telah mencapai tahap evaluasi HR, dengan ini Saudara diminta untuk menghadiri sesi Evaluasi HR.",
             "Evaluasi ini bertujuan untuk melakukan peninjauan terhadap riwayat kehadiran serta memberikan kesempatan kepada Saudara untuk menyampaikan klarifikasi terkait pelanggaran yang terjadi.",
             "Adapun pelaksanaan evaluasi akan dilakukan pada:",
         ],
@@ -417,14 +409,6 @@ const toDateOnly = (value) => {
     return `${year}-${month}-${day}`;
 };
 
-const normalizeUploadedFilePath = (value) => {
-    const raw = String(value || "").trim();
-    if (!raw) return null;
-    const normalized = raw.replace(/^\/+/, "");
-    if (!normalized.startsWith("uploads/")) return null;
-    return normalized;
-};
-
 const getAlphaViolationContext = async (employeeId) => {
     const [employeeData] = await db.promise().query(
         `SELECT created_at FROM employees WHERE id = ?`,
@@ -495,7 +479,7 @@ const getAlphaViolationContext = async (employeeId) => {
         streakEndDate: latestAlphaDate,
         consecutiveAlphaDays,
         alphaAccumulatedDays,
-        sanctionLevel: getSanctionLevelFromAlphaCounts({
+        sanctionLevel: await getSanctionLevelFromAlphaCounts({
             alphaConsecutiveDays: consecutiveAlphaDays,
             alphaAccumulatedDays,
         }),
@@ -536,48 +520,6 @@ const getIssuerSignatureInfo = async (userId, issuerRole) => {
         signedTitle,
         signedName,
     };
-};
-
-const saveWarningLetterToUploadFolder = async ({
-    letterNumber,
-    employeeId,
-    issuedDate,
-    letterContent,
-}) => {
-    const uploadDirectory = path.join(
-        __dirname,
-        `../uploads/${WARNING_LETTER_UPLOAD_SUBDIR}`
-    );
-
-    fs.mkdirSync(uploadDirectory, { recursive: true });
-
-    const safeLetterNumber = String(letterNumber || "SP")
-        .replace(/[^a-zA-Z0-9]/g, "-")
-        .replace(/-+/g, "-")
-        .replace(/^-|-$/g, "");
-    const safeIssuedDate = String(issuedDate || "").replace(/[^0-9-]/g, "");
-
-    const fileName = `sp-${safeLetterNumber}-${employeeId}-${safeIssuedDate}.pdf`;
-    const absoluteFilePath = path.join(uploadDirectory, fileName);
-    const relativeFilePath = `uploads/${WARNING_LETTER_UPLOAD_SUBDIR}/${fileName}`;
-
-    await new Promise((resolve, reject) => {
-        const doc = new PDFDocument({ size: "A4", margin: 56 });
-        const writeStream = fs.createWriteStream(absoluteFilePath);
-
-        writeStream.on("finish", resolve);
-        writeStream.on("error", reject);
-        doc.on("error", reject);
-
-        doc.pipe(writeStream);
-        doc.font("Helvetica").fontSize(11).text(stripHtmlToText(letterContent), {
-            align: "left",
-            lineGap: 4,
-        });
-        doc.end();
-    });
-
-    return relativeFilePath;
 };
 
 router.get(
@@ -695,8 +637,7 @@ router.get("/", verifyToken, verifyRole(["hr", "admin"]), async (req, res) => {
                 wl.reason,
                 wl.signed_title,
                 wl.signed_name,
-                wl.letter_content,
-                wl.file_path,
+            wl.letter_content,
                 COALESCE(e.full_name, u.name) AS employee_name,
                 e.employee_code,
                 e.npwp,
@@ -738,7 +679,6 @@ router.get("/", verifyToken, verifyRole(["hr", "admin"]), async (req, res) => {
                 wl.signed_title,
                 wl.signed_name,
                 wl.letter_content,
-                wl.file_path,
                 employee_name,
                 e.employee_code,
                 e.npwp,
@@ -758,10 +698,16 @@ router.get("/", verifyToken, verifyRole(["hr", "admin"]), async (req, res) => {
               }))
             : rows;
 
+        // Normalize sp_level in response
+        const normalized = filtered.map((r) => ({
+            ...r,
+            sp_level: normalizeSpLevel(r.sp_level) || r.sp_level,
+        }));
+
         res.json({
             message: "Warning letters fetched successfully",
-            total: filtered.length,
-            data: filtered,
+            total: normalized.length,
+            data: normalized,
         });
     } catch (error) {
         console.error(error);
@@ -797,7 +743,6 @@ router.get("/my", verifyToken, verifyRole(["pegawai"]), async (req, res) => {
                 wl.signed_title,
                 wl.signed_name,
                 wl.letter_content,
-                wl.file_path,
                 wl.created_at,
                 COALESCE(e.full_name, u.name) AS employee_name,
                 e.employee_code,
@@ -813,10 +758,15 @@ router.get("/my", verifyToken, verifyRole(["pegawai"]), async (req, res) => {
             [employeeId]
         );
 
+        const normalizedRows = rows.map((r) => ({
+            ...r,
+            sp_level: normalizeSpLevel(r.sp_level) || r.sp_level,
+        }));
+
         return res.json({
             message: "My warning letters fetched successfully",
-            total: rows.length,
-            data: rows,
+            total: normalizedRows.length,
+            data: normalizedRows,
         });
     } catch (error) {
         console.error(error);
@@ -848,7 +798,6 @@ router.get(
                     wl.signed_title,
                     wl.signed_name,
                     wl.letter_content,
-                    wl.file_path,
                     wl.created_at,
                     COALESCE(e.full_name, u.name) AS employee_name,
                     e.employee_code,
@@ -880,10 +829,15 @@ router.get(
 
             const [rows] = await db.promise().query(query, params);
 
+            const normalizedRows = rows.map((r) => ({
+                ...r,
+                sp_level: normalizeSpLevel(r.sp_level) || r.sp_level,
+            }));
+
             return res.json({
                 message: "Team warning letters fetched successfully",
-                total: rows.length,
-                data: rows,
+                total: normalizedRows.length,
+                data: normalizedRows,
             });
         } catch (error) {
             console.error(error);
@@ -926,17 +880,12 @@ router.get(
                     employee_name,
                     e.employee_code,
                     e.npwp,
-                    wl.file_path,
                     p.name,
                     p.level,
                     d.name,
                     issuer.name`,
                 [id]
             );
-
-            if (!rows.length) {
-                return res.status(404).json({ message: "Surat peringatan tidak ditemukan" });
-            }
 
             const letter = rows[0];
             const adminContext = isAdminContext(req);
@@ -971,7 +920,6 @@ router.post("/", verifyToken, verifyRole(["hr", "admin"]), async (req, res) => {
             evaluation_date,
             evaluation_time,
             evaluation_place,
-            file_path,
         } = req.body;
 
         if (!employee_id) {
@@ -994,9 +942,9 @@ router.post("/", verifyToken, verifyRole(["hr", "admin"]), async (req, res) => {
 
         const issuerRole = isAdminContext(req) ? "admin" : "hr";
         const issuerSignature = await getIssuerSignatureInfo(req.user.id, issuerRole);
-        const uploadedFilePath = normalizeUploadedFilePath(file_path);
 
-        const isEvaluasiHR = String(sp_level || "").toLowerCase().trim() === "evaluasi_hr";
+        const normalizedRequestedLevel = normalizeSpLevel(sp_level);
+        const isEvaluasiHR = normalizedRequestedLevel === "evaluasi_hr";
 
         if (isEvaluasiHR) {
             const violationContextEval = await getAlphaViolationContext(employee_id);
@@ -1014,24 +962,17 @@ router.post("/", verifyToken, verifyRole(["hr", "admin"]), async (req, res) => {
                 signedName: issuerSignature.signedName,
             });
 
-            const evalFilePath = uploadedFilePath || (await saveWarningLetterToUploadFolder({
-                letterNumber: evalLetterNumber,
-                employeeId: employee_id,
-                issuedDate: normalizedIssuedDate,
-                letterContent: evalLetterContent,
-            }));
-
             const [evalResult] = await db.promise().query(
                 `INSERT INTO warning_letters (
                     letter_number, sp_level, employee_id, issued_by_user_id, issued_by_role,
                     company_name, company_address, violation_date, issued_date, valid_until,
-                    status, reason, signed_title, signed_name, letter_content, file_path,
+                    status, reason, signed_title, signed_name, letter_content,
                     created_at, updated_at
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'active', NULL, ?, ?, ?, ?, NOW(), NOW())`,
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'active', NULL, ?, ?, ?, NOW(), NOW())`,
                 [
                     evalLetterNumber, "evaluasi_hr", employee_id, req.user.id, issuerRole,
                     COMPANY_NAME, COMPANY_ADDRESS, evalViolationDate, normalizedIssuedDate, normalizedIssuedDate,
-                    issuerSignature.signedTitle, issuerSignature.signedName, evalLetterContent, evalFilePath,
+                    issuerSignature.signedTitle, issuerSignature.signedName, evalLetterContent,
                 ]
             );
 
@@ -1041,8 +982,7 @@ router.post("/", verifyToken, verifyRole(["hr", "admin"]), async (req, res) => {
                         e.employee_code,
                         e.npwp,
                         p.name AS position_name,
-                        d.name AS department_name,
-                        wl.file_path
+                    d.name AS department_name
                  FROM warning_letters wl
                  JOIN employees e ON wl.employee_id = e.id
                  JOIN users u ON e.user_id = u.id
@@ -1074,7 +1014,7 @@ router.post("/", verifyToken, verifyRole(["hr", "admin"]), async (req, res) => {
 
         const inferredLevel =
             normalizeSpLevel(violationContext?.sanctionLevel) || "sp1";
-        const normalizedSpLevel = normalizeSpLevel(sp_level) || inferredLevel;
+        const normalizedSpLevel = normalizedRequestedLevel || inferredLevel;
 
         const letterNumber = await generateLetterNumber(normalizedIssuedDate);
 
@@ -1094,13 +1034,6 @@ router.post("/", verifyToken, verifyRole(["hr", "admin"]), async (req, res) => {
             signedTitle: issuerSignature.signedTitle,
             signedName: issuerSignature.signedName,
         });
-        const filePath = uploadedFilePath || (await saveWarningLetterToUploadFolder({
-            letterNumber,
-            employeeId: employee_id,
-            issuedDate: normalizedIssuedDate,
-            letterContent,
-        }));
-
         const [result] = await db.promise().query(
             `INSERT INTO warning_letters (
                 letter_number,
@@ -1118,10 +1051,9 @@ router.post("/", verifyToken, verifyRole(["hr", "admin"]), async (req, res) => {
                 signed_title,
                 signed_name,
                 letter_content,
-                file_path,
                 created_at,
                 updated_at
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'active', ?, ?, ?, ?, ?, NOW(), NOW())`,
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'active', ?, ?, ?, ?, NOW(), NOW())`,
             [
                 letterNumber,
                 normalizedSpLevel,
@@ -1137,7 +1069,6 @@ router.post("/", verifyToken, verifyRole(["hr", "admin"]), async (req, res) => {
                 issuerSignature.signedTitle,
                 issuerSignature.signedName,
                 letterContent,
-                filePath,
             ]
         );
 
@@ -1147,8 +1078,7 @@ router.post("/", verifyToken, verifyRole(["hr", "admin"]), async (req, res) => {
                     e.employee_code,
                     e.npwp,
                     p.name AS position_name,
-                          d.name AS department_name,
-                          wl.file_path
+                      d.name AS department_name
              FROM warning_letters wl
              JOIN employees e ON wl.employee_id = e.id
              JOIN users u ON e.user_id = u.id

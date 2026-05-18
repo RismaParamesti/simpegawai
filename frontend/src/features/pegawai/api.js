@@ -249,6 +249,15 @@ export const pegawaiApi = {
         }
     },
 
+    async getAttendanceWarningRulesPublic() {
+        try {
+            const response = await axios.get('/api/public/attendance-warning-rules')
+            return response.data || { data: [] }
+        } catch (error) {
+            throw new Error(parseApiError(error, 'Gagal memuat aturan peringatan kehadiran'))
+        }
+    },
+
     async submitSalaryAppeal(payload) {
         try {
             const formData = new FormData()

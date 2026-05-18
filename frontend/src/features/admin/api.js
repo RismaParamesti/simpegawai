@@ -308,6 +308,42 @@ export const adminApi = {
         }
     },
 
+    async getAttendanceWarningRules(params = {}) {
+        try {
+            const response = await axios.get('/api/attendance-warning-rules', { params })
+            return response.data || { data: [] }
+        } catch (error) {
+            throw new Error(parseApiError(error, 'Gagal memuat aturan peringatan kehadiran'))
+        }
+    },
+
+    async createAttendanceWarningRule(payload) {
+        try {
+            const response = await axios.post('/api/attendance-warning-rules', payload)
+            return response.data || {}
+        } catch (error) {
+            throw new Error(parseApiError(error, 'Gagal membuat aturan peringatan kehadiran'))
+        }
+    },
+
+    async updateAttendanceWarningRule(ruleId, payload) {
+        try {
+            const response = await axios.put(`/api/attendance-warning-rules/${ruleId}`, payload)
+            return response.data || {}
+        } catch (error) {
+            throw new Error(parseApiError(error, 'Gagal memperbarui aturan peringatan kehadiran'))
+        }
+    },
+
+    async deleteAttendanceWarningRule(ruleId) {
+        try {
+            const response = await axios.delete(`/api/attendance-warning-rules/${ruleId}`)
+            return response.data || {}
+        } catch (error) {
+            throw new Error(parseApiError(error, 'Gagal menghapus aturan peringatan kehadiran'))
+        }
+    },
+
     async getWarningLetters(params = {}) {
         try {
             const response = await axios.get('/api/warning-letters', { params })
