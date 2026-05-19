@@ -37,10 +37,12 @@ export default function CandidateJobsPage() {
   const [search, setSearch] = useState("");
   const [error, setError] = useState("");
 
+  const [swiperRef, setSwiperRef] = useState(null);
+
   const navigate = useNavigate();
 
   useEffect(() => {
-    dispatch(setPageTitle({ title: 'Lowongan Pekerjaan' }));
+    dispatch(setPageTitle({ title: "Lowongan Pekerjaan" }));
   }, [dispatch]);
 
   useEffect(() => {
@@ -113,7 +115,10 @@ export default function CandidateJobsPage() {
               Login
             </Link>
 
-            <Link to="/register?role=kandidat" className="btn btn-outline btn-primary btn-sm">
+            <Link
+              to="/register?role=kandidat"
+              className="btn btn-outline btn-primary btn-sm"
+            >
               Daftar
             </Link>
           </div>
@@ -144,6 +149,8 @@ animate-gradient"
             type="text"
             placeholder="Cari posisi, departemen..."
             className="input input-bordered w-full max-w-xl text-black shadow-2xl rounded-full px-6 h-14"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
           />
         </div>
       </section>
@@ -182,71 +189,98 @@ animate-gradient"
 
                 {/* ARROW */}
                 <div className="flex gap-3 mt-8">
-                  <button className="btn btn-circle bg-white text-[#F58220] border-none">
+                  <button
+                    className="btn btn-circle bg-white text-[#F58220] border-none hover:bg-gray-100"
+                    onClick={() => swiperRef?.slidePrev()}
+                  >
                     ❮
                   </button>
 
-                  <button className="btn btn-circle bg-white text-[#F58220] border-none">
+                  <button
+                    className="btn btn-circle bg-white text-[#F58220] border-none hover:bg-gray-100"
+                    onClick={() => swiperRef?.slideNext()}
+                  >
                     ❯
                   </button>
                 </div>
               </div>
 
               {/* RIGHT CARD SLIDER */}
-              <div className="flex gap-6 overflow-x-auto scroll-smooth pb-4">
-                {jobs.slice(0, 6).map((job) => (
-                  <div
-                    key={job.id}
-                    className="min-w-[260px] bg-white rounded-2xl shadow-lg p-5 hover:-translate-y-1 hover:shadow-2xl transition duration-300"
-                  >
-                    {/* Logo + time */}
-                    <div className="flex justify-between items-center mb-3">
-                      <div className="w-12 h-12 bg-gray-200 rounded-lg"></div>
+              <Swiper
+                modules={[Navigation]}
+                spaceBetween={24}
+                slidesPerView={1}
+                breakpoints={{
+                  640: { slidesPerView: 1 },
+                  768: { slidesPerView: 2 },
+                  1024: { slidesPerView: 3 },
+                }}
+                onSwiper={setSwiperRef}
+                className="w-full pb-4"
+              >
+                {filteredJobs.slice(0, 6).map((job) => (
+                  <SwiperSlide key={job.id} className="h-full flex">
+                    <div className="bg-white rounded-2xl shadow-lg p-5 hover:-translate-y-1 hover:shadow-2xl transition duration-300 w-full h-[360px] md:h-[380px] lg:h-[420px] flex flex-col justify-between overflow-hidden">
+                      <div className="mb-4">
+                        {/* Logo + time */}
+                        <div className="flex justify-between items-center mb-3">
+                          <div className="w-12 h-12 bg-gray-200 rounded-lg"></div>
 
-                      <span className="text-xs text-gray-400">{timeAgo(job.created_at)}</span>
+                          <span className="text-xs text-gray-400">
+                            {timeAgo(job.created_at)}
+                          </span>
+                        </div>
+
+                        {/* Job Title */}
+                        <h3 className="font-bold text-[#333333] mb-1 line-clamp-2">
+                          {job.title}
+                        </h3>
+
+                        {/* Company */}
+                        <div className="text-sm text-gray-600 mb-2">
+                          {job.position_name}
+                        </div>
+
+                        {/* Location */}
+                        <div className="text-xs text-gray-500 mb-3">
+                          📍 {job.location}
+                        </div>
+
+                        {/* Salary */}
+                        <div className="text-sm font-semibold text-[#333333]">
+                          Kisaran Gaji
+                        </div>
+
+                        <div className="text-sm text-gray-500 mb-3">
+                          {job.salary_range_min && job.salary_range_max
+                            ? `Rp ${parseInt(job.salary_range_min).toLocaleString("id-ID")} - Rp ${parseInt(job.salary_range_max).toLocaleString("id-ID")}`
+                            : "Dirahasiakan"}
+                        </div>
+
+                        {/* Deadline */}
+                        <div className="text-xs text-gray-400 mb-4">
+                          Lamar sebelum{" "}
+                          {job.deadline
+                            ? new Date(job.deadline).toLocaleDateString("id-ID", {
+                                day: "numeric",
+                                month: "long",
+                                year: "numeric",
+                              })
+                            : "-"}
+                        </div>
+                      </div>
+
+                      <button
+                        className="btn w-full text-white border-none"
+                        style={{ background: "#F58220" }}
+                        onClick={() => navigate(`/candidate/jobs/${job.id}`)}
+                      >
+                        Selengkapnya
+                      </button>
                     </div>
-
-                    {/* Job Title */}
-                    <h3 className="font-bold text-[#333333] mb-1 line-clamp-2">
-                      {job.title}
-                    </h3>
-
-                    {/* Company */}
-                    <div className="text-sm text-gray-600 mb-2">
-                      {job.position_name}
-                    </div>
-
-                    {/* Location */}
-                    <div className="text-xs text-gray-500 mb-3">
-                      📍 {job.location}
-                    </div>
-
-                    {/* Salary */}
-                    <div className="text-sm font-semibold text-[#333333]">
-                      Kisaran Gaji
-                    </div>
-
-                    <div className="text-sm text-gray-500 mb-3">
-                      {job.salary_range_min && job.salary_range_max
-                        ? `Rp ${parseInt(job.salary_range_min).toLocaleString('id-ID')} - Rp ${parseInt(job.salary_range_max).toLocaleString('id-ID')}`
-                        : 'Dirahasiakan'}
-                    </div>
-
-                    {/* Deadline */}
-                    <div className="text-xs text-gray-400 mb-4">
-                      Lamar sebelum {job.deadline ? new Date(job.deadline).toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' }) : "-"}
-                    </div>
-
-                    <button
-                      className="btn w-full text-white border-none"
-                      style={{ background: "#F58220" }}
-                      onClick={() => navigate(`/candidate/jobs/${job.id}`)}
-                    >
-                      Selengkapnya
-                    </button>
-                  </div>
+                  </SwiperSlide>
                 ))}
-              </div>
+              </Swiper>
             </div>
           </div>
         </div>
