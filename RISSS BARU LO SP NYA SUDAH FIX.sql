@@ -3,7 +3,7 @@
 -- https://www.phpmyadmin.net/
 --
 -- Host: 127.0.0.1
--- Generation Time: May 18, 2026 at 10:15 PM
+-- Generation Time: May 20, 2026 at 08:17 PM
 -- Server version: 10.4.32-MariaDB
 -- PHP Version: 8.2.12
 
@@ -1537,7 +1537,29 @@ INSERT INTO `activity_logs` (`id`, `user_id`, `username`, `role`, `action`, `mod
 (1632, 12, 'user5', 'hr', 'LOGIN', 'auth', 'Successful login', NULL, NULL, '::1', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/148.0.0.0 Safari/537.36 Edg/148.0.0.0', 'success', NULL, '2026-05-18 19:28:34', '2026-05-18 19:28:34'),
 (1633, 5, 'shafira', 'unknown', 'LOGIN', 'auth', 'Failed login attempt - invalid password', NULL, NULL, '::1', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/148.0.0.0 Safari/537.36 Edg/148.0.0.0', 'failed', 'Invalid password', '2026-05-18 19:29:32', '2026-05-18 19:29:32'),
 (1634, 5, 'shafira', 'pegawai', 'LOGIN', 'auth', 'Successful login', NULL, NULL, '::1', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/148.0.0.0 Safari/537.36 Edg/148.0.0.0', 'success', NULL, '2026-05-18 19:29:34', '2026-05-18 19:29:34'),
-(1635, 5, 'shafira', 'pegawai', 'LOGIN', 'auth', 'Successful login', NULL, NULL, '::1', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/148.0.0.0 Safari/537.36 Edg/148.0.0.0', 'success', NULL, '2026-05-18 19:48:27', '2026-05-18 19:48:27');
+(1635, 5, 'shafira', 'pegawai', 'LOGIN', 'auth', 'Successful login', NULL, NULL, '::1', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/148.0.0.0 Safari/537.36 Edg/148.0.0.0', 'success', NULL, '2026-05-18 19:48:27', '2026-05-18 19:48:27'),
+(1636, 5, 'shafira', 'pegawai', 'LOGIN', 'auth', 'Successful login', NULL, NULL, '::1', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/148.0.0.0 Safari/537.36 Edg/148.0.0.0', 'success', NULL, '2026-05-19 06:39:10', '2026-05-19 06:39:10'),
+(1637, 5, 'shafira', 'unknown', 'LOGIN', 'auth', 'Failed login attempt - invalid password', NULL, NULL, '::1', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/148.0.0.0 Safari/537.36 Edg/148.0.0.0', 'failed', 'Invalid password', '2026-05-19 09:09:22', '2026-05-19 09:09:22'),
+(1638, 5, 'shafira', 'pegawai', 'LOGIN', 'auth', 'Successful login', NULL, NULL, '::1', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/148.0.0.0 Safari/537.36 Edg/148.0.0.0', 'success', NULL, '2026-05-19 09:09:22', '2026-05-19 09:09:22'),
+(1639, 9, 'user4', 'finance', 'LOGIN', 'auth', 'Successful login', NULL, NULL, '::1', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/148.0.0.0 Safari/537.36 Edg/148.0.0.0', 'success', NULL, '2026-05-20 03:04:00', '2026-05-20 03:04:00'),
+(1640, 13, 'user6', 'admin', 'LOGIN', 'auth', 'Successful login', NULL, NULL, '::1', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/148.0.0.0 Safari/537.36 Edg/148.0.0.0', 'success', NULL, '2026-05-20 03:04:12', '2026-05-20 03:04:12'),
+(1641, 5, 'shafira', 'unknown', 'LOGIN', 'auth', 'Failed login attempt - invalid password', NULL, NULL, '::1', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/148.0.0.0 Safari/537.36 Edg/148.0.0.0', 'failed', 'Invalid password', '2026-05-20 06:36:19', '2026-05-20 06:36:19'),
+(1642, 5, 'shafira', 'pegawai', 'LOGIN', 'auth', 'Successful login', NULL, NULL, '::1', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/148.0.0.0 Safari/537.36 Edg/148.0.0.0', 'success', NULL, '2026-05-20 06:36:20', '2026-05-20 06:36:20'),
+(1643, 9, 'user4', 'finance', 'LOGIN', 'auth', 'Successful login', NULL, NULL, '::1', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/148.0.0.0 Safari/537.36 Edg/148.0.0.0', 'success', NULL, '2026-05-20 06:59:01', '2026-05-20 06:59:01'),
+(1644, 12, 'user5', 'hr', 'LOGIN', 'auth', 'Successful login', NULL, NULL, '::1', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/148.0.0.0 Safari/537.36 Edg/148.0.0.0', 'success', NULL, '2026-05-20 14:49:45', '2026-05-20 14:49:45'),
+(1645, 5, 'shafira', 'pegawai', 'LOGIN', 'auth', 'Successful login', NULL, NULL, '::1', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/148.0.0.0 Safari/537.36 Edg/148.0.0.0', 'success', NULL, '2026-05-20 15:20:54', '2026-05-20 15:20:54'),
+(1646, 8, 'user3', 'pegawai', 'LOGIN', 'auth', 'Successful login', NULL, NULL, '::1', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/148.0.0.0 Safari/537.36 Edg/148.0.0.0', 'success', NULL, '2026-05-20 15:47:43', '2026-05-20 15:47:43'),
+(1647, 5, 'shafira', 'unknown', 'LOGIN', 'auth', 'Failed login attempt - invalid password', NULL, NULL, '::1', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/148.0.0.0 Safari/537.36 Edg/148.0.0.0', 'failed', 'Invalid password', '2026-05-20 16:01:20', '2026-05-20 16:01:20'),
+(1648, 5, 'shafira', 'pegawai', 'LOGIN', 'auth', 'Successful login', NULL, NULL, '::1', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/148.0.0.0 Safari/537.36 Edg/148.0.0.0', 'success', NULL, '2026-05-20 16:01:20', '2026-05-20 16:01:20'),
+(1649, 8, 'user3', 'pegawai', 'LOGIN', 'auth', 'Successful login', NULL, NULL, '::1', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/148.0.0.0 Safari/537.36 Edg/148.0.0.0', 'success', NULL, '2026-05-20 16:01:59', '2026-05-20 16:01:59'),
+(1650, 8, 'user3', 'pegawai', 'LOGIN', 'auth', 'Successful login', NULL, NULL, '::1', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/148.0.0.0 Safari/537.36 Edg/148.0.0.0', 'success', NULL, '2026-05-20 16:02:40', '2026-05-20 16:02:40'),
+(1651, 5, 'shafira', 'pegawai', 'LOGIN', 'auth', 'Successful login', NULL, NULL, '::1', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/148.0.0.0 Safari/537.36 Edg/148.0.0.0', 'success', NULL, '2026-05-20 16:02:57', '2026-05-20 16:02:57'),
+(1652, 8, 'user3', 'pegawai', 'LOGIN', 'auth', 'Successful login', NULL, NULL, '::1', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/148.0.0.0 Safari/537.36 Edg/148.0.0.0', 'success', NULL, '2026-05-20 16:05:35', '2026-05-20 16:05:35'),
+(1653, 9, 'user4', 'finance', 'LOGIN', 'auth', 'Successful login', NULL, NULL, '::1', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/148.0.0.0 Safari/537.36 Edg/148.0.0.0', 'success', NULL, '2026-05-20 16:05:51', '2026-05-20 16:05:51'),
+(1654, 12, 'user5', 'hr', 'LOGIN', 'auth', 'Successful login', NULL, NULL, '::1', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/148.0.0.0 Safari/537.36 Edg/148.0.0.0', 'success', NULL, '2026-05-20 16:41:20', '2026-05-20 16:41:20'),
+(1655, 5, 'shafira', 'pegawai', 'LOGIN', 'auth', 'Successful login', NULL, NULL, '::1', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/148.0.0.0 Safari/537.36 Edg/148.0.0.0', 'success', NULL, '2026-05-20 17:03:32', '2026-05-20 17:03:32'),
+(1656, 5, 'shafira', 'pegawai', 'LOGIN', 'auth', 'Successful login', NULL, NULL, '::1', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/148.0.0.0 Safari/537.36 Edg/148.0.0.0', 'success', NULL, '2026-05-20 17:06:03', '2026-05-20 17:06:03'),
+(1657, 8, 'user3', 'pegawai', 'LOGIN', 'auth', 'Successful login', NULL, NULL, '::1', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/148.0.0.0 Safari/537.36 Edg/148.0.0.0', 'success', NULL, '2026-05-20 17:14:37', '2026-05-20 17:14:37');
 
 -- --------------------------------------------------------
 
@@ -3910,7 +3932,42 @@ INSERT INTO `attendance` (`id`, `employee_id`, `date`, `check_in`, `check_out`, 
 (2585, 9, '2026-05-18', NULL, NULL, 'alpha', 0, 0, NULL, 0.00, NULL, NULL, '2026-05-19 00:03:09', '2026-05-18 17:03:09'),
 (2587, 12, '2026-05-15', NULL, NULL, 'alpha', 0, 0, NULL, 0.00, NULL, NULL, '2026-05-19 00:54:40', '2026-05-18 17:54:40'),
 (2589, 12, '2026-05-16', NULL, NULL, 'alpha', 0, 0, NULL, 0.00, NULL, NULL, '2026-05-19 00:54:40', '2026-05-18 17:54:40'),
-(2591, 12, '2026-05-18', NULL, NULL, 'alpha', 0, 0, NULL, 0.00, NULL, NULL, '2026-05-19 00:54:40', '2026-05-18 17:54:40');
+(2591, 12, '2026-05-18', NULL, NULL, 'alpha', 0, 0, NULL, 0.00, NULL, NULL, '2026-05-19 00:54:40', '2026-05-18 17:54:40'),
+(2593, 5, '2026-05-19', NULL, NULL, 'alpha', 0, 0, NULL, 0.00, NULL, NULL, '2026-05-20 13:36:21', '2026-05-20 06:36:21'),
+(2595, 13, '2026-05-15', NULL, NULL, 'alpha', 0, 0, NULL, 0.00, NULL, NULL, '2026-05-20 13:59:14', '2026-05-20 06:59:14'),
+(2596, 13, '2026-05-16', NULL, NULL, 'alpha', 0, 0, NULL, 0.00, NULL, NULL, '2026-05-20 13:59:14', '2026-05-20 06:59:14'),
+(2597, 13, '2026-05-18', NULL, NULL, 'alpha', 0, 0, NULL, 0.00, NULL, NULL, '2026-05-20 13:59:14', '2026-05-20 06:59:14'),
+(2598, 13, '2026-05-19', NULL, NULL, 'alpha', 0, 0, NULL, 0.00, NULL, NULL, '2026-05-20 13:59:14', '2026-05-20 06:59:14'),
+(2599, 8, '2026-05-18', NULL, NULL, 'alpha', 0, 0, NULL, 0.00, NULL, NULL, '2026-05-20 13:59:14', '2026-05-20 06:59:14'),
+(2600, 8, '2026-05-19', NULL, NULL, 'alpha', 0, 0, NULL, 0.00, NULL, NULL, '2026-05-20 13:59:14', '2026-05-20 06:59:14'),
+(2601, 1, '2026-05-15', NULL, NULL, 'alpha', 0, 0, NULL, 0.00, NULL, NULL, '2026-05-20 13:59:14', '2026-05-20 06:59:14'),
+(2602, 1, '2026-05-16', NULL, NULL, 'alpha', 0, 0, NULL, 0.00, NULL, NULL, '2026-05-20 13:59:14', '2026-05-20 06:59:14'),
+(2603, 1, '2026-05-18', NULL, NULL, 'alpha', 0, 0, NULL, 0.00, NULL, NULL, '2026-05-20 13:59:14', '2026-05-20 06:59:14'),
+(2604, 1, '2026-05-19', NULL, NULL, 'alpha', 0, 0, NULL, 0.00, NULL, NULL, '2026-05-20 13:59:14', '2026-05-20 06:59:14'),
+(2605, 3, '2026-05-15', NULL, NULL, 'alpha', 0, 0, NULL, 0.00, NULL, NULL, '2026-05-20 13:59:14', '2026-05-20 06:59:14'),
+(2606, 3, '2026-05-16', NULL, NULL, 'alpha', 0, 0, NULL, 0.00, NULL, NULL, '2026-05-20 13:59:14', '2026-05-20 06:59:14'),
+(2607, 3, '2026-05-18', NULL, NULL, 'alpha', 0, 0, NULL, 0.00, NULL, NULL, '2026-05-20 13:59:14', '2026-05-20 06:59:14'),
+(2608, 3, '2026-05-19', NULL, NULL, 'alpha', 0, 0, NULL, 0.00, NULL, NULL, '2026-05-20 13:59:14', '2026-05-20 06:59:14'),
+(2609, 7, '2026-05-15', NULL, NULL, 'alpha', 0, 0, NULL, 0.00, NULL, NULL, '2026-05-20 13:59:14', '2026-05-20 06:59:14'),
+(2610, 7, '2026-05-16', NULL, NULL, 'alpha', 0, 0, NULL, 0.00, NULL, NULL, '2026-05-20 13:59:14', '2026-05-20 06:59:14'),
+(2611, 7, '2026-05-18', NULL, NULL, 'alpha', 0, 0, NULL, 0.00, NULL, NULL, '2026-05-20 13:59:14', '2026-05-20 06:59:14'),
+(2612, 7, '2026-05-19', NULL, NULL, 'alpha', 0, 0, NULL, 0.00, NULL, NULL, '2026-05-20 13:59:14', '2026-05-20 06:59:14'),
+(2613, 2, '2026-05-15', NULL, NULL, 'alpha', 0, 0, NULL, 0.00, NULL, NULL, '2026-05-20 13:59:14', '2026-05-20 06:59:14'),
+(2614, 2, '2026-05-16', NULL, NULL, 'alpha', 0, 0, NULL, 0.00, NULL, NULL, '2026-05-20 13:59:14', '2026-05-20 06:59:14'),
+(2615, 2, '2026-05-18', NULL, NULL, 'alpha', 0, 0, NULL, 0.00, NULL, NULL, '2026-05-20 13:59:14', '2026-05-20 06:59:14'),
+(2616, 2, '2026-05-19', NULL, NULL, 'alpha', 0, 0, NULL, 0.00, NULL, NULL, '2026-05-20 13:59:14', '2026-05-20 06:59:14'),
+(2617, 9, '2026-05-19', NULL, NULL, 'alpha', 0, 0, NULL, 0.00, NULL, NULL, '2026-05-20 13:59:14', '2026-05-20 06:59:14'),
+(2618, 12, '2026-05-19', NULL, NULL, 'alpha', 0, 0, NULL, 0.00, NULL, NULL, '2026-05-20 13:59:14', '2026-05-20 06:59:14'),
+(2619, 15, '2026-05-15', NULL, NULL, 'alpha', 0, 0, NULL, 0.00, NULL, NULL, '2026-05-20 13:59:14', '2026-05-20 06:59:14'),
+(2620, 15, '2026-05-16', NULL, NULL, 'alpha', 0, 0, NULL, 0.00, NULL, NULL, '2026-05-20 13:59:14', '2026-05-20 06:59:14'),
+(2621, 15, '2026-05-18', NULL, NULL, 'alpha', 0, 0, NULL, 0.00, NULL, NULL, '2026-05-20 13:59:14', '2026-05-20 06:59:14'),
+(2622, 15, '2026-05-19', NULL, NULL, 'alpha', 0, 0, NULL, 0.00, NULL, NULL, '2026-05-20 13:59:14', '2026-05-20 06:59:14'),
+(2623, 16, '2026-05-15', NULL, NULL, 'alpha', 0, 0, NULL, 0.00, NULL, NULL, '2026-05-20 13:59:14', '2026-05-20 06:59:14'),
+(2624, 16, '2026-05-16', NULL, NULL, 'alpha', 0, 0, NULL, 0.00, NULL, NULL, '2026-05-20 13:59:14', '2026-05-20 06:59:14'),
+(2625, 16, '2026-05-18', NULL, NULL, 'alpha', 0, 0, NULL, 0.00, NULL, NULL, '2026-05-20 13:59:14', '2026-05-20 06:59:14'),
+(2626, 16, '2026-05-19', NULL, NULL, 'alpha', 0, 0, NULL, 0.00, NULL, NULL, '2026-05-20 13:59:14', '2026-05-20 06:59:14'),
+(2627, 5, '2026-05-20', NULL, NULL, 'alpha', 0, 0, NULL, 0.00, NULL, NULL, '2026-05-21 00:03:32', '2026-05-20 17:03:32'),
+(2629, 8, '2026-05-20', NULL, NULL, 'alpha', 0, 0, NULL, 0.00, NULL, NULL, '2026-05-21 00:14:37', '2026-05-20 17:14:37');
 
 -- --------------------------------------------------------
 
@@ -3928,6 +3985,7 @@ CREATE TABLE `attendance_warning_rules` (
   `min_accumulated_alpha` int(11) NOT NULL DEFAULT 0,
   `min_accumulated_late` int(11) NOT NULL DEFAULT 0,
   `sanction_level` varchar(50) NOT NULL DEFAULT 'none',
+  `sp_duration_months` int(11) NOT NULL DEFAULT 6,
   `recommendation` text DEFAULT NULL,
   `effective_date` date NOT NULL,
   `is_active` tinyint(1) NOT NULL DEFAULT 1,
@@ -3942,11 +4000,11 @@ CREATE TABLE `attendance_warning_rules` (
 -- Dumping data for table `attendance_warning_rules`
 --
 
-INSERT INTO `attendance_warning_rules` (`id`, `rule_code`, `rule_name`, `description`, `min_consecutive_alpha`, `min_consecutive_late`, `min_accumulated_alpha`, `min_accumulated_late`, `sanction_level`, `recommendation`, `effective_date`, `is_active`, `notes`, `created_by_user_id`, `updated_by_user_id`, `created_at`, `updated_at`) VALUES
-(1, 'AWR-2026-001', 'Pelanggaran alpha berulang - SP1', 'Aturan awal untuk pegawai yang mulai menunjukkan pola alpha berulang.', 3, 3, 3, 4, 'sp1', 'Berikan surat peringatan pertama dan monitoring kehadiran harian.', '2026-05-19', 1, 'Digunakan sebagai baseline peringatan kehadiran.', NULL, NULL, '2026-05-18 17:23:11', '2026-05-18 17:23:11'),
-(2, 'AWR-2026-002', 'Pelanggaran alpha berulang - SP2', 'Aturan untuk pegawai yang sudah melewati batas SP1.', 5, 5, 5, 6, 'sp2', 'Naikkan ke SP2 dan lakukan pendampingan langsung dari atasan.', '2026-05-19', 1, 'Disesuaikan dengan kebijakan unit kerja.', NULL, NULL, '2026-05-18 17:23:11', '2026-05-18 17:23:11'),
-(3, 'AWR-2026-003', 'Pelanggaran alpha berulang - SP3', 'Aturan untuk pegawai dengan tingkat alpha tinggi dan berkelanjutan.', 6, 7, 6, 8, 'sp3', 'Naikkan ke SP3 dan lakukan tindakan disiplin lanjutan sesuai kebijakan perusahaan.', '2026-05-19', 1, 'Menjadi batas eskalasi tertinggi pada aturan ini.', NULL, NULL, '2026-05-18 17:23:11', '2026-05-18 17:23:11'),
-(4, 'AWR-2026-004', 'Tindakan Lanjutan', 'Escalation: pegawai yang melewati ambang SP3 atau menunjukkan pola serius perlu evaluasi HR atau tindakan lanjutan.', 7, 8, 7, 10, 'tindak_lanjut', 'Jadwalkan evaluasi HR; pertimbangkan tindakan lanjutan sesuai kebijakan perusahaan.', '2026-05-19', 1, 'Eskalasi setelah SP3.', NULL, 12, '2026-05-18 18:51:20', '2026-05-18 19:29:03');
+INSERT INTO `attendance_warning_rules` (`id`, `rule_code`, `rule_name`, `description`, `min_consecutive_alpha`, `min_consecutive_late`, `min_accumulated_alpha`, `min_accumulated_late`, `sanction_level`, `sp_duration_months`, `recommendation`, `effective_date`, `is_active`, `notes`, `created_by_user_id`, `updated_by_user_id`, `created_at`, `updated_at`) VALUES
+(1, 'AWR-2026-001', 'Pelanggaran alpha berulang - SP1', 'Aturan awal untuk pegawai yang mulai menunjukkan pola alpha berulang.', 3, 3, 3, 4, 'sp1', 3, 'Berikan surat peringatan pertama dan monitoring kehadiran harian.', '2026-05-19', 1, 'Digunakan sebagai baseline peringatan kehadiran.', NULL, NULL, '2026-05-18 17:23:11', '2026-05-20 16:35:52'),
+(2, 'AWR-2026-002', 'Pelanggaran alpha berulang - SP2', 'Aturan untuk pegawai yang sudah melewati batas SP1.', 5, 5, 5, 6, 'sp2', 6, 'Naikkan ke SP2 dan lakukan pendampingan langsung dari atasan.', '2026-05-19', 1, 'Disesuaikan dengan kebijakan unit kerja.', NULL, NULL, '2026-05-18 17:23:11', '2026-05-18 17:23:11'),
+(3, 'AWR-2026-003', 'Pelanggaran alpha berulang - SP3', 'Aturan untuk pegawai dengan tingkat alpha tinggi dan berkelanjutan.', 6, 7, 6, 8, 'sp3', 6, 'Naikkan ke SP3 dan lakukan tindakan disiplin lanjutan sesuai kebijakan perusahaan.', '2026-05-19', 1, 'Menjadi batas eskalasi tertinggi pada aturan ini.', NULL, NULL, '2026-05-18 17:23:11', '2026-05-18 17:23:11'),
+(4, 'AWR-2026-004', 'Tindakan Lanjutan', 'Escalation: pegawai yang melewati ambang SP3 atau menunjukkan pola serius perlu evaluasi HR atau tindakan lanjutan.', 7, 8, 7, 10, 'tindak_lanjut', 12, 'Jadwalkan evaluasi HR; pertimbangkan tindakan lanjutan sesuai kebijakan perusahaan.', '2026-05-19', 1, 'Eskalasi setelah SP3.', NULL, 12, '2026-05-18 18:51:20', '2026-05-20 16:36:27');
 
 -- --------------------------------------------------------
 
@@ -4097,17 +4155,17 @@ CREATE TABLE `employees` (
 --
 
 INSERT INTO `employees` (`id`, `user_id`, `employee_code`, `full_name`, `gender`, `birth_place`, `date_of_birth`, `marital_status`, `nationality`, `address`, `phone`, `email`, `nik`, `npwp`, `bank_account`, `bpjs_number`, `account_holder_name`, `bank_name`, `ktp_document`, `diploma_document`, `employment_contract_document`, `position_id`, `join_date`, `basic_salary`, `employment_status`, `working_hours_id`, `annual_leave_quota`, `remaining_leave_quota`, `alpha_consecutive_days`, `alpha_accumulated_days`, `alpha_sanction_level`, `alpha_last_evaluated_at`, `quota_reset_date`, `created_at`, `updated_at`, `deleted_at`) VALUES
-(1, 2, 'EMP001', 'Yuliana Putri ', NULL, NULL, NULL, NULL, 'Indonesian', NULL, '08123456789', 'yulianaputri@otakkanan.co.id', NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, 4, '2026-01-09', 8000000.00, 'permanent', 1, 12, 12, 3, 81, 'evaluasi_hr', '2026-05-15 01:19:54', NULL, '2026-01-12 14:43:08', '2026-05-15 01:19:54', NULL),
-(2, 1, 'EMP002', 'Dimas Setia Budi', NULL, NULL, NULL, NULL, 'Indonesian', NULL, '08111111111', 'dimassetiabudi@otakkanan.co.id', NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, 9, NULL, 7000000.00, 'permanent', 1, 12, 12, 37, 81, 'evaluasi_hr', '2026-05-14 23:59:00', NULL, '2026-01-12 14:44:10', '2026-05-14 23:59:00', NULL),
-(3, 3, 'EMP003', 'Gita Safitri', NULL, NULL, NULL, NULL, 'Indonesian', NULL, '22222222', 'gitasafitri@otakkanan.co.id', NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, 4, '2026-01-10', 8000000.00, 'permanent', 1, 12, 12, 3, 56, 'evaluasi_hr', '2026-05-14 23:59:00', NULL, '2026-01-13 14:50:44', '2026-05-14 23:59:00', NULL),
-(5, 5, 'EMP004', 'shafira', 'female', 'Jember', '2003-04-20', 'single', 'Indonesian', 'GWA 1', '0911097213921', 'shafira@gmail.com', '9012840194819041', '092438', '0291840219', '9082018421', 'Reihan Rachma Shafira', 'BNI', 'uploads/employee_documents/ktp_document-1772111243307-844121372.pdf', 'uploads/employee_documents/diploma_document-1772469288003-392959580.pdf', NULL, 5, '2026-02-16', 7000000.00, 'permanent', 1, 12, 11, 0, 46, 'tindak_lanjut', '2026-05-19 03:06:46', NULL, '2026-02-20 16:21:34', '2026-05-19 03:06:46', NULL),
-(7, 7, 'EMP005', 'aku', NULL, NULL, NULL, NULL, 'Indonesian', NULL, '0824019248', 'user2@gmail.com', NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, 7, '2026-02-20', 9000000.00, 'permanent', 1, 12, 12, 37, 63, 'evaluasi_hr', '2026-05-14 23:09:00', NULL, '2026-02-22 21:17:07', '2026-05-14 23:09:00', NULL),
-(8, 8, 'EMP006', 'user3', 'male', NULL, NULL, NULL, 'Indonesian', NULL, '08324209432', 'user3@gmail.com', NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, 3, '2026-02-19', 10000000.00, 'permanent', 1, 12, 11, 11, 48, 'evaluasi_hr', '2026-05-18 20:23:46', NULL, '2026-02-22 21:20:01', '2026-05-18 20:23:46', NULL),
-(9, 9, 'EMP007', 'user4', NULL, NULL, NULL, NULL, 'Indonesian', NULL, '-', 'user4@gmail.com', NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, 10, '2026-02-24', 9000000.00, 'permanent', 1, 12, 12, 33, 50, 'evaluasi_hr', '2026-05-19 00:03:09', NULL, '2026-02-25 16:11:00', '2026-05-19 00:03:09', NULL),
-(12, 12, 'EMP008', 'HR', NULL, NULL, NULL, NULL, 'Indonesian', NULL, '-', 'user5@gmail.com', NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, 12, '2026-02-27', 8500000.00, 'permanent', 1, 12, 12, 6, 46, 'evaluasi_hr', '2026-05-19 01:25:48', NULL, '2026-02-27 15:18:28', '2026-05-19 01:25:48', NULL),
-(13, 13, 'EMP009', 'DIREKTUR', 'male', NULL, NULL, NULL, 'Indonesian', NULL, '-', 'user6@gmail.com', NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, 2, '2026-02-27', 15000000.00, 'permanent', 1, 12, 12, 37, 54, 'evaluasi_hr', '2026-05-15 00:55:06', NULL, '2026-02-27 15:28:56', '2026-05-15 00:55:06', NULL),
-(15, 16, 'EMP010', 'user7', NULL, NULL, NULL, NULL, 'Indonesian', NULL, '-', 'user7@gmail.com', NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, 13, '2026-03-08', 5500000.00, 'permanent', 1, 12, 12, 3, 48, 'evaluasi_hr', '2026-05-14 23:59:00', NULL, '2026-03-10 23:20:42', '2026-05-14 23:59:00', NULL),
-(16, 22, 'EMP011', 'user8', NULL, NULL, NULL, NULL, 'Indonesian', NULL, NULL, 'user8@gmail.com', NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, 14, '2026-05-18', 0.00, 'permanent', 1, 12, 12, 0, 0, 'none', '2026-05-15 01:16:54', NULL, '2026-05-15 01:16:09', '2026-05-15 01:16:54', NULL);
+(1, 2, 'EMP001', 'Yuliana Putri ', NULL, NULL, NULL, NULL, 'Indonesian', NULL, '08123456789', 'yulianaputri@otakkanan.co.id', NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, 4, '2026-01-09', 8000000.00, 'permanent', 1, 12, 12, 7, 85, 'tindak_lanjut', '2026-05-20 22:16:43', NULL, '2026-01-12 14:43:08', '2026-05-20 22:16:43', NULL),
+(2, 1, 'EMP002', 'Dimas Setia Budi', NULL, NULL, NULL, NULL, 'Indonesian', NULL, '08111111111', 'dimassetiabudi@otakkanan.co.id', NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, 9, NULL, 7000000.00, 'permanent', 1, 12, 12, 41, 85, 'tindak_lanjut', '2026-05-20 22:16:43', NULL, '2026-01-12 14:44:10', '2026-05-20 22:16:43', NULL),
+(3, 3, 'EMP003', 'Gita Safitri', NULL, NULL, NULL, NULL, 'Indonesian', NULL, '22222222', 'gitasafitri@otakkanan.co.id', NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, 4, '2026-01-10', 8000000.00, 'permanent', 1, 12, 12, 7, 60, 'tindak_lanjut', '2026-05-20 22:16:43', NULL, '2026-01-13 14:50:44', '2026-05-20 22:16:43', NULL),
+(5, 5, 'EMP004', 'shafira', 'female', 'Jember', '2003-04-20', 'single', 'Indonesian', 'GWA 1', '0911097213921', 'shafira@gmail.com', '9012840194819041', '092438', '0291840219', '9082018421', 'Reihan Rachma Shafira', 'BNI', 'uploads/employee_documents/ktp_document-1772111243307-844121372.pdf', 'uploads/employee_documents/diploma_document-1772469288003-392959580.pdf', NULL, 5, '2026-02-16', 7000000.00, 'permanent', 1, 12, 11, 2, 48, 'tindak_lanjut', '2026-05-21 00:06:24', NULL, '2026-02-20 16:21:34', '2026-05-21 00:06:24', NULL),
+(7, 7, 'EMP005', 'aku', NULL, NULL, NULL, NULL, 'Indonesian', NULL, '0824019248', 'user2@gmail.com', NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, 7, '2026-02-20', 9000000.00, 'permanent', 1, 12, 12, 41, 85, 'tindak_lanjut', '2026-05-20 22:16:44', NULL, '2026-02-22 21:17:07', '2026-05-20 22:16:44', NULL),
+(8, 8, 'EMP006', 'user3', 'male', NULL, NULL, NULL, 'Indonesian', NULL, '08324209432', 'user3@gmail.com', NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, 3, '2026-02-19', 10000000.00, 'permanent', 1, 12, 11, 14, 51, 'tindak_lanjut', '2026-05-21 00:43:08', NULL, '2026-02-22 21:20:01', '2026-05-21 00:43:08', NULL),
+(9, 9, 'EMP007', 'user4', NULL, NULL, NULL, NULL, 'Indonesian', NULL, '-', 'user4@gmail.com', NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, 10, '2026-02-24', 9000000.00, 'permanent', 1, 12, 12, 34, 51, 'tindak_lanjut', '2026-05-20 23:06:03', NULL, '2026-02-25 16:11:00', '2026-05-20 23:06:03', NULL),
+(12, 12, 'EMP008', 'HR', NULL, NULL, NULL, NULL, 'Indonesian', NULL, '-', 'user5@gmail.com', NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, 12, '2026-02-27', 8500000.00, 'permanent', 1, 12, 12, 7, 47, 'tindak_lanjut', '2026-05-20 23:59:36', NULL, '2026-02-27 15:18:28', '2026-05-20 23:59:36', NULL),
+(13, 13, 'EMP009', 'DIREKTUR', 'male', NULL, NULL, NULL, 'Indonesian', NULL, '-', 'user6@gmail.com', NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, 2, '2026-02-27', 15000000.00, 'permanent', 1, 12, 12, 41, 80, 'tindak_lanjut', '2026-05-20 22:16:44', NULL, '2026-02-27 15:28:56', '2026-05-20 22:16:44', NULL),
+(15, 16, 'EMP010', 'user7', NULL, NULL, NULL, NULL, 'Indonesian', NULL, '-', 'user7@gmail.com', NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, 13, '2026-03-08', 5500000.00, 'permanent', 1, 12, 12, 7, 82, 'tindak_lanjut', '2026-05-20 22:16:44', NULL, '2026-03-10 23:20:42', '2026-05-20 22:16:44', NULL),
+(16, 22, 'EMP011', 'user8', NULL, NULL, NULL, NULL, 'Indonesian', NULL, NULL, 'user8@gmail.com', NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, 14, '2026-05-18', 0.00, 'permanent', 1, 12, 12, 4, 4, 'sp1', '2026-05-20 22:16:44', NULL, '2026-05-15 01:16:09', '2026-05-20 22:16:44', NULL);
 
 -- --------------------------------------------------------
 
@@ -4662,37 +4720,32 @@ INSERT INTO `user_roles` (`user_id`, `role_id`) VALUES
 
 CREATE TABLE `warning_letters` (
   `id` int(11) NOT NULL,
-  `letter_number` varchar(100) NOT NULL,
-  `sp_level` enum('sp1','sp2','sp3','evaluasi_hr') NOT NULL,
+  `auto_letter_number` varchar(100) DEFAULT NULL,
   `employee_id` int(11) NOT NULL,
-  `issued_by_user_id` int(11) NOT NULL,
-  `issued_by_role` enum('hr','admin') NOT NULL,
-  `company_name` varchar(150) NOT NULL DEFAULT 'PT OTAK KANAN',
-  `company_address` varchar(255) NOT NULL DEFAULT 'Graha Pena, Ruang 1503, Jl. Ahmad Yani No.88, Ketintang, Kec. Gayungan, Surabaya, Jawa Timur 60234',
-  `violation_date` date NOT NULL,
-  `issued_date` date NOT NULL,
-  `valid_until` date NOT NULL,
-  `status` enum('active','expired','revoked') NOT NULL DEFAULT 'active',
-  `reason` text DEFAULT NULL,
-  `signed_title` varchar(150) DEFAULT NULL,
-  `signed_name` varchar(150) DEFAULT NULL,
-  `letter_content` longtext NOT NULL,
-  `file_path` varchar(255) DEFAULT NULL,
+  `rule_id` int(11) DEFAULT NULL,
+  `rule_code` varchar(100) DEFAULT NULL,
+  `sp_level` varchar(50) NOT NULL,
+  `violation_date` datetime DEFAULT NULL,
+  `issued_date` datetime DEFAULT NULL,
+  `valid_until` datetime DEFAULT NULL,
+  `status` varchar(50) NOT NULL DEFAULT 'active',
+  `evidence_snapshot` longtext CHARACTER SET utf8mb4 COLLATE utf8mb4_bin DEFAULT NULL CHECK (json_valid(`evidence_snapshot`)),
+  `generated_by` varchar(50) NOT NULL DEFAULT 'hr',
   `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
   `updated_at` timestamp NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp()
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 --
 -- Dumping data for table `warning_letters`
 --
 
-INSERT INTO `warning_letters` (`id`, `letter_number`, `sp_level`, `employee_id`, `issued_by_user_id`, `issued_by_role`, `company_name`, `company_address`, `violation_date`, `issued_date`, `valid_until`, `status`, `reason`, `signed_title`, `signed_name`, `letter_content`, `file_path`, `created_at`, `updated_at`) VALUES
-(3, '001/SP-HRD/III/2026', 'sp3', 5, 12, 'hr', 'PT OTAK KANAN', 'Graha Pena, Ruang 1503, Jl. Ahmad Yani No.88, Ketintang, Kec. Gayungan, Surabaya, Jawa Timur 60234', '2026-03-03', '2026-03-07', '2026-09-07', 'active', NULL, 'HR & GA Manager', 'HR', 'PT OTAK KANAN\nGraha Pena, Ruang 1503, Jl. Ahmad Yani No.88, Ketintang, Kec. Gayungan, Surabaya, Jawa Timur 60234\n\nSURAT PERINGATAN KETIGA (SP3)\nNo: 001/SP-HRD/III/2026\n\nDiberikan kepada:\nNama       : shafira\nDepartemen : Operations\nPosisi     : Project Manager\nNPWP       : 092438\n\nBerdasarkan catatan kehadiran, Saudara tidak masuk kerja tanpa\nketerangan (alpha) secara berturut-turut pada tanggal\n03 Maret 2026 s.d. 30 April 2026.\n\nSehubungan dengan hal tersebut, perusahaan memberikan SURAT PERINGATAN KETIGA (SP3).\nDiharapkan Saudara tidak mengulangi pelanggaran tersebut dan meningkatkan\nkedisiplinan kerja.\n\nSurat peringatan ini berlaku selama 6 bulan sejak tanggal diterbitkan.\n\nSurabaya, 07 Maret 2026\n\nHR & GA Manager\n(HR)', 'uploads/warning_letters/sp-001-SP-HRD-III-2026-5-2026-03-07.pdf', '2026-03-06 17:51:40', '2026-03-06 17:51:40'),
-(4, '002/SP-HRD/III/2026', 'sp1', 2, 12, 'hr', 'PT OTAK KANAN', 'Graha Pena, Ruang 1503, Jl. Ahmad Yani No.88, Ketintang, Kec. Gayungan, Surabaya, Jawa Timur 60234', '2026-02-02', '2026-03-10', '2026-09-10', 'active', NULL, 'HR & GA Manager', 'HR', 'PT OTAK KANAN\nGraha Pena, Ruang 1503, Jl. Ahmad Yani No.88, Ketintang, Kec. Gayungan, Surabaya, Jawa Timur 60234\n\nSURAT PERINGATAN PERTAMA (SP1)\nNo: 002/SP-HRD/III/2026\n\nDiberikan kepada:\nNama       : Dimas Setia Budi\nDepartemen : Marketing and Sales\nPosisi     : Marketing Leader\nNPWP       : -\n\nBerdasarkan catatan kehadiran, Saudara tidak masuk kerja tanpa\nketerangan (alpha) secara berturut-turut pada tanggal\n02 Februari 2026 s.d. 30 April 2026.\n\nSehubungan dengan hal tersebut, perusahaan memberikan SURAT PERINGATAN PERTAMA (SP1).\nDiharapkan Saudara tidak mengulangi pelanggaran tersebut dan meningkatkan\nkedisiplinan kerja.\n\nSurat peringatan ini berlaku selama 6 bulan sejak tanggal diterbitkan.\n\nSurabaya, 10 Maret 2026\n\nHR & GA Manager\n(HR)', 'uploads/warning_letters/sp-002-SP-HRD-III-2026-2-2026-03-10.pdf', '2026-03-10 16:37:34', '2026-03-10 16:37:34'),
-(5, '003/SP-HRD/III/2026', 'sp1', 1, 12, 'hr', 'PT OTAK KANAN', 'Graha Pena, Ruang 1503, Jl. Ahmad Yani No.88, Ketintang, Kec. Gayungan, Surabaya, Jawa Timur 60234', '2026-02-02', '2026-03-10', '2026-09-10', 'active', NULL, 'HR & GA Manager', 'HR', 'PT OTAK KANAN\nGraha Pena, Ruang 1503, Jl. Ahmad Yani No.88, Ketintang, Kec. Gayungan, Surabaya, Jawa Timur 60234\n\nSURAT PERINGATAN PERTAMA (SP1)\nNo: 003/SP-HRD/III/2026\n\nDiberikan kepada:\nNama       : Yuliana Putri \nDepartemen : Operations\nPosisi     : Operations Supervisor\nNPWP       : -\n\nBerdasarkan catatan kehadiran, Saudara tidak masuk kerja tanpa\nketerangan (alpha) secara berturut-turut pada tanggal\n02 Februari 2026 s.d. 30 April 2026.\n\nSehubungan dengan hal tersebut, perusahaan memberikan SURAT PERINGATAN PERTAMA (SP1).\nDiharapkan Saudara tidak mengulangi pelanggaran tersebut dan meningkatkan\nkedisiplinan kerja.\n\nSurat peringatan ini berlaku selama 6 bulan sejak tanggal diterbitkan.\n\nSurabaya, 10 Maret 2026\n\nHR & GA Manager\n(HR)', 'uploads/warning_letters/sp-003-SP-HRD-III-2026-1-2026-03-10.pdf', '2026-03-10 16:38:07', '2026-03-10 16:38:07'),
-(6, '004/SP-HRD/III/2026', 'sp1', 7, 12, 'hr', 'PT OTAK KANAN', 'Graha Pena, Ruang 1503, Jl. Ahmad Yani No.88, Ketintang, Kec. Gayungan, Surabaya, Jawa Timur 60234', '2026-02-02', '2026-03-10', '2026-09-10', 'active', NULL, 'HR & GA Manager', 'HR', 'PT OTAK KANAN\nGraha Pena, Ruang 1503, Jl. Ahmad Yani No.88, Ketintang, Kec. Gayungan, Surabaya, Jawa Timur 60234\n\nSURAT PERINGATAN PERTAMA (SP1)\nNo: 004/SP-HRD/III/2026\n\nDiberikan kepada:\nNama       : aku\nDepartemen : Marketing and Sales\nPosisi     : Marketing & Sales Manager\nNPWP       : -\n\nBerdasarkan catatan kehadiran, Saudara tidak masuk kerja tanpa\nketerangan (alpha) secara berturut-turut pada tanggal\n02 Februari 2026 s.d. 30 April 2026.\n\nSehubungan dengan hal tersebut, perusahaan memberikan SURAT PERINGATAN PERTAMA (SP1).\nDiharapkan Saudara tidak mengulangi pelanggaran tersebut dan meningkatkan\nkedisiplinan kerja.\n\nSurat peringatan ini berlaku selama 6 bulan sejak tanggal diterbitkan.\n\nSurabaya, 10 Maret 2026\n\nHR & GA Manager\n(HR)', 'uploads/warning_letters/sp-004-SP-HRD-III-2026-7-2026-03-10.pdf', '2026-03-10 16:41:04', '2026-03-10 16:41:04'),
-(7, '005/SP-HRD/III/2026', 'sp1', 13, 12, 'hr', 'PT OTAK KANAN', 'Graha Pena, Ruang 1503, Jl. Ahmad Yani No.88, Ketintang, Kec. Gayungan, Surabaya, Jawa Timur 60234', '2026-03-05', '2026-03-13', '2026-09-13', 'active', NULL, 'HR & GA Manager', 'HR', 'PT OTAK KANAN\nGraha Pena, Ruang 1503, Jl. Ahmad Yani No.88, Ketintang, Kec. Gayungan, Surabaya, Jawa Timur 60234\n\nSURAT PERINGATAN PERTAMA (SP1)\nNo: 005/SP-HRD/III/2026\n\nDiberikan kepada:\nNama       : DIREKTUR\nDepartemen : Management\nPosisi     : Director\nNPWP       : -\n\nBerdasarkan catatan kehadiran, Saudara tidak masuk kerja tanpa\nketerangan (alpha) secara berturut-turut pada tanggal\n05 Maret 2026 s.d. 30 April 2026.\n\nSehubungan dengan hal tersebut, perusahaan memberikan SURAT PERINGATAN PERTAMA (SP1).\nDiharapkan Saudara tidak mengulangi pelanggaran tersebut dan meningkatkan\nkedisiplinan kerja.\n\nSurat peringatan ini berlaku selama 6 bulan sejak tanggal diterbitkan.\n\nSurabaya, 13 Maret 2026\n\nHR & GA Manager\n(HR)', 'uploads/warning_letters/sp-005-SP-HRD-III-2026-13-2026-03-13.pdf', '2026-03-13 08:44:19', '2026-03-13 08:44:19'),
-(8, '001/EVAL-HRD/III/2026', 'evaluasi_hr', 15, 12, 'hr', 'PT OTAK KANAN', 'Graha Pena, Ruang 1503, Jl. Ahmad Yani No.88, Ketintang, Kec. Gayungan, Surabaya, Jawa Timur 60234', '2026-03-10', '2026-03-13', '2026-03-13', 'active', NULL, 'HR & GA Manager', 'HR', 'PT OTAK KANAN\nGraha Pena, Ruang 1503, Jl. Ahmad Yani No.88, Ketintang, Kec. Gayungan, Surabaya, Jawa Timur 60234\n\nUNDANGAN EVALUASI HR\nNo: 001/EVAL-HRD/III/2026\n\nDiberikan kepada:\nNama       : user7\nDepartemen : Human Resources and General Affair\nPosisi     : General Affair\n\nDengan hormat,\n\nSehubungan dengan catatan pelanggaran kedisiplinan kehadiran yang telah\nmencapai tahap Surat Peringatan III (SP3), dengan ini Saudara diminta\nuntuk menghadiri sesi Evaluasi HR.\n\nEvaluasi ini bertujuan untuk melakukan peninjauan terhadap riwayat\nkehadiran serta memberikan kesempatan kepada Saudara untuk menyampaikan\nklarifikasi terkait pelanggaran yang terjadi.\n\nAdapun pelaksanaan evaluasi akan dilakukan pada:\n\nHari/Tanggal : Sabtu, 14 Maret 2026\nWaktu        : 11:20\nTempat       : Ruang HR / Kantor HRD\n\nDiharapkan Saudara dapat hadir sesuai jadwal yang telah ditentukan.\n\nSurabaya, 13 Maret 2026\n\nHR & GA Manager\n(HR)', 'uploads/warning_letters/sp-001-EVAL-HRD-III-2026-15-2026-03-13.pdf', '2026-03-13 09:53:42', '2026-03-13 09:53:42');
+INSERT INTO `warning_letters` (`id`, `auto_letter_number`, `employee_id`, `rule_id`, `rule_code`, `sp_level`, `violation_date`, `issued_date`, `valid_until`, `status`, `evidence_snapshot`, `generated_by`, `created_at`, `updated_at`) VALUES
+(1, 'AUTO-SP-5-20260520-1421317266', 5, 4, 'AWR-2026-004', 'tindak_lanjut', '2026-05-19 00:00:00', '2026-05-20 00:00:00', NULL, 'active', '{\"rule_id\":null,\"rule_code\":null,\"rule_name\":null,\"sanction_level\":\"tindak_lanjut\",\"alpha_consecutive_days\":1,\"alpha_accumulated_days\":47,\"late_consecutive_days\":0,\"late_accumulated_days\":0,\"violation_date\":\"2026-05-19\",\"issued_date\":\"2026-05-20\"}', 'system', '2026-05-20 15:20:55', '2026-05-20 15:42:29'),
+(3, 'AUTO-SP-8-20260520-1419138786', 8, NULL, NULL, 'tindak_lanjut', '2026-05-19 00:00:00', '2026-05-20 00:00:00', NULL, 'active', '{\"rule_id\":null,\"rule_code\":null,\"rule_name\":null,\"sanction_level\":\"tindak_lanjut\",\"alpha_consecutive_days\":13,\"alpha_accumulated_days\":50,\"late_consecutive_days\":0,\"late_accumulated_days\":0,\"violation_date\":\"2026-05-19\",\"issued_date\":\"2026-05-20\"}', 'system', '2026-05-20 15:47:44', '2026-05-20 15:47:44'),
+(10, 'AUTO-SP-9-20260520-1498263971', 9, 4, 'AWR-2026-004', 'tindak_lanjut', '2026-05-19 00:00:00', '2026-05-20 00:00:00', NULL, 'active', '{\"rule_id\":4,\"rule_code\":\"AWR-2026-004\",\"rule_name\":\"Tindakan Lanjutan\",\"sanction_level\":\"tindak_lanjut\",\"alpha_consecutive_days\":34,\"alpha_accumulated_days\":51,\"late_consecutive_days\":0,\"late_accumulated_days\":0,\"violation_date\":\"2026-05-19\",\"issued_date\":\"2026-05-20\"}', 'system', '2026-05-20 16:06:03', '2026-05-20 16:06:03'),
+(11, 'AUTO-SP-12-20260520-639566740', 12, 4, 'AWR-2026-004', 'tindak_lanjut', '2026-05-19 00:00:00', '2026-05-20 00:00:00', '2026-11-20 00:00:00', 'active', '{\"rule_id\":4,\"rule_code\":\"AWR-2026-004\",\"rule_name\":\"Tindakan Lanjutan\",\"sanction_level\":\"tindak_lanjut\",\"alpha_consecutive_days\":7,\"alpha_accumulated_days\":47,\"late_consecutive_days\":0,\"late_accumulated_days\":0,\"violation_date\":\"2026-05-19\",\"issued_date\":\"2026-05-20\",\"valid_until\":\"2026-11-20\"}', 'system', '2026-05-20 16:41:25', '2026-05-20 16:41:25'),
+(15, 'AUTO-SP-5-20260521-125903085', 5, 4, 'AWR-2026-004', 'tindak_lanjut', '2026-05-20 00:00:00', '2026-05-21 00:00:00', '2026-11-21 00:00:00', 'active', '{\"rule_id\":4,\"rule_code\":\"AWR-2026-004\",\"rule_name\":\"Tindakan Lanjutan\",\"sanction_level\":\"tindak_lanjut\",\"alpha_consecutive_days\":2,\"alpha_accumulated_days\":48,\"late_consecutive_days\":0,\"late_accumulated_days\":0,\"violation_date\":\"2026-05-20\",\"issued_date\":\"2026-05-21\",\"valid_until\":\"2026-11-21\"}', 'system', '2026-05-20 17:03:32', '2026-05-20 17:03:32'),
+(21, 'AUTO-SP-8-20260521-1365921283', 8, 4, 'AWR-2026-004', 'tindak_lanjut', '2026-05-20 00:00:00', '2026-05-21 00:00:00', '2026-11-21 00:00:00', 'active', '{\"rule_id\":4,\"rule_code\":\"AWR-2026-004\",\"rule_name\":\"Tindakan Lanjutan\",\"sanction_level\":\"tindak_lanjut\",\"alpha_consecutive_days\":14,\"alpha_accumulated_days\":51,\"late_consecutive_days\":0,\"late_accumulated_days\":0,\"violation_date\":\"2026-05-20\",\"issued_date\":\"2026-05-21\",\"valid_until\":\"2026-11-21\"}', 'system', '2026-05-20 17:14:37', '2026-05-20 17:14:37');
 
 -- --------------------------------------------------------
 
@@ -4931,11 +4984,10 @@ ALTER TABLE `user_roles`
 --
 ALTER TABLE `warning_letters`
   ADD PRIMARY KEY (`id`),
-  ADD UNIQUE KEY `uniq_warning_letter_number` (`letter_number`),
-  ADD KEY `idx_warning_letters_employee_id` (`employee_id`),
-  ADD KEY `idx_warning_letters_sp_level` (`sp_level`),
-  ADD KEY `idx_warning_letters_issued_date` (`issued_date`),
-  ADD KEY `fk_warning_letters_issued_by_user` (`issued_by_user_id`);
+  ADD UNIQUE KEY `uniq_auto_letter_number` (`auto_letter_number`),
+  ADD UNIQUE KEY `uniq_warning_employee_level_date_generated` (`employee_id`,`sp_level`,`violation_date`,`generated_by`),
+  ADD KEY `idx_employee_id` (`employee_id`),
+  ADD KEY `fk_warning_letters_rule` (`rule_id`);
 
 --
 -- Indexes for table `working_hours`
@@ -4952,7 +5004,7 @@ ALTER TABLE `working_hours`
 -- AUTO_INCREMENT for table `activity_logs`
 --
 ALTER TABLE `activity_logs`
-  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=1636;
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=1658;
 
 --
 -- AUTO_INCREMENT for table `allowance`
@@ -4970,7 +5022,7 @@ ALTER TABLE `applications`
 -- AUTO_INCREMENT for table `attendance`
 --
 ALTER TABLE `attendance`
-  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=2593;
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=2631;
 
 --
 -- AUTO_INCREMENT for table `attendance_warning_rules`
@@ -5066,7 +5118,7 @@ ALTER TABLE `users`
 -- AUTO_INCREMENT for table `warning_letters`
 --
 ALTER TABLE `warning_letters`
-  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=11;
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=31;
 
 --
 -- Constraints for dumped tables
@@ -5188,8 +5240,8 @@ ALTER TABLE `user_roles`
 -- Constraints for table `warning_letters`
 --
 ALTER TABLE `warning_letters`
-  ADD CONSTRAINT `fk_warning_letters_employee` FOREIGN KEY (`employee_id`) REFERENCES `employees` (`id`) ON DELETE CASCADE,
-  ADD CONSTRAINT `fk_warning_letters_issued_by_user` FOREIGN KEY (`issued_by_user_id`) REFERENCES `users` (`id`);
+  ADD CONSTRAINT `fk_warning_letters_employee` FOREIGN KEY (`employee_id`) REFERENCES `employees` (`id`) ON DELETE CASCADE ON UPDATE CASCADE,
+  ADD CONSTRAINT `fk_warning_letters_rule` FOREIGN KEY (`rule_id`) REFERENCES `attendance_warning_rules` (`id`) ON DELETE SET NULL ON UPDATE CASCADE;
 COMMIT;
 
 /*!40101 SET CHARACTER_SET_CLIENT=@OLD_CHARACTER_SET_CLIENT */;

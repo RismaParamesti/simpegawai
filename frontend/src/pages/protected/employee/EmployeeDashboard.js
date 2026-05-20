@@ -53,7 +53,9 @@ const formatDateKey = (dateValue) => {
 };
 
 const normalizeSanctionLevel = (value) => {
-  const raw = String(value || "").toLowerCase().trim();
+  const raw = String(value || "")
+    .toLowerCase()
+    .trim();
   if (!raw || raw === "none" || raw === "0" || raw === "-") return "none";
 
   if (/^\d+$/.test(raw)) {
@@ -73,25 +75,45 @@ const formatSanctionLabel = (value) => {
   if (!raw || raw.toLowerCase() === "none") return "Belum Ada SP";
   const spMatch = raw.match(/^\s*sp\s*[-_]?\s*(\d+)\s*$/i);
   if (spMatch) return `SP${spMatch[1]}`;
-  return raw.replace(/[-_]+/g, " ").replace(/\b\w/g, (char) => char.toUpperCase());
+  return raw
+    .replace(/[-_]+/g, " ")
+    .replace(/\b\w/g, (char) => char.toUpperCase());
 };
 
 const getMatchingWarningRule = (rules, sanctionLevel) => {
   const normalizedSanction = normalizeSanctionLevel(sanctionLevel);
   return (
     rules.find(
-      (rule) => normalizeSanctionLevel(rule.sanction_level) === normalizedSanction,
+      (rule) =>
+        normalizeSanctionLevel(rule.sanction_level) === normalizedSanction,
     ) || null
   );
 };
 
-const alphaSanctionLabelMap = {
-  none: "Belum Ada SP",
-  sp1: "SP1",
-  sp2: "SP2",
-  sp3: "SP3",
-  evaluasi_hr: "Evaluasi HR",
-  nonaktif: "Evaluasi HR",
+const getRuleThresholdSummary = (rule) => {
+  if (!rule) return "";
+
+  const alphaParts = [];
+  const lateParts = [];
+
+  if (Number(rule.min_consecutive_alpha || 0) > 0) {
+    alphaParts.push(`${Number(rule.min_consecutive_alpha)} alpha berturut`);
+  }
+  if (Number(rule.min_accumulated_alpha || 0) > 0) {
+    alphaParts.push(`${Number(rule.min_accumulated_alpha)} alpha akumulasi`);
+  }
+  if (Number(rule.min_consecutive_late || 0) > 0) {
+    lateParts.push(`${Number(rule.min_consecutive_late)} terlambat berturut`);
+  }
+  if (Number(rule.min_accumulated_late || 0) > 0) {
+    lateParts.push(`${Number(rule.min_accumulated_late)} terlambat akumulasi`);
+  }
+
+  const summary = [];
+  if (alphaParts.length > 0) summary.push(`Alpha: ${alphaParts.join(" / ")}`);
+  if (lateParts.length > 0) summary.push(`Telat: ${lateParts.join(" / ")}`);
+
+  return summary.join(" • ");
 };
 
 const alphaSanctionBadgeMap = {
@@ -100,6 +122,7 @@ const alphaSanctionBadgeMap = {
   sp2: "badge-warning",
   sp3: "badge-error",
   evaluasi_hr: "badge-secondary",
+  tindak_lanjut: "badge-secondary",
   nonaktif: "badge-secondary",
 };
 
@@ -358,7 +381,8 @@ function EmployeeDashboard() {
       });
       let cnt = 0;
       for (const item of hist) {
-        const isLate = Number(item?.late_minutes || 0) > 0 || Boolean(item?.is_late);
+        const isLate =
+          Number(item?.late_minutes || 0) > 0 || Boolean(item?.is_late);
         if (isLate) cnt += 1;
         else break;
       }
@@ -370,11 +394,21 @@ function EmployeeDashboard() {
   const permissionDays = Number(displayedSummary?.permission_days || 0);
   const absentDays = Number(displayedSummary?.absent_days || 0);
   const discipline = displayedSummary?.alpha_discipline || {};
-  const sanctionLevel = normalizeSanctionLevel(discipline?.alpha_sanction_level);
-  const sanctionLabel = discipline?.alpha_sanction_label || formatSanctionLabel(sanctionLevel);
+  const sanctionLevel = normalizeSanctionLevel(
+    discipline?.alpha_sanction_level,
+  );
+  const sanctionLabel =
+    discipline?.alpha_sanction_label || formatSanctionLabel(sanctionLevel);
   const sanctionBadgeClass =
-    discipline?.alpha_sanction_badge || alphaSanctionBadgeMap[sanctionLevel] || "badge-ghost";
-  const currentWarningRule = getMatchingWarningRule(warningRules, sanctionLevel);
+    discipline?.alpha_sanction_badge ||
+    alphaSanctionBadgeMap[sanctionLevel] ||
+    "badge-ghost";
+  const currentWarningRule = getMatchingWarningRule(
+    warningRules,
+    sanctionLevel,
+  );
+  const currentWarningRuleLabel = currentWarningRule?.sanction_label || formatSanctionLabel(currentWarningRule?.sanction_level || sanctionLevel);
+  const currentWarningRuleThresholdSummary = getRuleThresholdSummary(currentWarningRule);
   const currentNoticeKey = `${sanctionLevel}:${currentWarningRule?.id || "none"}:${discipline?.alpha_last_evaluated_at || ""}`;
   const totalWorkdays = calculateWorkdaysInMonth(currentMonth, currentYear);
   const performancePercent = calculateAccuratePercentage(
@@ -417,7 +451,6 @@ function EmployeeDashboard() {
     if (!startDate || !endDate) return false;
     return todayDateKey >= startDate && todayDateKey <= endDate;
   });
-  const isApprovedLeaveToday = !!activeApprovedLeaveToday;
   const isCheckInTooEarly =
     currentSeconds < checkInStartSeconds && !hasCheckedIn;
   const isCheckInCutoffPassed =
@@ -620,7 +653,9 @@ function EmployeeDashboard() {
                 </p>
               </button>
               <div className="col-span-2 p-3 bg-base-200 rounded-lg border border-base-300">
-                <p className="text-xs opacity-70 mb-1">Status Sanksi Disiplin Kehadiran</p>
+                <p className="text-xs opacity-70 mb-1">
+                  Status Sanksi Disiplin Kehadiran
+                </p>
                 <div className="grid md:grid-cols-5 grid-cols-1 gap-2 text-xs mb-2">
                   <div className="bg-base-100 rounded px-2 py-2">
                     <p className="opacity-70">Sanksi Saat Ini</p>
@@ -825,35 +860,128 @@ function EmployeeDashboard() {
           </div>
         </TitleCard>
       </div>
-
       {showWarningPopup && currentWarningRule ? (
-        <div className="modal modal-open">
-          <div className="modal-box">
-            <h3 className="font-bold text-lg">Peringatan Disiplin</h3>
-            <p className="py-2 text-sm opacity-80">Anda menerima Tindak Lanjut.</p>
-            <p className="text-sm mt-2">
-              Escalation: {currentWarningRule.description || currentWarningRule.recommendation || "Deskripsi tidak tersedia"}
-            </p>
-            <div className="modal-action">
-              <button
-                className="btn btn-ghost"
-                onClick={() => {
-                  localStorage.setItem(SP_ALERT_STORAGE_KEY, currentNoticeKey);
-                  setShowWarningPopup(false);
-                  navigate("/app/warning-letters");
-                }}
-              >
-                Lihat
-              </button>
-              <button
-                className="btn btn-primary"
-                onClick={() => {
-                  localStorage.setItem(SP_ALERT_STORAGE_KEY, currentNoticeKey);
-                  setShowWarningPopup(false);
-                }}
-              >
-                Tutup
-              </button>
+        <div className="modal modal-open backdrop-blur-sm">
+          <div className="modal-box max-w-xl p-0 overflow-hidden rounded-3xl shadow-2xl border border-error/30">
+            {/* HEADER */}
+            <div className="bg-gradient-to-r from-error to-red-600 text-white px-6 py-5">
+              <div className="flex items-center gap-4">
+                <div className="w-14 h-14 rounded-2xl bg-white/20 flex items-center justify-center shadow-md">
+                  <svg
+                    xmlns="http://www.w3.org/2000/svg"
+                    className="w-8 h-8"
+                    fill="none"
+                    viewBox="0 0 24 24"
+                    stroke="currentColor"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M12 9v2m0 4h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"
+                    />
+                  </svg>
+                </div>
+
+                <div>
+                  <h3 className="text-xl font-bold">
+                    Peringatan Disiplin Pegawai
+                  </h3>
+
+                  <p className="text-sm opacity-90 mt-1">
+                    Sistem mendeteksi pelanggaran kehadiran
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            {/* BODY */}
+            <div className="p-6">
+              {/* INFO BOX */}
+              <div className="rounded-2xl border border-error/20 bg-error/5 p-4 mb-5">
+                <div className="flex flex-wrap items-center gap-2 mb-3">
+                  <div className="badge badge-error badge-lg">
+                    {currentWarningRuleLabel}
+                  </div>
+                  <div className="badge badge-outline badge-warning">
+                    {normalizeSanctionLevel(currentWarningRule?.sanction_level || sanctionLevel) === "tindak_lanjut" || normalizeSanctionLevel(currentWarningRule?.sanction_level || sanctionLevel) === "evaluasi_hr"
+                      ? "Menghadap Atasan / HR"
+                      : `Level ${formatSanctionLabel(currentWarningRule?.sanction_level || sanctionLevel)}`}
+                  </div>
+                </div>
+
+                <h4 className="text-base font-bold text-error mb-1">
+                  {currentWarningRule?.rule_name || "Aturan Peringatan Kehadiran"}
+                </h4>
+
+                <p className="text-sm leading-6 text-base-content/90">
+                  {currentWarningRule?.description ||
+                    currentWarningRule?.recommendation ||
+                    "Deskripsi aturan tidak tersedia."}
+                </p>
+
+                <div className="mt-4 rounded-xl bg-base-100 p-3 border border-base-300">
+                  <p className="text-xs uppercase font-bold opacity-60 mb-1">
+                    Keterangan Pelanggaran
+                  </p>
+
+                  <div className="grid grid-cols-2 gap-3 text-sm">
+                    <div className="rounded-xl bg-base-100 border p-3">
+                      <p className="text-xs opacity-60">Alpha Berturut</p>
+                      <p className="font-bold text-error">
+                        {Number(discipline?.alpha_consecutive_days || 0)} hari
+                      </p>
+                    </div>
+
+                    <div className="rounded-xl bg-base-100 border p-3">
+                      <p className="text-xs opacity-60">Alpha Akumulasi</p>
+                      <p className="font-bold text-error">
+                        {Number(discipline?.alpha_accumulated_days || 0)} hari
+                      </p>
+                    </div>
+
+                    <div className="rounded-xl bg-base-100 border p-3">
+                      <p className="text-xs opacity-60">Terlambat Berturut</p>
+                      <p className="font-bold text-error">{consecutiveLate} kali</p>
+                    </div>
+
+                    <div className="rounded-xl bg-base-100 border p-3">
+                      <p className="text-xs opacity-60">Terlambat Akumulasi</p>
+                      <p className="font-bold text-error">{lateDays} kali</p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* FOOTER */}
+              <div className="flex flex-col sm:flex-row gap-3 justify-end">
+                <button
+                  className="btn btn-outline btn-warning rounded-xl flex-1 sm:flex-none"
+                  onClick={() => {
+                    localStorage.setItem(
+                      SP_ALERT_STORAGE_KEY,
+                      currentNoticeKey,
+                    );
+                    setShowWarningPopup(false);
+                    navigate("/app/warning-letters");
+                  }}
+                >
+                  Lihat Pelanggaran
+                </button>
+
+                <button
+                  className="btn btn-error rounded-xl flex-1 sm:flex-none"
+                  onClick={() => {
+                    localStorage.setItem(
+                      SP_ALERT_STORAGE_KEY,
+                      currentNoticeKey,
+                    );
+                    setShowWarningPopup(false);
+                  }}
+                >
+                  Saya Mengerti
+                </button>
+              </div>
             </div>
           </div>
         </div>
@@ -863,4 +991,3 @@ function EmployeeDashboard() {
 }
 
 export default EmployeeDashboard;
-

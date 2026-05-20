@@ -32,6 +32,7 @@ const HRSalaryAppeals = lazy(() => import("../pages/protected/hr/HRSalaryAppeals
 const Allowance = lazy(() => import("../pages/protected/hr/HRAllowance"));
 const HRPayrollDirectorAdjustments = lazy(() => import("../pages/protected/hr/HRAllowanceOther"),);
 const HRWarningLetters = lazy(() => import("../pages/protected/hr/HRWarningLetters"),);
+const ActiveViolations = lazy(() => import("../pages/protected/ActiveViolationsPage"));
 const HRJobOpenings = lazy(() => import("../pages/protected/hr/HRJobOpenings"));
 const HRRecruitmentProcess = lazy(() => import("../pages/protected/hr/HRRecruitmentProcess"),);
 const HRRecruitmentProcessDetail = lazy(() => import("../pages/protected/hr/HRRecruitmentProcessDetail"),);
@@ -208,6 +209,10 @@ const hrRoutes = [
     component: HRWarningLetters,
   },
   {
+    path: "/active-violations",
+    component: ActiveViolations,
+  },
+  {
     path: "/candidate/:jobId",
     component: HRRecruitmentProcessDetail,
   },
@@ -257,6 +262,10 @@ const atasanRoutes = [
   {
     path: "/team-attendance",
     component: AtasanAttendance,
+  },
+  {
+    path: "/active-violations",
+    component: ActiveViolations,
   },
   {
     path: "/settings-profile",

@@ -334,6 +334,15 @@ export const hrApi = {
         }
     },
 
+    async getActiveWarningLetters(params = {}) {
+        try {
+            const response = await axios.get('/api/warning-letters/active', { params })
+            return response.data || { data: [] }
+        } catch (error) {
+            throw new Error(parseApiError(error, 'Gagal memuat data pelanggaran aktif'))
+        }
+    },
+
     async createWarningLetter(payload) {
         try {
             const response = await axios.post('/api/warning-letters', payload)

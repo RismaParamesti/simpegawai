@@ -207,7 +207,8 @@ const alphaSanctionLabelMap = {
   sp1: "SP1",
   sp2: "SP2",
   sp3: "SP3",
-  evaluasi_hr: "Evaluasi HR",
+  evaluasi_hr: "Tindak Lanjut",
+  tindak_lanjut: "Tindak Lanjut",
   nonaktif: "Evaluasi HR",
 };
 
@@ -217,6 +218,7 @@ const alphaSanctionBadgeMap = {
   sp2: "badge-warning",
   sp3: "badge-error",
   evaluasi_hr: "badge-secondary",
+  tindak_lanjut: "badge-secondary",
   nonaktif: "badge-secondary",
 };
 

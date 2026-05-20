@@ -48,6 +48,22 @@ const getAlphaGenerationTime = () => {
   };
 };
 
+const getDisciplineEscalationTime = () => {
+  const rawTime = String(process.env.DAILY_DISCIPLINE_CRON_TIME || "14:00").trim();
+  const [hourPart, minutePart] = rawTime.split(":");
+  const hour = Number(hourPart);
+  const minute = Number(minutePart);
+
+  if (!Number.isFinite(hour) || !Number.isFinite(minute)) {
+    return { hour: 14, minute: 0 };
+  }
+
+  return {
+    hour: Math.max(0, Math.min(23, hour)),
+    minute: Math.max(0, Math.min(59, minute)),
+  };
+};
+
 const scheduleDailyAlphaGeneration = () => {
   const runJob = async () => {
     try {
@@ -61,6 +77,37 @@ const scheduleDailyAlphaGeneration = () => {
 
   const scheduleNextRun = () => {
     const { hour, minute } = getAlphaGenerationTime();
+    const now = new Date();
+    const nextRun = new Date(now);
+    nextRun.setHours(hour, minute, 0, 0);
+
+    if (nextRun <= now) {
+      nextRun.setDate(nextRun.getDate() + 1);
+    }
+
+    const delay = nextRun.getTime() - now.getTime();
+    setTimeout(async () => {
+      await runJob();
+      setInterval(runJob, 24 * 60 * 60 * 1000);
+    }, delay);
+  };
+
+  scheduleNextRun();
+};
+
+const scheduleDailyDisciplineEscalation = () => {
+  const runJob = async () => {
+    try {
+      if (typeof attendanceRoutes.runDailyDisciplineEscalation !== "function") {
+        return;
+      }
+
+      await attendanceRoutes.runDailyDisciplineEscalation();
+    } catch (error) {}
+  };
+
+  const scheduleNextRun = () => {
+    const { hour, minute } = getDisciplineEscalationTime();
     const now = new Date();
     const nextRun = new Date(now);
     nextRun.setHours(hour, minute, 0, 0);
@@ -150,3 +197,4 @@ const startServer = async () => {
 startServer();
 
 scheduleDailyAlphaGeneration();
+scheduleDailyDisciplineEscalation();

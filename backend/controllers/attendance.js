@@ -86,6 +86,166 @@ function formatDateOnly(date) {
     return `${yyyy}-${mm}-${dd}`;
 }
 
+const buildAutoWarningNumber = ({
+    employeeId,
+    spLevel,
+    issuedDate,
+    alphaConsecutiveDays,
+    alphaAccumulatedDays,
+    lateConsecutiveDays,
+    lateAccumulatedDays,
+}) => {
+    const base = [
+        employeeId,
+        spLevel,
+        issuedDate,
+        alphaConsecutiveDays,
+        alphaAccumulatedDays,
+        lateConsecutiveDays,
+        lateAccumulatedDays,
+    ].join("|");
+
+    let hash = 0;
+    for (let i = 0; i < base.length; i++) {
+        hash = (hash << 5) - hash + base.charCodeAt(i);
+        hash |= 0;
+    }
+
+    return `AUTO-SP-${employeeId}-${String(issuedDate || "").replace(/-/g, "")}-${Math.abs(hash)}`;
+};
+
+const getSanctionSeverityRank = (value) => {
+    const normalized = normalizeSanctionLevel(value);
+    if (!normalized || normalized === ALPHA_SANCTION_LEVEL.NONE) {
+        return 0;
+    }
+
+    const spMatch = normalized.match(/^sp(\d+)$/i);
+    if (spMatch) {
+        return Number.parseInt(spMatch[1], 10) || 0;
+    }
+
+    if (normalized === "evaluasi_hr" || normalized === "tindak_lanjut") {
+        return 100;
+    }
+
+    return 1;
+};
+
+const getActiveWarningLetterForEmployee = async (employeeId) => {
+    const [rows] = await db.promise().query(
+        `SELECT id, sp_level, issued_date, valid_until, status
+         FROM warning_letters
+         WHERE employee_id = ?
+           AND status = 'active'
+           AND valid_until >= CURDATE()
+         ORDER BY valid_until DESC, issued_date DESC, id DESC
+         LIMIT 1`,
+        [employeeId]
+    );
+
+    return rows[0] || null;
+};
+
+const expireOutdatedWarningLettersForEmployee = async (employeeId) => {
+    await db.promise().query(
+        `UPDATE warning_letters
+         SET status = 'expired', updated_at = NOW()
+         WHERE employee_id = ?
+           AND status = 'active'
+           AND valid_until < CURDATE()`,
+        [employeeId]
+    );
+};
+
+const persistAutoWarningLetter = async ({
+    employeeId,
+    rule,
+    sanctionLevel,
+    alphaConsecutiveDays,
+    alphaAccumulatedDays,
+    lateConsecutiveDays,
+    lateAccumulatedDays,
+    violationDate,
+}) => {
+    const issuedDate = formatDateOnly(new Date());
+    const durationMonths = Number(rule?.sp_duration_months || 6);
+    const validUntilDate = new Date();
+    validUntilDate.setMonth(validUntilDate.getMonth() + durationMonths);
+    const validUntil = formatDateOnly(validUntilDate);
+    const autoLetterNumber = buildAutoWarningNumber({
+        employeeId,
+        spLevel: sanctionLevel,
+        issuedDate,
+        alphaConsecutiveDays,
+        alphaAccumulatedDays,
+        lateConsecutiveDays,
+        lateAccumulatedDays,
+    });
+
+    await expireOutdatedWarningLettersForEmployee(employeeId);
+
+    const activeWarning = await getActiveWarningLetterForEmployee(employeeId);
+    const currentRank = getSanctionSeverityRank(activeWarning?.sp_level);
+    const nextRank = getSanctionSeverityRank(sanctionLevel);
+
+    if (activeWarning && nextRank <= currentRank) {
+        return;
+    }
+
+    if (activeWarning && nextRank > currentRank) {
+        await db.promise().query(
+            `UPDATE warning_letters
+             SET status = 'escalated', updated_at = NOW()
+             WHERE id = ?`,
+            [activeWarning.id]
+        );
+    }
+
+    const evidenceSnapshot = {
+        rule_id: rule?.id || rule?.ruleId || null,
+        rule_code: rule?.rule_code || rule?.ruleCode || null,
+        rule_name: rule?.rule_name || rule?.ruleName || null,
+        sanction_level: sanctionLevel,
+        alpha_consecutive_days: alphaConsecutiveDays,
+        alpha_accumulated_days: alphaAccumulatedDays,
+        late_consecutive_days: lateConsecutiveDays,
+        late_accumulated_days: lateAccumulatedDays,
+        violation_date: violationDate,
+        issued_date: issuedDate,
+        valid_until: validUntil,
+    };
+
+    // Persist as a regular warning_letter record so manual and system-generated entries live in one table
+    await db.promise().query(
+        `INSERT IGNORE INTO warning_letters (
+            auto_letter_number,
+            employee_id,
+            rule_id,
+            rule_code,
+            sp_level,
+            violation_date,
+            issued_date,
+            valid_until,
+            status,
+            evidence_snapshot,
+            generated_by
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'active', ?, ?)`,
+        [
+            autoLetterNumber,
+            employeeId,
+            rule?.id || rule?.ruleId || null,
+            rule?.rule_code || rule?.ruleCode || null,
+            sanctionLevel,
+            violationDate,
+            issuedDate,
+            validUntil,
+            JSON.stringify(evidenceSnapshot),
+            'system',
+        ]
+    );
+};
+
 // ============================
 // HELPER FUNCTIONS
 // ============================
@@ -570,7 +730,10 @@ const getSanctionLevelFromAlphaCounts = async ({
 
     try {
         const [rules] = await db.promise().query(
-            `SELECT * FROM attendance_warning_rules WHERE is_active = 1 ORDER BY GREATEST(COALESCE(min_consecutive_alpha,0), COALESCE(min_accumulated_alpha,0), COALESCE(min_consecutive_late,0), COALESCE(min_accumulated_late,0)) DESC, id DESC`
+            `SELECT id, rule_code, rule_name, sanction_level, recommendation, min_consecutive_alpha, min_consecutive_late, min_accumulated_alpha, min_accumulated_late
+             FROM attendance_warning_rules
+             WHERE is_active = 1
+             ORDER BY GREATEST(COALESCE(min_consecutive_alpha,0), COALESCE(min_accumulated_alpha,0), COALESCE(min_consecutive_late,0), COALESCE(min_accumulated_late,0)) DESC, id DESC`
         );
 
         for (const rule of rules) {
@@ -582,27 +745,43 @@ const getSanctionLevelFromAlphaCounts = async ({
 
             if (minConsec > 0 && consecutive >= minConsec) {
                 return {
+                    ruleId: rule.id,
+                    ruleCode: rule.rule_code,
+                    ruleName: rule.rule_name,
                     level: normalizedRuleLevel,
-                    label: rule.sanction_label || null,
+                    label: rule.rule_name || null,
+                    recommendation: rule.recommendation || null,
                 };
             }
             if (minAccum > 0 && accumulated >= minAccum) {
                 return {
+                    ruleId: rule.id,
+                    ruleCode: rule.rule_code,
+                    ruleName: rule.rule_name,
                     level: normalizedRuleLevel,
-                    label: rule.sanction_label || null,
+                    label: rule.rule_name || null,
+                    recommendation: rule.recommendation || null,
                 };
             }
 
             if (minConsecLate > 0 && lateConsecutive >= minConsecLate) {
                 return {
+                    ruleId: rule.id,
+                    ruleCode: rule.rule_code,
+                    ruleName: rule.rule_name,
                     level: normalizedRuleLevel,
-                    label: rule.sanction_label || null,
+                    label: rule.rule_name || null,
+                    recommendation: rule.recommendation || null,
                 };
             }
             if (minAccumLate > 0 && lateAccum >= minAccumLate) {
                 return {
+                    ruleId: rule.id,
+                    ruleCode: rule.rule_code,
+                    ruleName: rule.rule_name,
                     level: normalizedRuleLevel,
-                    label: rule.sanction_label || null,
+                    label: rule.rule_name || null,
+                    recommendation: rule.recommendation || null,
                 };
             }
         }
@@ -702,6 +881,21 @@ const evaluateAlphaDisciplineForEmployee = async (employeeId) => {
         ]
     );
 
+    if (sanctionLevel && sanctionLevel !== ALPHA_SANCTION_LEVEL.NONE) {
+        const latestViolationDate = attendanceRows.find((row) => String(row.status || "").toLowerCase() === "alpha")?.date || new Date();
+
+        await persistAutoWarningLetter({
+            employeeId,
+            rule: sanctionResult,
+            sanctionLevel,
+            alphaConsecutiveDays,
+            alphaAccumulatedDays,
+            lateConsecutiveDays,
+            lateAccumulatedDays,
+            violationDate: formatDateOnly(latestViolationDate),
+        });
+    }
+
     return {
         alpha_consecutive_days: alphaConsecutiveDays,
         alpha_accumulated_days: alphaAccumulatedDays,
@@ -710,6 +904,35 @@ const evaluateAlphaDisciplineForEmployee = async (employeeId) => {
         alpha_sanction_level: sanctionLevel,
         alpha_sanction_label_from_rule: sanctionLabelFromRule,
         account_locked: false,
+    };
+};
+
+const runDailyDisciplineEscalation = async () => {
+    const [employees] = await db.promise().query(
+        `SELECT e.id
+         FROM employees e
+         INNER JOIN users u ON u.id = e.user_id
+         WHERE e.deleted_at IS NULL
+           AND LOWER(COALESCE(u.status, 'active')) = 'active'`
+    );
+
+    let processedEmployees = 0;
+    let evaluatedWarnings = 0;
+
+    for (const employee of employees) {
+        processedEmployees += 1;
+        const result = await evaluateAlphaDisciplineForEmployee(employee.id);
+        if (result && result.alpha_sanction_level && result.alpha_sanction_level !== ALPHA_SANCTION_LEVEL.NONE) {
+            evaluatedWarnings += 1;
+        }
+    }
+
+    return {
+        skipped: false,
+        message: "Daily discipline escalation completed",
+        total_employees: employees.length,
+        processed_employees: processedEmployees,
+        evaluated_warnings: evaluatedWarnings,
     };
 };
 
@@ -2344,6 +2567,7 @@ const runDailyAlphaGeneration = async (targetDateInput) => {
 };
 
 router.runDailyAlphaGeneration = runDailyAlphaGeneration;
+router.runDailyDisciplineEscalation = runDailyDisciplineEscalation;
 
 // Endpoint untuk scheduler harian agar alpha tercatat tanpa menunggu user buka halaman
 router.post("/cron/generate-alpha", async (req, res) => {
@@ -2362,6 +2586,24 @@ router.post("/cron/generate-alpha", async (req, res) => {
         if (error.statusCode === 400) {
             return res.status(400).json({ message: error.message });
         }
+        console.error(error);
+        return res.status(500).json({ message: "Server error" });
+    }
+});
+
+router.post("/cron/escalate-discipline", async (req, res) => {
+    try {
+        const cronKey = req.headers["x-cron-key"];
+        const expectedCronKey = process.env.CRON_SECRET;
+
+        if (!expectedCronKey || cronKey !== expectedCronKey) {
+            return res.status(401).json({ message: "Unauthorized cron request" });
+        }
+
+        const result = await runDailyDisciplineEscalation();
+
+        return res.status(200).json(result);
+    } catch (error) {
         console.error(error);
         return res.status(500).json({ message: "Server error" });
     }
@@ -3060,3 +3302,6 @@ router.put(
 );
 
 module.exports = router;
+// Export evaluator for administrative use (backfill scripts)
+module.exports.evaluateAlphaDisciplineForEmployee = evaluateAlphaDisciplineForEmployee;
+module.exports.runDailyDisciplineEscalation = runDailyDisciplineEscalation;

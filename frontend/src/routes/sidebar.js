@@ -70,7 +70,7 @@ const pegawaiRoutes = [
       {
         path: "/app/warning-letters",
         icon: <DocumentTextIcon className={iconClasses} />,
-        name: "Aturan Kehadiran",
+        name: "Disiplin Kehadiran",
       },
     ],
   },
@@ -152,9 +152,15 @@ const hrRoutes = [
       {
         path: "/app/warning-letters",
         icon: <DocumentTextIcon className={iconClasses} />,
-        name: "Aturan Kehadiran",
+        name: "Disiplin Kehadiran",
       },
     ],
+  },
+
+  {
+    path: "/app/active-violations",
+    icon: <DocumentTextIcon className={iconClasses} />,
+    name: "Pelanggaran Aktif",
   },
 
   {
@@ -226,6 +232,11 @@ const atasanRoutes = [
     path: "/app/team-attendance",
     icon: <CalendarDaysIcon className={iconClasses} />,
     name: "Kehadiran Tim",
+  },
+  {
+    path: "/app/active-violations",
+    icon: <DocumentTextIcon className={iconClasses} />,
+    name: "Pelanggaran Aktif",
   },
 ];
 
