@@ -11,19 +11,62 @@ import {
     CheckCircleIcon
 } from '@heroicons/react/24/outline'
 
+const formatDateLabel = (value) => {
+    if (!value) return '-'
+    const date = new Date(value)
+    if (Number.isNaN(date.getTime())) return '-'
+    return date.toLocaleDateString('id-ID', {
+        day: '2-digit',
+        month: 'short',
+        year: 'numeric',
+    })
+}
+
+const formatViolationCounts = (item) => {
+    const alphaConsecutive = Number(item?.alpha_consecutive_days || 0)
+    const alphaAccumulated = Number(item?.alpha_accumulated_days || 0)
+    const lateConsecutive = Number(item?.late_consecutive_days || 0)
+    const lateAccumulated = Number(item?.late_accumulated_days || 0)
+
+    const parts = []
+    if (alphaConsecutive > 0 || alphaAccumulated > 0) {
+        parts.push(`Alpha ${alphaConsecutive} berturut / ${alphaAccumulated} akumulasi`)
+    }
+    if (lateConsecutive > 0 || lateAccumulated > 0) {
+        parts.push(`Telat ${lateConsecutive} berturut / ${lateAccumulated} akumulasi`)
+    }
+
+    return parts.join(' | ') || '-'
+}
+
+const formatSanctionLabel = (value) => {
+    const raw = String(value || '').trim()
+    if (!raw) return '-'
+    const spMatch = raw.match(/^sp\s*[-_]?\s*(\d+)$/i)
+    if (spMatch) return `SP${spMatch[1]}`
+    return raw.replace(/[-_]+/g, ' ')
+}
+
 function HRDashboard() {
     const dispatch = useDispatch()
     const navigate = useNavigate()
     const [loading, setLoading] = useState(true)
     const [error, setError] = useState('')
     const [dashboard, setDashboard] = useState(null)
+    const [activeViolations, setActiveViolations] = useState([])
 
     const loadDashboard = useCallback(async () => {
         try {
             setLoading(true)
             setError('')
-            const result = await hrApi.getDashboard()
-            setDashboard(result)
+            const [dashboardResult, violationResult] = await Promise.allSettled([
+                hrApi.getDashboard(),
+                hrApi.getActiveWarningLetters(),
+            ])
+            setDashboard(dashboardResult.status === 'fulfilled' ? dashboardResult.value : null)
+            setActiveViolations(
+                violationResult.status === 'fulfilled' ? violationResult.value?.data || [] : []
+            )
         } catch (err) {
             setError(err.message)
         } finally {
@@ -496,6 +539,55 @@ function HRDashboard() {
                     ) : null}
                 </TitleCard>
             </div>
+
+            <TitleCard title="Pegawai dengan Pelanggaran Aktif" topMargin="mt-6">
+                {activeViolations.length > 0 ? (
+                    <div className="overflow-x-auto">
+                        <table className="table table-zebra table-sm">
+                            <thead>
+                                <tr>
+                                    <th>Pegawai</th>
+                                    <th>Departemen</th>
+                                    <th>SP Aktif</th>
+                                    <th>Keterangan Pelanggaran</th>
+                                    <th>Berlaku Sampai</th>
+                                    <th>Status</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {activeViolations.slice(0, 10).map((item) => (
+                                    <tr key={item.id}>
+                                        <td>
+                                            <div className="font-semibold cursor-pointer hover:underline" onClick={() => navigate('/app/employees', { state: { employeeId: item.employee_id } })}>
+                                                {item.employee_name || '-'}
+                                            </div>
+                                            <div className="text-xs opacity-70">{item.employee_code || '-'}</div>
+                                        </td>
+                                        <td>{item.department_name || '-'}</td>
+                                        <td>
+                                            <span className="badge badge-warning badge-sm">{formatSanctionLabel(item.sp_level)}</span>
+                                        </td>
+                                        <td className="text-xs leading-5">{formatViolationCounts(item)}</td>
+                                        <td>
+                                            {formatDateLabel(item.valid_until)}
+                                            {item.remaining_days !== null ? (
+                                                <div className="text-xs opacity-70">{item.remaining_days} hari lagi</div>
+                                            ) : null}
+                                        </td>
+                                        <td>
+                                            <span className="badge badge-success badge-sm">active</span>
+                                        </td>
+                                    </tr>
+                                ))}
+                            </tbody>
+                        </table>
+                    </div>
+                ) : (
+                    <div className="text-center text-base-content/60 py-4">
+                        Tidak ada pelanggaran aktif saat ini
+                    </div>
+                )}
+            </TitleCard>
         </>
     )
 }

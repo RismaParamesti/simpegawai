@@ -141,20 +141,95 @@ function EmployeeWarningLetters() {
     if (/sp\s*[-_]?\s*1|^1$|^sp1$/i.test(raw)) return "sp1";
     if (/sp\s*[-_]?\s*2|^2$|^sp2$/i.test(raw)) return "sp2";
     if (/sp\s*[-_]?\s*3|^3$|^sp3$/i.test(raw)) return "sp3";
-    if (
-      raw.includes("evaluasi") ||
-      raw.includes("nonaktif") ||
-      raw.includes("non-active") ||
-      raw.includes("non active")
-    )
-      return "evaluasi_hr";
+      if (raw.includes("evaluasi") || raw.includes("nonaktif") || raw.includes("non-active") || raw.includes("non active") || raw === "tindak_lanjut") {
+        return "tindak_lanjut";
+      }
     if (raw === "none" || raw === "-" || raw === "0") return "none";
     return raw;
   };
 
   const sanctionLevel = normalizeSanction(discipline.alpha_sanction_level);
-  const sanctionLabel = discipline.alpha_sanction_label || makeSanctionLabel(discipline.alpha_sanction_level || sanctionLevel);
-  const sanctionBadgeClass = discipline.alpha_sanction_badge || makeSanctionBadge(discipline.alpha_sanction_level || sanctionLevel);
+
+  // Derive a sanction from rules + history when backend hasn't provided discipline info
+  const derivedSanction = (() => {
+    if (discipline && (discipline.alpha_sanction_level || discipline.alpha_sanction_label || discipline.alpha_sanction_badge)) return null;
+    if (!rules || rules.length === 0) return null;
+
+    const accAlpha = (history || []).reduce((acc, it) => acc + (String(it.status || "").toLowerCase() === "alpha" ? 1 : 0), 0);
+    const consecutiveAlpha = (() => {
+      try {
+        const hist = (history || []).slice().sort((a, b) => {
+          const da = new Date(a.date || 0).getTime();
+          const db = new Date(b.date || 0).getTime();
+          return db - da;
+        });
+        let cnt = 0;
+        for (const item of hist) {
+          const st = String(item.status || "").toLowerCase();
+          if (st === "alpha") cnt += 1;
+          else break;
+        }
+        return cnt;
+      } catch (e) {
+        return 0;
+      }
+    })();
+
+    const accLate = (history || []).reduce((acc, it) => acc + ((Number(it.late_minutes || 0) > 0 || Boolean(it.is_late)) ? 1 : 0), 0);
+    const consecutiveLateLocal = (() => {
+      try {
+        const hist = (history || []).slice().sort((a, b) => new Date(b.date || 0).getTime() - new Date(a.date || 0).getTime());
+        let cnt = 0;
+        for (const item of hist) {
+          const isLate = Number(item.late_minutes || 0) > 0 || Boolean(item.is_late);
+          if (isLate) cnt++;
+          else break;
+        }
+        return cnt;
+      } catch (e) {
+        return 0;
+      }
+    })();
+
+    let best = null;
+    const normLevel = (s) => {
+      const m = String(s || "").toLowerCase();
+      const num = parseInt(m.replace(/\D/g, ""), 10);
+      return Number.isNaN(num) ? 0 : num;
+    };
+
+    for (const rule of rules) {
+      const match =
+        (rule.min_consecutive_alpha && consecutiveAlpha >= Number(rule.min_consecutive_alpha)) ||
+        (rule.min_accumulated_alpha && accAlpha >= Number(rule.min_accumulated_alpha)) ||
+        (rule.min_consecutive_late && consecutiveLateLocal >= Number(rule.min_consecutive_late)) ||
+        (rule.min_accumulated_late && accLate >= Number(rule.min_accumulated_late));
+      if (match) {
+        if (!best || normLevel(rule.sanction_level) > normLevel(best.sanction_level)) best = rule;
+      }
+    }
+
+    if (!best) return null;
+    return {
+      level: normalizeSanction(best.sanction_level || best.sanction_label || ""),
+      label: best.sanction_label || makeSanctionLabel(best.sanction_level || best.sanction_label || ""),
+      badge: best.sanction_badge || makeSanctionBadge(best.sanction_level || best.sanction_label || ""),
+    };
+  })();
+
+  const _isPlaceholderLabel = (lbl) => {
+    if (!lbl) return true;
+    const s = String(lbl).toLowerCase().trim();
+    return s === "belum ada sp" || s === "none" || s === "-" || s === "0";
+  };
+
+  const sanctionLabel = (!discipline.alpha_sanction_label || _isPlaceholderLabel(discipline.alpha_sanction_label))
+    ? (derivedSanction && derivedSanction.label) || makeSanctionLabel(discipline.alpha_sanction_level || sanctionLevel)
+    : discipline.alpha_sanction_label;
+
+  const sanctionBadgeClass = (!discipline.alpha_sanction_badge || String(discipline.alpha_sanction_badge).trim() === "")
+    ? (derivedSanction && derivedSanction.badge) || makeSanctionBadge(discipline.alpha_sanction_level || sanctionLevel)
+    : discipline.alpha_sanction_badge;
 
   const alphaHistory = (history || []).filter((item) => {
     const status = String(item.status || "").toLowerCase();

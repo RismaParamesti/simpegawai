@@ -85,7 +85,7 @@ export const atasanApi = {
 
     async getTeamWarningLetters(params = {}) {
         try {
-            const response = await axios.get('/api/warning-letters/team', { params })
+            const response = await axios.get('/api/warning-letters/team/active', { params })
             return response.data || { data: [] }
         } catch (error) {
             throw new Error(parseApiError(error, 'Gagal memuat surat peringatan tim'))

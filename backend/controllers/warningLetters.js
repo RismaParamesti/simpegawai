@@ -486,6 +486,81 @@ const getAlphaViolationContext = async (employeeId) => {
     };
 };
 
+const parseEvidenceSnapshot = (snapshot) => {
+    if (!snapshot) return {};
+    if (typeof snapshot === "object") return snapshot;
+
+    try {
+        return JSON.parse(snapshot);
+    } catch (error) {
+        return {};
+    }
+};
+
+const mapViolationRow = (row) => {
+    const snapshot = parseEvidenceSnapshot(row.evidence_snapshot);
+    const validUntil = row.valid_until || snapshot.valid_until || null;
+    const validUntilDate = validUntil ? new Date(validUntil) : null;
+    const remainingDays =
+        validUntilDate && !Number.isNaN(validUntilDate.getTime())
+            ? Math.max(
+                  0,
+                  Math.ceil((validUntilDate.getTime() - Date.now()) / (24 * 60 * 60 * 1000)),
+              )
+            : null;
+
+    return {
+        ...row,
+        sp_level: normalizeSpLevel(row.sp_level) || row.sp_level,
+        rule_id: snapshot.rule_id || null,
+        rule_code: snapshot.rule_code || null,
+        rule_name: snapshot.rule_name || null,
+        alpha_consecutive_days: Number(snapshot.alpha_consecutive_days || 0),
+        alpha_accumulated_days: Number(snapshot.alpha_accumulated_days || 0),
+        late_consecutive_days: Number(snapshot.late_consecutive_days || 0),
+        late_accumulated_days: Number(snapshot.late_accumulated_days || 0),
+        valid_until: validUntil,
+        remaining_days: remainingDays,
+    };
+};
+
+const buildActiveViolationListQuery = ({ scope = "all" } = {}) => {
+        const baseQuery = `SELECT
+                        wl.id,
+                        wl.auto_letter_number,
+                        wl.sp_level,
+                        wl.employee_id,
+                        wl.violation_date,
+                        wl.issued_date,
+                        wl.valid_until,
+                        wl.status,
+                        wl.evidence_snapshot,
+                        wl.generated_by,
+                        COALESCE(e.full_name, u.name) AS employee_name,
+                        e.employee_code,
+                        e.npwp,
+                        p.name AS position_name,
+                        LOWER(COALESCE(p.level, '')) AS position_level,
+                        d.name AS department_name
+                 FROM warning_letters wl
+                 JOIN employees e ON wl.employee_id = e.id
+                 JOIN users u ON e.user_id = u.id
+                 LEFT JOIN positions p ON e.position_id = p.id
+                 LEFT JOIN departments d ON p.department_id = d.id
+                 WHERE wl.status = 'active'
+                     AND wl.valid_until >= CURDATE()`;
+
+    if (scope === "team") {
+        return `${baseQuery}
+           AND p.department_id = ?
+           AND e.id <> ?
+         ORDER BY wl.valid_until ASC, wl.issued_date DESC, wl.id DESC`;
+    }
+
+    return `${baseQuery}
+         ORDER BY wl.valid_until ASC, wl.issued_date DESC, wl.id DESC`;
+};
+
 const getIssuerSignatureInfo = async (userId, issuerRole) => {
     const [rows] = await db.promise().query(
         `SELECT
@@ -619,33 +694,57 @@ router.get(
     }
 );
 
+router.get(
+    "/active",
+    verifyToken,
+    verifyRole(["hr", "admin"]),
+    async (req, res) => {
+        try {
+            const { employee_id } = req.query;
+            const query = buildActiveViolationListQuery({ scope: "all" });
+            const params = [];
+
+            let finalQuery = query;
+            if (employee_id) {
+                finalQuery = query.replace("WHERE wl.status = 'active'\n           AND wl.valid_until >= CURDATE()", "WHERE wl.status = 'active'\n           AND wl.valid_until >= CURDATE()\n           AND wl.employee_id = ?");
+                params.push(employee_id);
+            }
+
+            const [rows] = await db.promise().query(finalQuery, params);
+
+            return res.json({
+                message: "Active warning letters fetched successfully",
+                total: rows.length,
+                data: rows.map(mapViolationRow),
+            });
+        } catch (error) {
+            console.error(error);
+            return res.status(500).json({ message: "Server error" });
+        }
+    }
+);
+
 router.get("/", verifyToken, verifyRole(["hr", "admin"]), async (req, res) => {
     try {
         const { employee_id } = req.query;
 
         let query = `SELECT
                 wl.id,
-                wl.letter_number,
+                wl.auto_letter_number,
                 wl.sp_level,
                 wl.employee_id,
-                wl.issued_by_user_id,
-                wl.issued_by_role,
                 wl.violation_date,
                 wl.issued_date,
-                wl.valid_until,
                 wl.status,
-                wl.reason,
-                wl.signed_title,
-                wl.signed_name,
-            wl.letter_content,
+                wl.evidence_snapshot,
+                wl.generated_by,
                 COALESCE(e.full_name, u.name) AS employee_name,
                 e.employee_code,
                 e.npwp,
                 p.name AS position_name,
                 LOWER(COALESCE(p.level, '')) AS position_level,
                 d.name AS department_name,
-                GROUP_CONCAT(DISTINCT LOWER(r.name)) AS recipient_roles_csv,
-                issuer.name AS issued_by_name
+                GROUP_CONCAT(DISTINCT LOWER(r.name)) AS recipient_roles_csv
             FROM warning_letters wl
             JOIN employees e ON wl.employee_id = e.id
             JOIN users u ON e.user_id = u.id
@@ -653,7 +752,6 @@ router.get("/", verifyToken, verifyRole(["hr", "admin"]), async (req, res) => {
             LEFT JOIN departments d ON p.department_id = d.id
             LEFT JOIN user_roles ur ON ur.user_id = u.id
             LEFT JOIN roles r ON r.id = ur.role_id
-            LEFT JOIN users issuer ON issuer.id = wl.issued_by_user_id
             WHERE 1=1`;
 
         const params = [];
@@ -663,29 +761,23 @@ router.get("/", verifyToken, verifyRole(["hr", "admin"]), async (req, res) => {
             params.push(employee_id);
         }
 
-        query += `
+            query += `
             GROUP BY
                 wl.id,
-                wl.letter_number,
+                wl.auto_letter_number,
                 wl.sp_level,
                 wl.employee_id,
-                wl.issued_by_user_id,
-                wl.issued_by_role,
                 wl.violation_date,
                 wl.issued_date,
-                wl.valid_until,
                 wl.status,
-                wl.reason,
-                wl.signed_title,
-                wl.signed_name,
-                wl.letter_content,
+                wl.evidence_snapshot,
+                wl.generated_by,
                 employee_name,
                 e.employee_code,
                 e.npwp,
                 p.name,
                 p.level,
-                d.name,
-                issuer.name
+                d.name
             ORDER BY wl.issued_date DESC, wl.id DESC`;
 
         const [rows] = await db.promise().query(query, params);
@@ -732,17 +824,14 @@ router.get("/my", verifyToken, verifyRole(["pegawai"]), async (req, res) => {
         const [rows] = await db.promise().query(
             `SELECT
                 wl.id,
-                wl.letter_number,
+                wl.auto_letter_number,
                 wl.sp_level,
                 wl.employee_id,
                 wl.violation_date,
                 wl.issued_date,
-                wl.valid_until,
                 wl.status,
-                wl.reason,
-                wl.signed_title,
-                wl.signed_name,
-                wl.letter_content,
+                wl.evidence_snapshot,
+                wl.generated_by,
                 wl.created_at,
                 COALESCE(e.full_name, u.name) AS employee_name,
                 e.employee_code,
@@ -783,37 +872,28 @@ router.get(
             const { employee_id } = req.query;
             const managerScope = await resolveManagerScope(db, req.user.id);
 
-            let query = `SELECT
-                    wl.id,
-                    wl.letter_number,
-                    wl.sp_level,
-                    wl.employee_id,
-                    wl.issued_by_user_id,
-                    wl.issued_by_role,
-                    wl.violation_date,
-                    wl.issued_date,
-                    wl.valid_until,
-                    wl.status,
-                    wl.reason,
-                    wl.signed_title,
-                    wl.signed_name,
-                    wl.letter_content,
-                    wl.created_at,
-                    COALESCE(e.full_name, u.name) AS employee_name,
-                    e.employee_code,
-                    e.npwp,
-                    p.name AS position_name,
-                    d.name AS department_name,
-                    issuer.name AS issued_by_name
-                FROM warning_letters wl
-                JOIN employees e ON wl.employee_id = e.id
-                JOIN users u ON e.user_id = u.id
-                LEFT JOIN positions p ON e.position_id = p.id
-                LEFT JOIN departments d ON p.department_id = d.id
-                LEFT JOIN users issuer ON issuer.id = wl.issued_by_user_id
-                WHERE p.department_id = ?
-                  AND e.id <> ?
-                  AND LOWER(COALESCE(wl.issued_by_role, '')) = 'hr'`;
+                        let query = `SELECT
+                                        wl.id,
+                                        wl.auto_letter_number,
+                                        wl.sp_level,
+                                        wl.employee_id,
+                                        wl.violation_date,
+                                        wl.issued_date,
+                                        wl.status,
+                                        wl.evidence_snapshot,
+                                        wl.created_at,
+                                        COALESCE(e.full_name, u.name) AS employee_name,
+                                        e.employee_code,
+                                        e.npwp,
+                                        p.name AS position_name,
+                                        d.name AS department_name
+                                FROM warning_letters wl
+                                JOIN employees e ON wl.employee_id = e.id
+                                JOIN users u ON e.user_id = u.id
+                                LEFT JOIN positions p ON e.position_id = p.id
+                                LEFT JOIN departments d ON p.department_id = d.id
+                                WHERE p.department_id = ?
+                                    AND e.id <> ?`;
 
             const params = [
                 managerScope.departmentId,
@@ -849,6 +929,41 @@ router.get(
 );
 
 router.get(
+    "/team/active",
+    verifyToken,
+    verifyRole(["atasan"]),
+    async (req, res) => {
+        try {
+            const { employee_id } = req.query;
+            const managerScope = await resolveManagerScope(db, req.user.id);
+            let query = buildActiveViolationListQuery({ scope: "team" });
+            const params = [managerScope.departmentId, managerScope.managerEmployeeId];
+
+            if (employee_id) {
+                query = query.replace(
+                    "AND e.id <> ?\n         ORDER BY wl.valid_until ASC, wl.issued_date DESC, wl.id DESC",
+                    "AND e.id <> ?\n           AND wl.employee_id = ?\n         ORDER BY wl.valid_until ASC, wl.issued_date DESC, wl.id DESC",
+                );
+                params.push(employee_id);
+            }
+
+            const [rows] = await db.promise().query(query, params);
+
+            return res.json({
+                message: "Active team warning letters fetched successfully",
+                total: rows.length,
+                data: rows.map(mapViolationRow),
+            });
+        } catch (error) {
+            console.error(error);
+            return res.status(error.statusCode || 500).json({
+                message: error.message || "Server error",
+            });
+        }
+    }
+);
+
+router.get(
     "/:id",
     verifyToken,
     verifyRole(["hr", "admin"]),
@@ -864,8 +979,7 @@ router.get(
                     p.name AS position_name,
                     LOWER(COALESCE(p.level, '')) AS position_level,
                     d.name AS department_name,
-                    GROUP_CONCAT(DISTINCT LOWER(r.name)) AS recipient_roles_csv,
-                    issuer.name AS issued_by_name
+                    GROUP_CONCAT(DISTINCT LOWER(r.name)) AS recipient_roles_csv
                 FROM warning_letters wl
                 JOIN employees e ON wl.employee_id = e.id
                 JOIN users u ON e.user_id = u.id
@@ -873,7 +987,6 @@ router.get(
                 LEFT JOIN departments d ON p.department_id = d.id
                 LEFT JOIN user_roles ur ON ur.user_id = u.id
                 LEFT JOIN roles r ON r.id = ur.role_id
-                LEFT JOIN users issuer ON issuer.id = wl.issued_by_user_id
                 WHERE wl.id = ?
                 GROUP BY
                     wl.id,
@@ -882,8 +995,7 @@ router.get(
                     e.npwp,
                     p.name,
                     p.level,
-                    d.name,
-                    issuer.name`,
+                    d.name`,
                 [id]
             );
 
@@ -949,54 +1061,65 @@ router.post("/", verifyToken, verifyRole(["hr", "admin"]), async (req, res) => {
         if (isEvaluasiHR) {
             const violationContextEval = await getAlphaViolationContext(employee_id);
             const evalViolationDate = violationContextEval?.latestAlphaDate || normalizedIssuedDate;
-
+            // For evaluation letters created by HR, store minimal metadata in evidence_snapshot
             const evalLetterNumber = await generateEvaluasiLetterNumber(normalizedIssuedDate);
-            const evalLetterContent = buildEvaluasiHRContent({
-                letterNumber: evalLetterNumber,
-                employee: employeeData,
-                evaluationDate: evaluation_date,
-                evaluationTime: evaluation_time,
-                evaluationPlace: evaluation_place || "Ruang HR / Kantor HRD",
-                issuedDate: normalizedIssuedDate,
-                signedTitle: issuerSignature.signedTitle,
-                signedName: issuerSignature.signedName,
-            });
+            // Determine valid duration based on rule mapping if available
+            let evalDurationMonths = 6;
+            try {
+                const [ruleRows] = await db.promise().query(
+                    `SELECT sp_duration_months FROM attendance_warning_rules WHERE sanction_level COLLATE utf8mb4_unicode_ci = ? LIMIT 1`,
+                    [normalizeSpLevel('evaluasi_hr')]
+                );
+                if (ruleRows && ruleRows[0] && ruleRows[0].sp_duration_months) {
+                    evalDurationMonths = Number(ruleRows[0].sp_duration_months) || evalDurationMonths;
+                }
+            } catch (e) {
+                // ignore and use default
+            }
+
+            const validUntilDateEval = new Date(normalizedIssuedDate);
+            validUntilDateEval.setMonth(validUntilDateEval.getMonth() + evalDurationMonths);
+            const validUntilEval = toDateOnly(validUntilDateEval);
+
+            const evidenceSnapshot = {
+                type: 'evaluasi_hr',
+                letter_number: evalLetterNumber,
+                evaluation_date: evaluation_date || null,
+                evaluation_time: evaluation_time || null,
+                evaluation_place: evaluation_place || null,
+                signed_title: issuerSignature.signedTitle || null,
+                signed_name: issuerSignature.signedName || null,
+                valid_until: validUntilEval,
+            };
 
             const [evalResult] = await db.promise().query(
                 `INSERT INTO warning_letters (
-                    letter_number, sp_level, employee_id, issued_by_user_id, issued_by_role,
-                    company_name, company_address, violation_date, issued_date, valid_until,
-                    status, reason, signed_title, signed_name, letter_content,
-                    created_at, updated_at
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'active', NULL, ?, ?, ?, NOW(), NOW())`,
+                    auto_letter_number, sp_level, employee_id,
+                    violation_date, issued_date, valid_until, status, evidence_snapshot, generated_by, created_at, updated_at
+                ) VALUES (?, ?, ?, ?, ?, ?, 'active', ?, 'hr', NOW(), NOW())`,
                 [
-                    evalLetterNumber, "evaluasi_hr", employee_id, req.user.id, issuerRole,
-                    COMPANY_NAME, COMPANY_ADDRESS, evalViolationDate, normalizedIssuedDate, normalizedIssuedDate,
-                    issuerSignature.signedTitle, issuerSignature.signedName, evalLetterContent,
+                    null,
+                    'evaluasi_hr',
+                    employee_id,
+                    evalViolationDate,
+                    normalizedIssuedDate,
+                    validUntilEval,
+                    JSON.stringify(evidenceSnapshot),
                 ]
             );
 
             const [evalCreatedRows] = await db.promise().query(
-                `SELECT wl.*,
-                        COALESCE(e.full_name, u.name) AS employee_name,
-                        e.employee_code,
-                        e.npwp,
-                        p.name AS position_name,
-                    d.name AS department_name
+                `SELECT wl.*, COALESCE(e.full_name, u.name) AS employee_name, e.employee_code, e.npwp, p.name AS position_name, d.name AS department_name
                  FROM warning_letters wl
                  JOIN employees e ON wl.employee_id = e.id
                  JOIN users u ON e.user_id = u.id
                  LEFT JOIN positions p ON e.position_id = p.id
                  LEFT JOIN departments d ON p.department_id = d.id
-                 WHERE wl.id = ?
-                 LIMIT 1`,
+                 WHERE wl.id = ? LIMIT 1`,
                 [evalResult.insertId]
             );
 
-            return res.status(201).json({
-                message: "Undangan evaluasi HR berhasil dibuat",
-                data: evalCreatedRows[0] || null,
-            });
+            return res.status(201).json({ message: 'Undangan evaluasi HR berhasil dibuat', data: evalCreatedRows[0] || null });
         }
 
         const violationContext = await getAlphaViolationContext(employee_id);
@@ -1016,59 +1139,60 @@ router.post("/", verifyToken, verifyRole(["hr", "admin"]), async (req, res) => {
             normalizeSpLevel(violationContext?.sanctionLevel) || "sp1";
         const normalizedSpLevel = normalizedRequestedLevel || inferredLevel;
 
+        // For manual HR-created warning letters, store metadata-only (no PDF/content columns)
         const letterNumber = await generateLetterNumber(normalizedIssuedDate);
+        // Determine duration from attendance_warning_rules for this SP level if present
+        let durationMonths = 6;
+        try {
+            const [ruleRows] = await db.promise().query(
+                `SELECT sp_duration_months FROM attendance_warning_rules WHERE sanction_level COLLATE utf8mb4_unicode_ci = ? LIMIT 1`,
+                [normalizedSpLevel]
+            );
+            if (ruleRows && ruleRows[0] && ruleRows[0].sp_duration_months) {
+                durationMonths = Number(ruleRows[0].sp_duration_months) || durationMonths;
+            }
+        } catch (e) {
+            // ignore and use default
+        }
 
-        const validUntilDate = new Date(normalizedIssuedDate);
-        validUntilDate.setMonth(validUntilDate.getMonth() + 6);
-        const validUntil = toDateOnly(validUntilDate);
+        const validUntilDateManual = new Date(normalizedIssuedDate);
+        validUntilDateManual.setMonth(validUntilDateManual.getMonth() + durationMonths);
+        const validUntilManual = toDateOnly(validUntilDateManual);
 
-        const letterContent = buildWarningLetterContent({
-            letterNumber,
-            spLevel: normalizedSpLevel,
-            employee: employeeData,
-            violationDate: normalizedViolationDate,
-            violationDateEnd: violationContext.streakEndDate,
-            consecutiveAlphaDays: violationContext.consecutiveAlphaDays,
-            reason,
-            issuedDate: normalizedIssuedDate,
-            signedTitle: issuerSignature.signedTitle,
-            signedName: issuerSignature.signedName,
-        });
+        const evidenceSnapshot = {
+            type: 'manual_warning',
+            letter_number: letterNumber,
+            sp_level: normalizedSpLevel,
+            reason: reason || null,
+            signed_title: issuerSignature.signedTitle || null,
+            signed_name: issuerSignature.signedName || null,
+            violation_date: normalizedViolationDate,
+            issued_date: normalizedIssuedDate,
+            valid_until: validUntilManual,
+        };
+
         const [result] = await db.promise().query(
             `INSERT INTO warning_letters (
-                letter_number,
+                auto_letter_number,
                 sp_level,
                 employee_id,
-                issued_by_user_id,
-                issued_by_role,
-                company_name,
-                company_address,
                 violation_date,
                 issued_date,
                 valid_until,
                 status,
-                reason,
-                signed_title,
-                signed_name,
-                letter_content,
+                evidence_snapshot,
+                generated_by,
                 created_at,
                 updated_at
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'active', ?, ?, ?, ?, NOW(), NOW())`,
+            ) VALUES (?, ?, ?, ?, ?, ?, 'active', ?, 'hr', NOW(), NOW())`,
             [
-                letterNumber,
+                null,
                 normalizedSpLevel,
                 employee_id,
-                req.user.id,
-                issuerRole,
-                COMPANY_NAME,
-                COMPANY_ADDRESS,
                 normalizedViolationDate,
                 normalizedIssuedDate,
-                validUntil,
-                reason || null,
-                issuerSignature.signedTitle,
-                issuerSignature.signedName,
-                letterContent,
+                validUntilManual,
+                JSON.stringify(evidenceSnapshot),
             ]
         );
 
