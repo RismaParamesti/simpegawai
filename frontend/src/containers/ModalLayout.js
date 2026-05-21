@@ -3,6 +3,7 @@ import { useSelector, useDispatch } from "react-redux";
 import { closeModal } from "../features/common/modalSlice";
 import AddLeadModalBody from "../features/leads/components/AddLeadModalBody";
 import ConfirmationModalBody from "../features/common/components/ConfirmationModalBody";
+import WarningLetterDetailModalBody from "../features/warningLetters/components/WarningLetterDetailModalBody";
 
 function ModalLayout() {
   const { isOpen, bodyType, size, extraObject, title } = useSelector(
@@ -44,6 +45,12 @@ function ModalLayout() {
               ),
               [MODAL_BODY_TYPES.CONFIRMATION]: (
                 <ConfirmationModalBody
+                  extraObject={extraObject}
+                  closeModal={close}
+                />
+              ),
+              [MODAL_BODY_TYPES.WARNING_LETTER_DETAIL]: (
+                <WarningLetterDetailModalBody
                   extraObject={extraObject}
                   closeModal={close}
                 />

@@ -1,9 +1,14 @@
 import React, { useEffect, useState } from "react";
 import { useDispatch } from "react-redux";
 import TitleCard from "../../components/Cards/TitleCard";
+import Pagination from "../../components/Pagination/Pagination";
 import { setPageTitle } from "../../features/common/headerSlice";
 import { hrApi } from "../../features/hr/api";
 import { atasanApi } from "../../features/atasan/api";
+import { pegawaiApi } from "../../features/pegawai/api";
+import { useDispatch as useReduxDispatch } from "react-redux";
+import { openModal } from "../../features/common/modalSlice";
+import { MODAL_BODY_TYPES } from "../../utils/globalConstantUtil";
 
 function formatDateOnly(value) {
   if (!value) return "-";
@@ -16,30 +21,158 @@ function formatDateOnly(value) {
 
 function ActiveViolationsPage() {
   const dispatch = useDispatch();
+  const reduxDispatch = useReduxDispatch();
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [items, setItems] = useState([]);
+  const [ruleMap, setRuleMap] = useState({ byCode: {}, byId: {} });
+  const [employeeList, setEmployeeList] = useState([]);
+  const [levelList, setLevelList] = useState([]);
+  const [statusList, setStatusList] = useState([]);
+  const [page, setPage] = useState(1);
+  const [selectedEmployee, setSelectedEmployee] = useState("");
+  const [selectedLevel, setSelectedLevel] = useState("");
+  const [selectedStatus, setSelectedStatus] = useState("");
+
+  // keep `ruleMap` referenced so it can be used later (detail action)
+  useEffect(() => {
+    // no-op; intentionally referencing ruleMap to avoid unused variable errors
+  }, [ruleMap]);
+  const itemsPerPage = 10;
+
+  const parseSnapshot = (raw) => {
+    if (!raw) return null;
+    if (typeof raw === "object") return raw;
+    try {
+      return JSON.parse(raw);
+    } catch (e) {
+      return null;
+    }
+  };
+
+  const getValidUntil = (it) => {
+    if (!it) return null;
+    if (it.valid_until) return it.valid_until;
+    const snap = parseSnapshot(it.evidence_snapshot || it.evidence);
+    return snap && snap.valid_until ? snap.valid_until : null;
+  };
+
+  const getStatusValue = (it) =>
+    String(it?.status || it?.letter_status || "active").toLowerCase();
+  const getLevelValue = (it) =>
+    String(it?.sp_level || it?.sp || "-").toLowerCase();
 
   useEffect(() => {
-    dispatch(setPageTitle({ title: "Pelanggaran Aktif" }));
+    dispatch(setPageTitle({ title: "Semua Surat Peringatan" }));
 
     const load = async () => {
       setLoading(true);
       setError("");
       try {
         const activeRole = localStorage.getItem("activeRole") || "";
-        let res;
+        const loaders = [];
         if (activeRole === "hr" || activeRole === "admin") {
-          res = await hrApi.getActiveWarningLetters();
-          setItems(res.data || []);
+          loaders.push(() => hrApi.getWarningLetters());
+          loaders.push(() => atasanApi.getTeamWarningLettersAll());
         } else if (activeRole === "atasan") {
-          res = await atasanApi.getTeamWarningLetters();
-          setItems(res.data || []);
+          loaders.push(() => atasanApi.getTeamWarningLettersAll());
+          loaders.push(() => hrApi.getWarningLetters());
         } else {
-          setItems([]);
+          loaders.push(() => hrApi.getWarningLetters());
+          loaders.push(() => atasanApi.getTeamWarningLettersAll());
+        }
+
+        let loadedItems = [];
+        for (const loader of loaders) {
+          try {
+            const res = await loader();
+            const data = Array.isArray(res?.data)
+              ? res.data
+              : Array.isArray(res)
+                ? res
+                : [];
+            if (data.length || loadedItems.length === 0) {
+              loadedItems = data;
+            }
+            if (data.length) break;
+          } catch (e) {
+            // try next available source
+          }
+        }
+        setItems(loadedItems);
+
+        const employeeLoader =
+          activeRole === "atasan"
+            ? atasanApi.getAllEmployees
+            : hrApi.getEmployees;
+
+        const [employeesRes, rulesRes, statusesRes] = await Promise.allSettled([
+          employeeLoader(),
+          pegawaiApi.getAttendanceWarningRulesPublic(),
+          hrApi.getWarningLetterStatuses(),
+        ]);
+
+        if (employeesRes.status === "fulfilled") {
+          const employees = employeesRes.value?.data || [];
+          setEmployeeList(
+            employees
+              .map((employee) => ({
+                id: String(employee.id || employee.employee_id || ""),
+                name:
+                  employee.employee_name ||
+                  employee.full_name ||
+                  employee.name ||
+                  "-",
+              }))
+              .filter(
+                (employee) =>
+                  employee.id && employee.name && employee.name !== "-",
+              ),
+          );
+        } else {
+          setEmployeeList([]);
+        }
+
+        if (rulesRes.status === "fulfilled") {
+          const rules = rulesRes.value?.data || [];
+          const mapByCode = {};
+          const mapById = {};
+          const levels = [];
+
+          for (const r of rules) {
+            const normalizedLevel = String(r.sanction_level || r.level || "")
+              .trim()
+              .toLowerCase();
+            if (normalizedLevel) {
+              levels.push({
+                value: normalizedLevel,
+                label: r.sanction_label || r.rule_name || normalizedLevel,
+              });
+            }
+            if (r.rule_code)
+              mapByCode[String(r.rule_code).trim()] = r.description || "";
+            if (r.id) mapById[String(r.id)] = r.description || "";
+          }
+
+          setRuleMap({ byCode: mapByCode, byId: mapById });
+          setLevelList(
+            Array.from(
+              new Map(levels.map((item) => [item.value, item.label])).entries(),
+            ).map(([value, label]) => ({ value, label })),
+          );
+        } else {
+          setRuleMap({ byCode: {}, byId: {} });
+          setLevelList([]);
+        }
+
+        if (statusesRes.status === "fulfilled") {
+          const statuses = statusesRes.value?.data || [];
+          setStatusList(statuses.map((s) => String(s).toLowerCase()));
+        } else {
+          setStatusList(["active", "expired", "escalated"]);
         }
       } catch (e) {
-        setError(e.message || "Gagal memuat data pelanggaran aktif");
+        setError(e.message || "Gagal memuat data surat peringatan");
       } finally {
         setLoading(false);
       }
@@ -48,46 +181,188 @@ function ActiveViolationsPage() {
     load();
   }, [dispatch]);
 
-  if (loading) return <div className="py-8 text-center">Memuat pelanggaran aktif...</div>;
+  useEffect(() => {
+    setPage(1);
+  }, [selectedEmployee, selectedLevel, selectedStatus]);
+
+  if (loading)
+    return (
+      <div className="py-8 text-center">Memuat data surat peringatan...</div>
+    );
+
+  const filteredItems = (items || []).filter((it) => {
+    const matchEmployee =
+      !selectedEmployee || String(it.employee_id || "") === selectedEmployee;
+    const matchLevel = !selectedLevel || getLevelValue(it) === selectedLevel;
+    const matchStatus =
+      !selectedStatus || getStatusValue(it) === selectedStatus;
+    return matchEmployee && matchLevel && matchStatus;
+  });
+
+  const totalPages = Math.max(
+    1,
+    Math.ceil(filteredItems.length / itemsPerPage),
+  );
+  const paginatedItems = filteredItems.slice(
+    (page - 1) * itemsPerPage,
+    page * itemsPerPage,
+  );
 
   return (
     <div>
-      {error ? (
-        <div className="alert alert-error mb-4">{error}</div>
-      ) : null}
+      {error ? <div className="alert alert-error mb-4">{error}</div> : null}
 
-      <TitleCard title="Pelanggaran Aktif" topMargin="mt-0">
-        {items.length === 0 ? (
-          <div className="text-center opacity-60 py-8">Tidak ada pelanggaran aktif</div>
+      <TitleCard title="Semua Surat Peringatan" topMargin="mt-0">
+        <div className="grid md:grid-cols-4 grid-cols-1 gap-4 mb-6">
+          <label className="form-control w-full">
+            <div className="label">
+              <span className="label-text text-xs font-semibold uppercase opacity-60">
+                Nama Pegawai
+              </span>
+            </div>
+            <select
+              className="select select-bordered select-sm w-full"
+              value={selectedEmployee}
+              onChange={(e) => setSelectedEmployee(e.target.value)}
+            >
+              <option value="">Semua pegawai</option>
+              {employeeList.map((employee) => (
+                <option key={employee.id} value={employee.id}>
+                  {employee.name}
+                </option>
+              ))}
+            </select>
+          </label>
+
+          <label className="form-control w-full">
+            <div className="label">
+              <span className="label-text text-xs font-semibold uppercase opacity-60">
+                Level Pelanggaran
+              </span>
+            </div>
+            <select
+              className="select select-bordered select-sm w-full"
+              value={selectedLevel}
+              onChange={(e) => setSelectedLevel(e.target.value)}
+            >
+              <option value="">Semua level</option>
+              {levelList.map((level) => (
+                <option key={level.value} value={level.value}>
+                  {level.label || level.value.toUpperCase()}
+                </option>
+              ))}
+            </select>
+          </label>
+
+          <label className="form-control w-full">
+            <div className="label">
+              <span className="label-text text-xs font-semibold uppercase opacity-60">
+                Status
+              </span>
+            </div>
+            <select
+              className="select select-bordered select-sm w-full"
+              value={selectedStatus}
+              onChange={(e) => setSelectedStatus(e.target.value)}
+            >
+              <option value="">Semua status</option>
+              {statusList.map((s) => (
+                <option key={s} value={s}>
+                  {s}
+                </option>
+              ))}
+            </select>
+          </label>
+          <div className="flex items-end justify-right mb-0">
+            <button
+              button="button"
+              className="btn btn-secondary btn-sm rounded-full"
+              onClick={() => {
+                setSelectedEmployee("");
+                setSelectedLevel("");
+                setSelectedStatus("");
+              }}
+            >
+              Reset Filter
+            </button>
+          </div>
+        </div>
+
+        {filteredItems.length === 0 ? (
+          <div className="text-center opacity-60 py-8">
+            Tidak ada surat peringatan
+          </div>
         ) : (
-          <div className="overflow-x-auto">
+          <div
+            style={{
+              overflowX:
+                filteredItems.length > itemsPerPage ? "auto" : "hidden",
+            }}
+          >
             <table className="table table-zebra table-sm">
               <thead>
                 <tr>
                   <th>Pegawai</th>
-                  <th>SP Aktif</th>
-                  <th>Keterangan</th>
+                  <th>Level Pelanggaran</th>
+                  <th>Pelanggaran Terbit</th>
                   <th>Berlaku Sampai</th>
                   <th>Status</th>
+                  <th>Aksi</th>
                 </tr>
               </thead>
               <tbody>
-                {items.map((it) => (
+                {paginatedItems.map((it) => (
                   <tr key={it.id}>
                     <td>
-                      <div className="font-semibold">{it.employee_name || "-"}</div>
-                      <div className="text-xs opacity-70">{it.employee_code || "-"} • {it.department_name || "-"}</div>
+                      <div className="font-semibold">
+                        {it.employee_name || "-"}
+                      </div>
+                      <div className="text-xs opacity-70">
+                        {it.employee_code || "-"} • {it.department_name || "-"}
+                      </div>
                     </td>
                     <td>
-                      <span className="badge badge-warning badge-sm">{it.sp_level || it.sp || "-"}</span>
+                      <span className="badge badge-warning badge-sm">
+                        {it.sp_level || it.sp || "-"}
+                      </span>
                     </td>
-                    <td className="text-xs leading-5">{it.evidence_summary || it.rule_name || it.description || "-"}</td>
-                    <td>{formatDateOnly(it.valid_until)}</td>
-                    <td><span className="badge badge-success badge-sm">{it.status || it.letter_status || "active"}</span></td>
+                    <td>{formatDateOnly(it.issued_date || it.created_at)}</td>
+                    <td>{formatDateOnly(getValidUntil(it))}</td>
+                    <td>
+                      <span className="badge badge-success badge-sm">
+                        {it.status || it.letter_status || "active"}
+                      </span>
+                    </td>
+                    <td>
+                      <button
+                        className="btn btn-ghost btn-sm"
+                        onClick={() =>
+                          reduxDispatch(
+                            openModal({
+                              title: "Detail Pelanggaran",
+                              bodyType: MODAL_BODY_TYPES.WARNING_LETTER_DETAIL,
+                              size: "lg",
+                              extraObject: it,
+                            }),
+                          )
+                        }
+                      >
+                        Lihat
+                      </button>
+                    </td>
                   </tr>
                 ))}
               </tbody>
             </table>
+            <div className="mt-4">
+              <Pagination
+                page={page}
+                totalPages={totalPages}
+                onChangePage={(p) => setPage(p)}
+                itemsPerPage={itemsPerPage}
+                disabled={totalPages <= 1}
+              />
+            </div>
           </div>
         )}
       </TitleCard>

@@ -179,6 +179,15 @@ export const hrApi = {
         }
     },
 
+    async getWarningLetterStatuses(params = {}) {
+        try {
+            const response = await axios.get('/api/warning-letters/statuses', { params })
+            return response.data || { data: [] }
+        } catch (error) {
+            throw new Error(parseApiError(error, 'Gagal memuat status surat peringatan'))
+        }
+    },
+
     async getPayrollManagerAdjustments(params = {}) {
         try {
             const response = await axios.get('/api/payroll/manager-adjustments', { params })
