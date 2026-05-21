@@ -19,6 +19,7 @@ import {
   ScaleIcon,
   BuildingOffice2Icon,
   CalculatorIcon,
+  ExclamationTriangleIcon ,
 } from "@heroicons/react/24/outline";
 
 const iconClasses = `h-6 w-6`;
@@ -69,8 +70,8 @@ const pegawaiRoutes = [
       },
       {
         path: "/app/warning-letters",
-        icon: <DocumentTextIcon className={iconClasses} />,
-        name: "Disiplin Kehadiran",
+        icon: <ExclamationTriangleIcon className={iconClasses} />,
+        name: "Disiplin Kehadiran Saya",
       },
     ],
   },
@@ -152,15 +153,15 @@ const hrRoutes = [
       {
         path: "/app/warning-letters",
         icon: <DocumentTextIcon className={iconClasses} />,
-        name: "Disiplin Kehadiran",
+        name: "Pengaturan Disiplin Kehadiran",
+      },
+
+      {
+        path: "/app/active-violations",
+        icon: <ExclamationTriangleIcon className={iconClasses} />,
+        name: "Disiplin Kehadiran Pegawai",
       },
     ],
-  },
-
-  {
-    path: "/app/active-violations",
-    icon: <DocumentTextIcon className={iconClasses} />,
-    name: "Pelanggaran Aktif",
   },
 
   {
@@ -229,14 +230,31 @@ const atasanRoutes = [
     ],
   },
   {
+    path: "",
+    icon: <ClipboardDocumentListIcon className={iconClasses} />,
+    name: "Cuti dan Izin Anggota Tim",
+    submenu: [
+      {
+        path: "/app/leave-requests",
+        icon: <ClipboardDocumentCheckIcon className={iconClasses} />,
+        name: "Persetujuan Cuti & Izin",
+      },
+      {
+        path: "/app/leave-requests-history",
+        icon: <ClockIcon className={iconClasses} />,
+        name: "Riwayat Cuti & Izin",
+      },
+    ],
+  },
+  {
     path: "/app/team-attendance",
     icon: <CalendarDaysIcon className={iconClasses} />,
     name: "Kehadiran Tim",
   },
   {
     path: "/app/active-violations",
-    icon: <DocumentTextIcon className={iconClasses} />,
-    name: "Pelanggaran Aktif",
+    icon: <ExclamationTriangleIcon className={iconClasses} />,
+    name: "Disiplin Kehadiran Tim",
   },
 ];
 

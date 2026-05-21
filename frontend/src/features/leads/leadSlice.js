@@ -28,17 +28,18 @@ export const leadsSlice = createSlice({
         }
     },
 
-    extraReducers: {
-		[getLeadsContent.pending]: state => {
-			state.isLoading = true
-		},
-		[getLeadsContent.fulfilled]: (state, action) => {
-			state.leads = action.payload.data
-			state.isLoading = false
-		},
-		[getLeadsContent.rejected]: state => {
-			state.isLoading = false
-		},
+    extraReducers: (builder) => {
+        builder
+            .addCase(getLeadsContent.pending, (state) => {
+                state.isLoading = true
+            })
+            .addCase(getLeadsContent.fulfilled, (state, action) => {
+                state.leads = action.payload.data
+                state.isLoading = false
+            })
+            .addCase(getLeadsContent.rejected, (state) => {
+                state.isLoading = false
+            })
     }
 })
 

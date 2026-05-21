@@ -963,6 +963,29 @@ router.get(
     }
 );
 
+// GET DISTINCT STATUSES
+router.get(
+    "/statuses",
+    verifyToken,
+    verifyRole(["hr", "admin", "atasan"]),
+    async (req, res) => {
+        try {
+            const [rows] = await db.promise().query(
+                `SELECT DISTINCT LOWER(COALESCE(status, '')) AS status FROM warning_letters`,
+            );
+
+            const statuses = (rows || [])
+                .map((r) => String(r.status || "").trim())
+                .filter((s) => s);
+
+            return res.json({ message: 'Warning letter statuses fetched', total: statuses.length, data: statuses });
+        } catch (error) {
+            console.error(error);
+            return res.status(500).json({ message: 'Server error' });
+        }
+    }
+);
+
 router.get(
     "/:id",
     verifyToken,
