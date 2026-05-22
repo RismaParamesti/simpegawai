@@ -51,7 +51,14 @@ export default function CandidateJobsPage() {
     api
       .get("/job-openings")
       .then((res) => {
-        setJobs(res.data.jobs || []);
+        const jobsData = res.data.jobs || [];
+        const now = new Date();
+        const visible = jobsData.filter((job) => {
+          if (job.status !== "open") return false;
+          if (!job.deadline) return true;
+          return new Date(job.deadline) >= now;
+        });
+        setJobs(visible);
       })
       .catch(() => {
         setError("Gagal mengambil data lowongan.");

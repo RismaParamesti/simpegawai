@@ -1,5 +1,5 @@
 import { useState, useMemo, useEffect } from "react";
-import { useNavigate, useLocation } from "react-router-dom";
+import { useLocation } from "react-router-dom";
 import {
   getRequiredDocuments,
   DOCUMENT_FIELD_METADATA,
@@ -34,8 +34,50 @@ function getAuthHeaders() {
   return token ? { Authorization: `Bearer ${token}` } : {};
 }
 
+function getCoverLetterFileUrl(value) {
+  if (!value) return "";
+
+  if (typeof value === "string") {
+    if (value.startsWith("http")) return value;
+    if (value.startsWith("/")) {
+      return `http://localhost:5000${value}`;
+    }
+    return `http://localhost:5000/${value}`;
+  }
+
+  if (typeof value === "number") {
+    return `http://localhost:5000/${value}`;
+  }
+
+  if (typeof value === "object") {
+    const fileValue =
+      value.url || value.path || value.file_url || value.filename || value.name;
+    return getCoverLetterFileUrl(fileValue);
+  }
+
+  return String(value);
+}
+
+function getFileDisplayText(value) {
+  if (!value) return "";
+  if (typeof value === "string" || typeof value === "number") {
+    return String(value);
+  }
+  if (typeof value === "object") {
+    return (
+      value.name ||
+      value.filename ||
+      value.file_name ||
+      value.url ||
+      value.path ||
+      value.file_url ||
+      "File terlampir"
+    );
+  }
+  return String(value);
+}
+
 export default function HRRecruitmentProcessDetail() {
-  const navigate = useNavigate();
   // Untuk popup Tolak
   const [showRejectPopup, setShowRejectPopup] = useState(false);
   const [rejectNotes, setRejectNotes] = useState("");
@@ -86,7 +128,7 @@ export default function HRRecruitmentProcessDetail() {
       }
     }
     // Jika tidak ada id aplikasi di path, tetap di list
-  }, [urlApplicationId, applications]);
+  }, [urlApplicationId, applications, selected]);
 
   const fetchApplications = async () => {
     try {
@@ -705,7 +747,7 @@ export default function HRRecruitmentProcessDetail() {
                               <p
                                 className={`font-semibold break-all ${!val ? "text-error opacity-60" : ""}`}
                               >
-                                {val || "Tidak diupload"}
+                                {getFileDisplayText(val) || "Tidak diupload"}
                               </p>
                             </div>
                             {val ? (
@@ -736,20 +778,22 @@ export default function HRRecruitmentProcessDetail() {
                   <h3 className="card-title text-lg">Cover Letter</h3>
                   <div className="whitespace-pre-line break-words p-2 border rounded bg-base-100 min-h-[48px]">
                     {selected.cover_letter_file ? (
+                      (() => {
+                        const coverLetterUrl = getCoverLetterFileUrl(
+                          selected.cover_letter_file,
+                        );
+                        return (
                       <a
-                        href={
-                          selected.cover_letter_file.startsWith("http")
-                            ? selected.cover_letter_file
-                            : selected.cover_letter_file.startsWith("/")
-                              ? `http://localhost:5000${selected.cover_letter_file}`
-                              : `http://localhost:5000/${selected.cover_letter_file}`
-                        }
+                        href={coverLetterUrl || "#"}
                         target="_blank"
                         rel="noopener noreferrer"
                         className="font-semibold break-all hover:underline"
                       >
-                        {selected.cover_letter_file}
+                        {getFileDisplayText(selected.cover_letter_file) ||
+                          "Cover letter"}
                       </a>
+                        );
+                      })()
                     ) : (
                       <span className="opacity-60 italic">
                         Tidak ada cover letter

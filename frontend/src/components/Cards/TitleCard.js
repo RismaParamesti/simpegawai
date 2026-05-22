@@ -1,7 +1,7 @@
 import Subtitle from "../Typography/Subtitle";
 import { useNavigate } from "react-router-dom";
 
-function TitleCard({ title, children, topMargin, TopSideButtons, to, linkState }) {
+function TitleCard({ title, subtitle, children, topMargin, TopSideButtons, to, linkState }) {
   const navigate = useNavigate();
   const clickable = !!to;
 
@@ -32,9 +32,14 @@ function TitleCard({ title, children, topMargin, TopSideButtons, to, linkState }
     >
       {/* Title for Card */}
       <div className="flex items-start justify-between gap-4">
-        <Subtitle styleClass={TopSideButtons ? "inline-block" : ""}>
-          {title}
-        </Subtitle>
+        <div>
+          <Subtitle styleClass={TopSideButtons ? "inline-block" : ""}>
+            {title}
+          </Subtitle>
+          {subtitle && (
+            <p className="mt-1 text-sm text-base-content/60">{subtitle}</p>
+          )}
+        </div>
 
         {/* Top side button, show only if present */}
         {TopSideButtons && <div className="shrink-0">{TopSideButtons}</div>}

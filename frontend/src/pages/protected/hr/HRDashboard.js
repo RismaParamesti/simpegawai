@@ -174,7 +174,7 @@ function HRDashboard() {
                                     {item.value}
                                 </p>
                                 <p className="text-xs text-base-content/60 mt-1 hidden sm:block">{item.detail}</p>
-                                <p className="text-xs text-base-content/60 mt-0.5">Klik &rarr;</p>
+                                
                             </div>
                         </div>
                     </button>

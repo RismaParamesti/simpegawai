@@ -233,6 +233,7 @@ function EmployeeAttendance() {
   const [warningLetters, setWarningLetters] = useState([]);
   const [actionLoading, setActionLoading] = useState(false);
   const attendanceTodayCardRef = useRef(null);
+  const [showCheckoutModal, setShowCheckoutModal] = useState(false);
 
   const now = new Date();
   const [selectedMonth, setSelectedMonth] = useState(now.getMonth() + 1);
@@ -313,11 +314,20 @@ function EmployeeAttendance() {
   const attendanceDate = today?.date ? new Date(today.date) : new Date();
   const isSundayToday = attendanceDate.getDay() === 0;
   const attendanceWindow = getAttendanceWorkingHoursWindow(today);
-  const nowTime = new Date();
-  const currentSeconds =
-    nowTime.getHours() * 3600 +
-    nowTime.getMinutes() * 60 +
-    nowTime.getSeconds();
+  const [currentSeconds, setCurrentSeconds] = useState(() => {
+    const now = new Date();
+    return now.getHours() * 3600 + now.getMinutes() * 60 + now.getSeconds();
+  });
+
+  useEffect(() => {
+    const id = setInterval(() => {
+      const now = new Date();
+      setCurrentSeconds(
+        now.getHours() * 3600 + now.getMinutes() * 60 + now.getSeconds(),
+      );
+    }, 15000);
+    return () => clearInterval(id);
+  }, []);
   const checkInStartSeconds = attendanceWindow.checkInSeconds;
   const checkInCutoffSeconds = attendanceWindow.checkOutSeconds;
   const isCheckInTooEarly =
@@ -353,6 +363,10 @@ function EmployeeAttendance() {
   const isAfterCutoffOut = currentSeconds > checkInCutoffSeconds;
   // ensure check-out is also disabled after cutoff
   const canCheckOutNowFinal = canCheckOutNow && !isAfterCutoffOut;
+
+  const shouldShowCheckoutNotification = Boolean(
+    today?.check_in && !today?.check_out && isAfterCutoffOut,
+  );
 
   // Pagination logic
   const itemsPerPage = 10;
@@ -468,6 +482,37 @@ function EmployeeAttendance() {
             </div>
           ) : null}
 
+          {shouldShowCheckoutNotification ? (
+            <div className="alert alert-warning mb-4 flex justify-between items-center">
+              <div>Anda belum absen pulang. Silakan absen pulang sekarang.</div>
+              <div className="flex gap-2">
+                <button
+                  className="btn btn-sm btn-primary"
+                  onClick={() => {
+                    attendanceTodayCardRef.current?.scrollIntoView({
+                      behavior: "smooth",
+                      block: "start",
+                    });
+                    setShowCheckoutModal(true);
+                  }}
+                >
+                  Absen Pulang Sekarang
+                </button>
+                <button
+                  className="btn btn-sm"
+                  onClick={() => {
+                    attendanceTodayCardRef.current?.scrollIntoView({
+                      behavior: "smooth",
+                      block: "start",
+                    });
+                  }}
+                >
+                  Buka Halaman Absensi
+                </button>
+              </div>
+            </div>
+          ) : null}
+
           {!isSundayToday && !isLeaveIntegratedToday && isCheckInTooEarly ? (
             <div className="alert alert-warning mb-4">
               <span>
@@ -569,6 +614,33 @@ function EmployeeAttendance() {
           </div>
         </TitleCard>
       </div>
+
+      {showCheckoutModal && (
+        <div className="modal modal-open">
+          <div className="modal-box">
+            <h3 className="font-bold text-lg">Konfirmasi Absen Pulang</h3>
+            <p className="py-4">Apakah Anda ingin absen pulang sekarang?</p>
+            <div className="modal-action">
+              <button
+                className={`btn btn-primary ${actionLoading ? "loading" : ""}`}
+                onClick={async () => {
+                  setShowCheckoutModal(false);
+                  try {
+                    await runCheckout();
+                  } catch (e) {
+                    // runCheckout handles errors
+                  }
+                }}
+              >
+                Ya, Absen Pulang
+              </button>
+              <button className="btn" onClick={() => setShowCheckoutModal(false)}>
+                Batal
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       <TitleCard title="Riwayat Absensi" topMargin="mt-6">
         <div className="grid md:grid-cols-3 grid-cols-1 gap-3 mb-4">

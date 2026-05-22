@@ -1,5 +1,4 @@
 import React, { useEffect, useState } from "react";
-import { NotificationManager } from "react-notifications";
 import { useDispatch } from "react-redux";
 import { useNavigate } from "react-router-dom";
 import api from "../../../lib/api";
@@ -15,6 +14,13 @@ export default function CandidateJobList() {
   const [filteredJobs, setFilteredJobs] = useState([]);
   const [locations, setLocations] = useState([]);
   const [applicantsCount, setApplicantsCount] = useState({});
+  const [candidateSummary, setCandidateSummary] = useState({
+    total: 0,
+    changed: 0,
+    unchanged: 0,
+  });
+  const [applicationsList, setApplicationsList] = useState([]);
+  const [activeFilter, setActiveFilter] = useState(null); // 'all' | 'changed' | 'unchanged' | null
 
   const [search, setSearch] = useState("");
   const [locationFilter, setLocationFilter] = useState("");
@@ -23,26 +29,63 @@ export default function CandidateJobList() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
 
-  const [selectedJob, setSelectedJob] = useState(null);
-  const [openModal, setOpenModal] = useState(false);
-
   useEffect(() => {
-    dispatch(setPageTitle({ title: "Data Kandidat" }));
+    dispatch(setPageTitle({ title: "Daftar Kandidat" }));
     fetchJobs();
-  }, [dispatch]);
+      // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [dispatch]);
 
   useEffect(() => {
-    filterJobs();
+    let result = jobs;
+
+    if (search) {
+      result = result.filter((job) =>
+        job.position_name?.toLowerCase().includes(search.toLowerCase()),
+      );
+    }
+
+    if (locationFilter) {
+      result = result.filter(
+        (job) => job.location?.toLowerCase() === locationFilter.toLowerCase(),
+      );
+    }
+
+    if (statusFilter) {
+      result = result.filter((job) => job.status === statusFilter);
+    }
+
+    setFilteredJobs(result);
   }, [search, locationFilter, statusFilter, jobs]);
 
   const fetchJobs = async () => {
     try {
       setLoading(true);
-      const res = await api.get("/job-openings");
+      const [res, appsRes] = await Promise.all([
+        api.get("/job-openings"),
+        api.get("/candidates/admin/applications").catch(() => null),
+      ]);
       const jobsData = res.data.jobs || [];
       // Tidak filter status, tampilkan semua (open & closed)
       setJobs(jobsData);
       setFilteredJobs(jobsData);
+
+      const applications = Array.isArray(appsRes?.data?.applications)
+        ? appsRes.data.applications
+        : [];
+      setApplicationsList(applications);
+      const totalApplications = applications.length;
+      const unchangedApplications = applications.filter((app) => {
+        const appStatus = String(app.status || "").toLowerCase();
+        return appStatus === "submitted";
+      }).length;
+      setCandidateSummary({
+        total: totalApplications,
+        changed: Math.max(0, totalApplications - unchangedApplications),
+        unchanged: unchangedApplications,
+      });
+
+      
+
       // Prefer applications_count returned by the jobs API
       const countsFromJobs = {};
       jobsData.forEach((j) => {
@@ -84,55 +127,6 @@ export default function CandidateJobList() {
     }
   };
 
-  const filterJobs = () => {
-    let result = jobs;
-
-    if (search) {
-      result = result.filter((job) =>
-        job.position_name?.toLowerCase().includes(search.toLowerCase()),
-      );
-    }
-
-    if (locationFilter) {
-      result = result.filter(
-        (job) => job.location?.toLowerCase() === locationFilter.toLowerCase(),
-      );
-    }
-
-    if (statusFilter) {
-      result = result.filter((job) => job.status === statusFilter);
-    }
-
-    setFilteredJobs(result);
-  };
-
-  // State untuk menyimpan daftar job yang sudah pernah dilamar
-  const [appliedJobIds, setAppliedJobIds] = useState([]);
-
-  // Ambil daftar aplikasi user saat mount
-  useEffect(() => {
-    const fetchAppliedJobs = async () => {
-      try {
-        const res = await api.get("/candidates/applications");
-        if (res.data.applications) {
-          const ids = res.data.applications
-            .map(
-              (app) =>
-                app.job_opening_id ||
-                app.job_openingId ||
-                app.job_id ||
-                app.jobId,
-            )
-            .filter(Boolean);
-          setAppliedJobIds(ids);
-        }
-      } catch (err) {
-        setAppliedJobIds([]);
-      }
-    };
-    fetchAppliedJobs();
-  }, []);
-
   const getEmploymentTypeLabel = (type) => {
     const typeMap = {
       permanent: "Tetap",
@@ -145,13 +139,56 @@ export default function CandidateJobList() {
     return typeMap[type?.toLowerCase()] || type || "-";
   };
 
-  const openJobDetail = (job) => {
-    setSelectedJob(job);
-    setOpenModal(true);
+  
+
+  const computeJobsList = (mode) => {
+    // return list of jobs that have at least one application matching mode, with counts
+    const byJob = {};
+    applicationsList.forEach((app) => {
+      const jid = app.job_opening_id || app.job_id;
+      if (!jid) return;
+      const appStatus = String(app.status || "").toLowerCase();
+      const isUnchanged = appStatus === "submitted";
+      let include = false;
+      if (mode === "all") include = true;
+      if (mode === "unchanged" && isUnchanged) include = true;
+      if (mode === "changed" && !isUnchanged) include = true;
+      if (!include) return;
+      if (!byJob[jid]) byJob[jid] = 0;
+      byJob[jid]++;
+    });
+
+    return Object.keys(byJob).map((jid) => {
+      const jobId = Number(jid);
+      const job = jobs.find((j) => (j.id || j.job_opening_id) === jobId) || { id: jobId, title: `Lowongan #${jobId}` };
+      return { job, count: byJob[jid] };
+    }).sort((a,b) => b.count - a.count);
   };
 
   return (
     <div>
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+        <div onClick={() => setActiveFilter('all')} className="rounded-2xl bg-base-100 border border-base-200 shadow-sm p-5 cursor-pointer hover:shadow-md">
+          <p className="text-sm text-base-content/60">Total Pelamar</p>
+          <p className="mt-2 text-3xl font-bold text-base-content">
+            {candidateSummary.total}
+          </p>
+        </div>
+        <div onClick={() => setActiveFilter('changed')} className="rounded-2xl bg-base-100 border border-base-200 shadow-sm p-5 cursor-pointer hover:shadow-md">
+          <p className="text-sm text-base-content/60">Sudah Dikelola</p>
+          <p className="mt-2 text-3xl font-bold text-warning">
+            {candidateSummary.changed}
+          </p>
+        </div>
+        <div onClick={() => setActiveFilter('unchanged')} className="rounded-2xl bg-base-100 border border-base-200 shadow-sm p-5 cursor-pointer hover:shadow-md">
+          <p className="text-sm text-base-content/60">Belum Dikelola</p>
+          <p className="mt-2 text-3xl font-bold text-success">
+            {candidateSummary.unchanged}
+          </p>
+        </div>
+      </div>
+      {/* When activeFilter is set, the main job grid below will be filtered to show only matching lowongan. */}
+
       <TitleCard title="Pilih Lowongan Pekerjaan" topMargin="mt-0">
         {/* SEARCH + FILTER */}
         <div className="flex flex-col md:flex-row md:items-center gap-4 mb-6">
@@ -203,6 +240,18 @@ export default function CandidateJobList() {
               <option value="closed">Closed</option>
             </select>
           </div>
+            <button
+            button = "button"
+              className="btn btn-secondary btn-sm rounded-full"
+              onClick={() => {
+                setSearch("");
+                setLocationFilter("");
+                setStatusFilter("");
+                setActiveFilter(null);
+              }}
+            >
+              Reset
+            </button>
         </div>
 
         {/* LOADING */}
@@ -216,78 +265,67 @@ export default function CandidateJobList() {
         {error && <div className="text-center text-error p-4">{error}</div>}
 
         {/* JOB LIST */}
-        {!loading && !error && (
-          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
-            {filteredJobs.map((job) => (
-              <div
-                key={job.id}
-                className="card bg-base-100 shadow-md border hover:shadow-xl transition"
-              >
-                <div className="card-body">
-                  {/* TITLE */}
-                  <h2 className="card-title text-primary">
-                    {job.position_name}
-                  </h2>
-
-                  {/* LOCATION */}
-                  <p className="text-sm opacity-70">
-                    📍 {job.location || "Lokasi tidak disebutkan"}
-                  </p>
-
-                  {/* TYPE */}
-                  <div className="badge badge-outline capitalize">
-                    Pegawai {getEmploymentTypeLabel(job.employment_type)}
-                  </div>
-
-                  {/* SALARY */}
-                  <p className="text-sm mt-2">
-                    {job.salary_range_min && job.salary_range_max
-                      ? `💰 Rp ${Number(job.salary_range_min).toLocaleString("id-ID")} - Rp ${Number(job.salary_range_max).toLocaleString("id-ID")}`
-                      : "💰 Gaji dirahasiakan"}
-                  </p>
-
-                  {/* QUOTA */}
-                  <p className="text-sm">👥 Kuota: {job.quota || 1}</p>
-
-                  {/* APPLICANTS COUNT */}
-                  <p className="text-sm">👥 Jumlah Pelamar: {applicantsCount[job.id || job.job_opening_id || job.job_openingId || job.jobId] ?? "-"}</p>
-
-                  {/* DEADLINE */}
-                  <p className="text-sm text-warning">
-                    ⏳ Deadline:{" "}
-                    {job.deadline
-                      ? new Date(job.deadline).toLocaleDateString("id-ID")
-                      : "-"}
-                  </p>
-
-                  {/* STATUS */}
-                  <div className="mt-2">
-                    {job.status === "open" && (
-                      <span className="badge badge-success">
-                        Open Recruitment
-                      </span>
-                    )}
-
-                    {job.status === "closed" && (
-                      <span className="badge badge-error">Closed</span>
-                    )}
-                  </div>
-
-                  {/* BUTTON */}
-                  <button
-                    className="btn btn-primary btn-sm"
-                    onClick={() => {
-                      const jid = job.id || job.job_opening_id || job.job_openingId || job.jobId;
-                      navigate(`/app/candidate/${jid}?job_id=${jid}`, { state: { job } });
-                    }}
+        {!loading && !error && (() => {
+          const jobsForFilter = activeFilter ? computeJobsList(activeFilter) : null;
+          const visibleJobs = activeFilter ? jobsForFilter.map(j => j.job) : filteredJobs;
+          return (
+            <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
+              {visibleJobs.map((job) => {
+                const jobCount = activeFilter ? (jobsForFilter.find(j => (j.job.id || j.job.job_opening_id) === (job.id || job.job_opening_id)) || {}).count : (applicantsCount[job.id || job.job_opening_id || job.job_openingId || job.jobId] ?? "-");
+                return (
+                  <div
+                    key={job.id}
+                    className="card bg-base-100 shadow-md border hover:shadow-xl transition"
                   >
-                    Lihat Lamaran
-                  </button>
-                </div>
-              </div>
-            ))}
-          </div>
-        )}
+                    <div className="card-body">
+                      {/* TITLE */}
+                      <h2 className="card-title text-primary">{job.position_name}</h2>
+
+                      {/* LOCATION */}
+                      <p className="text-sm opacity-70">📍 {job.location || "Lokasi tidak disebutkan"}</p>
+
+                      {/* TYPE */}
+                      <div className="badge badge-outline capitalize">Pegawai {getEmploymentTypeLabel(job.employment_type)}</div>
+
+                      {/* SALARY */}
+                      <p className="text-sm mt-2">
+                        {job.salary_range_min && job.salary_range_max
+                          ? `💰 Rp ${Number(job.salary_range_min).toLocaleString("id-ID")} - Rp ${Number(job.salary_range_max).toLocaleString("id-ID")}`
+                          : "💰 Gaji dirahasiakan"}
+                      </p>
+
+                      {/* QUOTA */}
+                      <p className="text-sm">👥 Kuota: {job.quota || 1}</p>
+
+                      {/* APPLICANTS COUNT */}
+                      <p className="text-sm">👥 Jumlah Pelamar: {jobCount ?? "-"}</p>
+
+                      {/* DEADLINE */}
+                      <p className="text-sm text-warning">⏳ Deadline: {job.deadline ? new Date(job.deadline).toLocaleDateString("id-ID") : "-"}</p>
+
+                      {/* STATUS */}
+                      <div className="mt-2">
+                        {job.status === "open" && <span className="badge badge-success">Open Recruitment</span>}
+                        {job.status === "closed" && <span className="badge badge-error">Closed</span>}
+                      </div>
+
+                      {/* BUTTON */}
+                      <button
+                        className="btn btn-primary btn-sm"
+                        onClick={() => {
+                          const jid = job.id || job.job_opening_id || job.job_openingId || job.jobId;
+                          navigate(`/app/candidate/${jid}?job_id=${jid}`, { state: { job } });
+                        }}
+                      >
+                        Lihat Kandidat
+                      </button>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          );
+        })()}
       </TitleCard>
     </div>
   );
