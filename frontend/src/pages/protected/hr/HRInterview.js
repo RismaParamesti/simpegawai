@@ -1,12 +1,11 @@
 // Pastikan status/hiring_status di-fetch untuk semua job di history
-import React, { useEffect, useState } from "react";
+import React, { useCallback, useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import HRModalInterview from "./HRInterviewModal";
 import HRInterviewDetailLowongan from "./HRInterviewNilai";
 import TitleCard from "../../../components/Cards/TitleCard";
 import axios from "axios";
 import { useRef } from "react";
-import { NotificationManager } from "react-notifications";
 
 export default function HRInterview() {
   const [activeMenu, setActiveMenu] = useState("schedule");
@@ -58,6 +57,7 @@ export default function HRInterview() {
     window.addEventListener("refreshInterviewData", handler);
     return () => window.removeEventListener("refreshInterviewData", handler);
   }, [activeMenu]);
+
   const [data, setData] = useState([]); // interview data
   const [candidates, setCandidates] = useState([]); // kandidat lolos dokumen
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -68,6 +68,80 @@ export default function HRInterview() {
   const [mode, setMode] = useState("create");
   const [isCancelModalOpen, setIsCancelModalOpen] = useState(false);
   const [cancelNotes, setCancelNotes] = useState("");
+
+  useEffect(() => {
+    if (activeMenu === "schedule") {
+      axios
+        .get("/api/hr/applications?status=lolos_dokumen")
+        .then(async (res) => {
+          const apps = (res.data && res.data.applications) || [];
+          let tempCanceledMap = {};
+
+          try {
+            const resp = await axios.get(
+              "/api/hr/interviews/canceled-applications",
+            );
+
+            if (resp.data && Array.isArray(resp.data.applications)) {
+              resp.data.applications.forEach((row) => {
+                tempCanceledMap[row.application_id] = true;
+              });
+            }
+          } catch (e) {
+            console.error("[ERROR CANCELED]:", e);
+          }
+
+          setCanceledMap(tempCanceledMap);
+          setCandidates(apps);
+        })
+        .catch(() => setCandidates([]));
+    } else if (activeMenu === "list") {
+      axios
+        .get("/api/hr/interviews")
+        .then((res) => {
+          console.log("[DEBUG] DATA INTERVIEWS", res.data.interviews);
+          if (!res.data.interviews || res.data.interviews.length === 0) {
+            console.warn(
+              "[DEBUG] Tidak ada data interview yang diterima dari API",
+            );
+          }
+          setData(
+            (res.data.interviews || []).map((i) => ({
+              ...i,
+              status: i.status || i.interview_status || "scheduled",
+              job_title:
+                i.job_title || i.position_name || i.base_position || "Lainnya",
+              id: i.id || i.interview_id,
+              candidate_name: i.candidate_name || i.name || "-",
+              scheduled_date: i.scheduled_date || i.date,
+              interview_type: i.interview_type || i.type || "-",
+              interviewer_name:
+                i.interviewer_name || i.interviewer || i.full_name || "-",
+            })),
+          );
+        })
+        .catch((err) => {
+          console.error("[DEBUG] Error ambil data interviews:", err);
+          setData([]);
+        });
+    } else if (activeMenu === "history") {
+      axios
+        .get("/api/hr/interviews/history-combined")
+        .then((res) => {
+          setData(res.data.history || []);
+        })
+        .catch(() => setData([]));
+    }
+  }, [activeMenu]);
+
+  const [form, setForm] = useState({
+    datetime: "",
+    type: "Online",
+    stage: "HR",
+    interviewer: "",
+    location: "",
+  });
+
   const handleSchedule = (candidate) => {
     // Cek apakah kandidat sudah punya jadwal interview (scheduled/rescheduled)
     const alreadyScheduled = data.some(
@@ -150,104 +224,6 @@ export default function HRInterview() {
     }, 100);
   };
 
-  const [form, setForm] = useState({
-    datetime: "",
-    type: "Online",
-    stage: "HR",
-    interviewer: "",
-    location: "",
-  });
-
-  useEffect(() => {
-    if (activeMenu === "schedule") {
-      // Ambil data aplikasi lolos_dokumen
-      axios
-        .get("/api/hr/applications?status=lolos_dokumen")
-        .then(async (res) => {
-          const apps = (res.data && res.data.applications) || [];
-          let tempCanceledMap = {};
-
-          try {
-            const resp = await axios.get(
-              "/api/hr/interviews/canceled-applications",
-            );
-
-            if (resp.data && Array.isArray(resp.data.applications)) {
-              resp.data.applications.forEach((row) => {
-                tempCanceledMap[row.application_id] = true;
-              });
-            }
-          } catch (e) {
-            console.error("[ERROR CANCELED]:", e);
-          }
-
-          setCanceledMap(tempCanceledMap);
-          setCandidates(apps);
-        })
-        .catch(() => setCandidates([]));
-    } else if (activeMenu === "list") {
-      axios
-        .get("/api/hr/interviews")
-        .then((res) => {
-          console.log("[DEBUG] DATA INTERVIEWS", res.data.interviews);
-          // Jika data kosong, tampilkan pesan
-          if (!res.data.interviews || res.data.interviews.length === 0) {
-            console.warn(
-              "[DEBUG] Tidak ada data interview yang diterima dari API",
-            );
-          }
-          // Pastikan status interview sesuai
-          setData(
-            (res.data.interviews || []).map((i) => ({
-              ...i,
-              status: i.status || i.interview_status || "scheduled",
-              job_title:
-                i.job_title || i.position_name || i.base_position || "Lainnya",
-              id: i.id || i.interview_id,
-              candidate_name: i.candidate_name || i.name || "-",
-              scheduled_date: i.scheduled_date || i.date,
-              interview_type: i.interview_type || i.type || "-",
-              interviewer_name:
-                i.interviewer_name || i.interviewer || i.full_name || "-",
-            })),
-          );
-        })
-        .catch((err) => {
-          console.error("[DEBUG] Error ambil data interviews:", err);
-          setData([]);
-        });
-    } else if (activeMenu === "history") {
-      // Ambil data interview status completed & canceled_by_company dari endpoint gabungan
-      axios
-        .get("/api/hr/interviews/history-combined")
-        .then((res) => {
-          const interviews = (res.data.history || []).map((i) => ({
-            ...i,
-            job_title:
-              i.job_title || i.position_name || i.base_position || "Lainnya",
-            id: i.id || i.interview_id,
-            candidate_name: i.candidate_name || i.name || "-",
-            scheduled_date: i.scheduled_date || i.date,
-            interview_type: i.interview_type || i.type || "-",
-            interviewer_name:
-              i.interviewer_name || i.interviewer || i.full_name || "-",
-            status: i.status || i.interview_status || "completed",
-          }));
-          setData(interviews);
-        })
-        .catch((err) => {
-          console.error("[DEBUG HISTORY] error:", err);
-          setData([]);
-        });
-    }
-  }, [activeMenu]);
-
-  const menu = [
-    { key: "schedule", label: "Buatkan Jadwal" },
-    { key: "list", label: "Jadwal Wawancara" },
-    { key: "history", label: "Riwayat Jadwal" },
-  ];
-
   const formatDate = (date) => {
     if (!date) return "-";
     const d = new Date(date);
@@ -273,6 +249,45 @@ export default function HRInterview() {
     return `${hari} ${namaBulan} ${tahun}, pukul ${jam}:${menit}`;
   };
 
+  const menu = [
+    { key: "schedule", label: "Buatkan Jadwal" },
+    { key: "list", label: "Jadwal Wawancara" },
+    { key: "history", label: "Riwayat Jadwal" },
+  ];
+
+  const [jobStatusMap, setJobStatusMap] = useState({}); // { [job_opening_id]: { status, hiring_status } }
+  const jobStatusLoading = useRef({}); // prevent duplicate fetch
+
+  // Fungsi untuk fetch status job_openings jika belum ada di state
+  const fetchJobStatus = useCallback(
+    async (jobOpeningId) => {
+      if (
+        !jobOpeningId ||
+        jobStatusMap[jobOpeningId] ||
+        jobStatusLoading.current[jobOpeningId]
+      )
+        return;
+      jobStatusLoading.current[jobOpeningId] = true;
+      try {
+        const res = await axios.get(`/api/job-openings/${jobOpeningId}`);
+        if (res.data && res.data.job) {
+          setJobStatusMap((prev) => ({
+            ...prev,
+            [jobOpeningId]: {
+              status: res.data.job.status,
+              hiring_status: res.data.job.hiring_status,
+            },
+          }));
+        }
+      } catch (e) {
+        // Optional: handle error
+      } finally {
+        jobStatusLoading.current[jobOpeningId] = false;
+      }
+    },
+    [jobStatusMap],
+  );
+
   const groupedData = data
     .filter((d) => ["scheduled", "rescheduled"].includes(d.status))
     .reduce((acc, curr) => {
@@ -284,6 +299,7 @@ export default function HRInterview() {
     }, {});
 
   // Pastikan status/hiring_status selalu di-fetch untuk setiap job di groupedData (activeMenu === 'list')
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => {
     if (activeMenu === "history") {
       Object.keys(groupedData).forEach((job) => {
@@ -293,7 +309,7 @@ export default function HRInterview() {
         if (jobOpeningId) fetchJobStatus(jobOpeningId);
       });
     }
-  }, [activeMenu, groupedData]);
+  }, [activeMenu, groupedData, fetchJobStatus]);
 
   // Gabungkan data interviews (completed) dan applications/interviews (canceled_by_company) untuk history
   // Hanya tampilkan interview dengan status 'completed' dan 'canceled_by_company' (bukan 'cancelled')
@@ -333,6 +349,7 @@ export default function HRInterview() {
     }),
   );
 
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => {
     if (activeMenu === "history") {
       Object.keys(filteredHistory).forEach((job) => {
@@ -342,37 +359,7 @@ export default function HRInterview() {
         if (jobOpeningId) fetchJobStatus(jobOpeningId);
       });
     }
-  }, [activeMenu, filteredHistory]);
-
-  const [jobStatusMap, setJobStatusMap] = useState({}); // { [job_opening_id]: { status, hiring_status } }
-  const jobStatusLoading = useRef({}); // prevent duplicate fetch
-
-  // Fungsi untuk fetch status job_openings jika belum ada di state
-  const fetchJobStatus = async (jobOpeningId) => {
-    if (
-      !jobOpeningId ||
-      jobStatusMap[jobOpeningId] ||
-      jobStatusLoading.current[jobOpeningId]
-    )
-      return;
-    jobStatusLoading.current[jobOpeningId] = true;
-    try {
-      const res = await axios.get(`/api/job-openings/${jobOpeningId}`);
-      if (res.data && res.data.job) {
-        setJobStatusMap((prev) => ({
-          ...prev,
-          [jobOpeningId]: {
-            status: res.data.job.status,
-            hiring_status: res.data.job.hiring_status,
-          },
-        }));
-      }
-    } catch (e) {
-      // Optional: handle error
-    } finally {
-      jobStatusLoading.current[jobOpeningId] = false;
-    }
-  };
+  }, [activeMenu, filteredHistory, fetchJobStatus]);
 
   return (
     <TitleCard
@@ -985,14 +972,6 @@ export default function HRInterview() {
                 </div>
               ) : (
                 Object.keys(filteredHistory).map((job, idx) => {
-                  const first = filteredHistory[job]?.[0];
-                  const jobOpeningId =
-                    first?.job_opening_id || first?.position_id || first?.id;
-                  const jobStatus = jobStatusMap[jobOpeningId] || {};
-                  const status = (jobStatus.status || "").toLowerCase();
-                  const hiringStatus = (
-                    jobStatus.hiring_status || ""
-                  ).toLowerCase();
                   return (
                     <div
                       key={idx}
@@ -1028,234 +1007,7 @@ export default function HRInterview() {
                           >
                             Detail Lowongan
                           </button>
-                          {/* Button lanjut ke interview, hanya tampil saat shortlisting */}
-                          {(() => {
-                            // Ambil dari filteredHistory, bukan groupedData
-                            const first = filteredHistory[job]?.[0];
-                            const jobOpeningId =
-                              first?.job_opening_id ||
-                              first?.position_id ||
-                              first?.id;
-                            const jobStatus = jobStatusMap[jobOpeningId] || {};
-                            const status = (
-                              jobStatus.status || ""
-                            ).toLowerCase();
-                            const hiringStatus = (
-                              jobStatus.hiring_status || ""
-                            ).toLowerCase();
-                            // Tampilkan tombol selalu; state `disabled` akan mengontrol apakah bisa diklik
-                            // Determine if all interviews for this job have been graded
-                            const interviewsForJob = filteredHistory[job] || [];
-                            const allGraded =
-                              interviewsForJob.length > 0 &&
-                              interviewsForJob.every(
-                                (it) => it.result && it.result !== "pending",
-                              );
-
-                            return (
-                              <button
-                                className="btn btn-success btn-xs"
-                                disabled={!allGraded}
-                                title={
-                                  allGraded
-                                    ? "Selesaikan lowongan dan publish hasil interview ke kandidat"
-                                    : "Semua interview harus dinilai terlebih dahulu"
-                                }
-                                onClick={async () => {
-                                  if (!jobOpeningId) {
-                                    alert("ID lowongan tidak ditemukan!");
-                                    return;
-                                  }
-                                  if (!allGraded) return; // safety
-                                  if (
-                                    !window.confirm(
-                                      "Yakin ingin menyelesaikan lowongan ini dan mempublish hasil interview ke kandidat?",
-                                    )
-                                  )
-                                    return;
-                                  try {
-                                    // Mark job_openings as complete (backend expected to publish results)
-                                    await axios.put(
-                                      `/api/job-openings/${jobOpeningId}/complete`,
-                                    );
-                                    // Try calling explicit publish endpoint if backend exposes it.
-                                    // This is a no-op if the endpoint does not exist or fails.
-                                    let publishSucceeded = false;
-                                    try {
-                                      await axios.post(
-                                        `/api/job-openings/${jobOpeningId}/publish-interviews`,
-                                      );
-                                      publishSucceeded = true;
-                                    } catch (e) {
-                                      // publish endpoint absent or failed. We'll attempt a frontend fallback below.
-                                      publishSucceeded = false;
-                                      NotificationManager.info(
-                                        "Publish endpoint not available; attempting per-application updates.",
-                                        "Info",
-                                        4000,
-                                      );
-                                    }
-                                    alert(
-                                      "Lowongan berhasil diselesaikan dan hasil interview dipublish.",
-                                    );
-                                    // Refresh status di map
-                                    fetchJobStatus(jobOpeningId);
-                                    // Optimistic UI update: mark job as completed locally
-                                    setJobStatusMap((prev) => ({
-                                      ...prev,
-                                      [jobOpeningId]: {
-                                        status: "closed",
-                                        hiring_status: "completed",
-                                      },
-                                    }));
-                                    setData((prev) =>
-                                      (prev || []).map((it) =>
-                                        (it.job_opening_id ||
-                                          it.position_id ||
-                                          it.id) === jobOpeningId
-                                          ? { ...it, status: "completed" }
-                                          : it,
-                                      ),
-                                    );
-                                    // Notify other parts of the app to refresh (e.g., candidate view)
-                                    if (
-                                      typeof window !== "undefined" &&
-                                      window.dispatchEvent
-                                    ) {
-                                      window.dispatchEvent(
-                                        new Event("interviewsPublished"),
-                                      );
-                                    }
-                                    // Switch to history view and refresh history data so published results appear
-                                    setActiveMenu("history");
-                                    try {
-                                      const resp = await axios.get(
-                                        "/api/hr/interviews/history-combined",
-                                      );
-                                      const interviews = (
-                                        resp.data.history || []
-                                      ).map((i) => ({
-                                        ...i,
-                                        job_title:
-                                          i.job_title ||
-                                          i.position_name ||
-                                          i.base_position ||
-                                          "Lainnya",
-                                        id: i.id || i.interview_id,
-                                        candidate_name:
-                                          i.candidate_name || i.name || "-",
-                                        scheduled_date:
-                                          i.scheduled_date || i.date,
-                                        interview_type:
-                                          i.interview_type || i.type || "-",
-                                        interviewer_name:
-                                          i.interviewer_name ||
-                                          i.interviewer ||
-                                          i.full_name ||
-                                          "-",
-                                        status:
-                                          i.status ||
-                                          i.interview_status ||
-                                          "completed",
-                                      }));
-                                      setData(interviews);
-                                    } catch (e) {
-                                      // ignore fetch errors here
-                                    }
-                                    // If publish endpoint wasn't available, fallback: update application statuses per-interview
-                                    if (!publishSucceeded) {
-                                      try {
-                                        const publishErrors = [];
-                                        let successCount = 0;
-                                        for (const it of interviewsForJob) {
-                                          const appId = it.application_id;
-                                          if (!appId) continue;
-                                          let appStatus = "";
-                                          if (
-                                            it.recommendation === "hire" &&
-                                            it.result === "passed"
-                                          ) {
-                                            appStatus = "diterima";
-                                          } else if (
-                                            it.recommendation === "reject" &&
-                                            it.result === "failed"
-                                          ) {
-                                            appStatus = "ditolak";
-                                          } else {
-                                            continue;
-                                          }
-                                          try {
-                                            const res = await axios.put(
-                                              `/api/hr/applications/${appId}/status`,
-                                              { status: appStatus },
-                                            );
-                                            successCount++;
-                                            console.log(
-                                              `Updated application ${appId} => ${appStatus}`,
-                                              res.data,
-                                            );
-                                            NotificationManager.success(
-                                              `Status aplikasi ${appId} diupdate ke ${appStatus}`,
-                                              "Sukses",
-                                              3000,
-                                            );
-                                          } catch (err) {
-                                            publishErrors.push({ appId, err });
-                                            console.error(
-                                              `Failed update application ${appId}`,
-                                              err,
-                                            );
-                                            NotificationManager.error(
-                                              `Gagal update status aplikasi ${appId}: ${err?.response?.data?.message || err?.message || JSON.stringify(err)}`,
-                                              "Publish Error",
-                                              6000,
-                                            );
-                                          }
-                                        }
-                                        if (successCount > 0) {
-                                          NotificationManager.info(
-                                            `${successCount} aplikasi berhasil dipublish.`,
-                                            "Info",
-                                            4000,
-                                          );
-                                        }
-                                        if (publishErrors.length > 0) {
-                                          console.warn(
-                                            "Some application status updates failed:",
-                                            publishErrors,
-                                          );
-                                          NotificationManager.error(
-                                            "Beberapa update status aplikasi gagal. Cek console/network untuk detail.",
-                                            "Error",
-                                            8000,
-                                          );
-                                        }
-                                      } catch (err) {
-                                        console.error(
-                                          "Fallback publish failed",
-                                          err,
-                                        );
-                                        NotificationManager.error(
-                                          `Fallback publish failed: ${err?.message || JSON.stringify(err)}`,
-                                          "Error",
-                                          8000,
-                                        );
-                                      }
-                                    }
-                                  } catch (err) {
-                                    alert(
-                                      "Gagal menyelesaikan lowongan: " +
-                                        (err?.response?.data?.message ||
-                                          err?.message ||
-                                          JSON.stringify(err)),
-                                    );
-                                  }
-                                }}
-                              >
-                                Selesaikan Lowongan Ini
-                              </button>
-                            );
-                          })()}
+                        
                         </div>
                       </div>
 

@@ -128,6 +128,12 @@ const hrRoutes = [
       },
 
       {
+        path: "/app/Evaluated-candidates",
+        icon: <ClipboardDocumentCheckIcon className={iconClasses} />,
+        name: "Akhiri Proses Rekrutmen",
+      },
+
+      {
         path: "/app/Hire-candidates",
         icon: <ClipboardDocumentListIcon className={iconClasses} />,
         name: "Kandidat yang lolos",

@@ -38,6 +38,7 @@ const HRRecruitmentProcess = lazy(() => import("../pages/protected/hr/HRRecruitm
 const HRRecruitmentProcessDetail = lazy(() => import("../pages/protected/hr/HRRecruitmentProcessDetail"),);
 const HRInterview = lazy(() => import("../pages/protected/hr/HRInterview"));
 const JobDetail = lazy(() => import("../pages/protected/hr/HRInterviewDetailLowongan"));
+const HREvaluatedCandidates = lazy(() => import("../pages/protected/hr/HREvaluatedCandidates"));
 const HRHiredCandidate = lazy(() => import("../pages/protected/hr/HRHiredCandidate"),);
 const HRHiredCandidateDetail = lazy(() => import("../pages/protected/hr/HRHiredCandidateDetail"),);
 const HRHiredCandidateDetailModal = lazy(() => import("../pages/protected/hr/HRHiredCandidateDetailModal"),);
@@ -163,6 +164,10 @@ const hrRoutes = [
   {
     path: "/Interview-process",
     component: HRInterview,
+  },
+  {
+    path: "/evaluated-candidates",
+    component: HREvaluatedCandidates,
   },
   {
     path: "/DetailInterview-process",
