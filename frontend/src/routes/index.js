@@ -174,6 +174,10 @@ const hrRoutes = [
     component: JobDetail,
   },
   {
+    path: "/job-openings/:jobId",
+    component: JobDetail,
+  },
+  {
     path: "/employees",
     component: HREmployees,
   },
@@ -218,7 +222,7 @@ const hrRoutes = [
     component: ActiveViolations,
   },
   {
-    path: "/candidate/:jobId",
+    path: "/recruitment-process/:jobId",
     component: HRRecruitmentProcessDetail,
   },
   {

@@ -5,7 +5,7 @@ const db = require('../config/db');
 
 // Update hasil interview (edit data lama)
 router.put('/admin/interviews/:id/result', async (req, res) => {
-  const { id } = req.params;a
+  const { id } = req.params;
   const { rating, recommendation, interviewer_notes, result, status } = req.body;
   try {
     const [rows] = await db.promise().query(

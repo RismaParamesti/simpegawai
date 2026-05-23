@@ -6,7 +6,7 @@ function SidebarSubmenu({ submenu, name, icon }) {
   const location = useLocation();
   const [isExpanded, setIsExpanded] = useState(false);
   const isActiveChild = submenu.some(
-    (item) => location.pathname === item.path,
+    (item) => location.pathname === item.path || location.pathname.startsWith(`${item.path}/`),
   );
 
   const closeDrawerOnMobile = () => {
@@ -53,7 +53,7 @@ function SidebarSubmenu({ submenu, name, icon }) {
                   <Link
                     to={m.path}
                     onClick={closeDrawerOnMobile}
-                    className={`relative rounded-xl px-3 py-2 transition font-medium ${location.pathname === m.path ? "bg-primary/10 text-primary" : "text-base-content/75 hover:bg-base-100/80 hover:text-base-content"}`}
+                    className={`relative rounded-xl px-3 py-2 transition font-medium ${location.pathname === m.path || location.pathname.startsWith(`${m.path}/`) ? "bg-primary/10 text-primary" : "text-base-content/75 hover:bg-base-100/80 hover:text-base-content"}`}
                   >
                     <span className="flex items-center">
                       <span className="flex w-8 justify-center text-base">
@@ -62,7 +62,7 @@ function SidebarSubmenu({ submenu, name, icon }) {
 
                       <span>{m.name}</span>
                     </span>
-                    {location.pathname === m.path ? (
+                    {location.pathname === m.path || location.pathname.startsWith(`${m.path}/`) ? (
                       <span
                         className="absolute inset-y-2 left-1 w-1 rounded-full bg-primary shadow-[0_0_0_4px_rgba(234,107,47,0.12)]"
                         aria-hidden="true"

@@ -6,6 +6,7 @@ import HRInterviewDetailLowongan from "./HRInterviewNilai";
 import TitleCard from "../../../components/Cards/TitleCard";
 import axios from "axios";
 import { useRef } from "react";
+import { NotificationManager } from "react-notifications";
 
 export default function HRInterview() {
   const [activeMenu, setActiveMenu] = useState("schedule");
@@ -68,6 +69,9 @@ export default function HRInterview() {
   const [mode, setMode] = useState("create");
   const [isCancelModalOpen, setIsCancelModalOpen] = useState(false);
   const [cancelNotes, setCancelNotes] = useState("");
+  const [isCancelLowonganModalOpen, setIsCancelLowonganModalOpen] =
+    useState(false);
+  const [pendingCancelLowongan, setPendingCancelLowongan] = useState(null);
 
   useEffect(() => {
     if (activeMenu === "schedule") {
@@ -249,13 +253,163 @@ export default function HRInterview() {
     return `${hari} ${namaBulan} ${tahun}, pukul ${jam}:${menit}`;
   };
 
+  // Format header: "jobName - posisi (base_position if different)"
+  const formatJobAndPosFromFirst = (first, jobName) => {
+    const f = first || {};
+    const name =
+      jobName || f.job_title || f.job_opening_title || f.title || "Lainnya";
+    const pos = f.position_name || f.base_position || (f.job_opening && f.job_opening.base_position) || "";
+    if (!pos) return name;
+    return `${name} - ${pos}`;
+  };
+
+  const handleCancelLowongan = async (items, jobName, onSuccess) => {
+    const first = items?.[0];
+    const jobId = first?.job_opening_id || first?.position_id || first?.id;
+
+    if (!first || !jobId) {
+      alert("Data lowongan tidak ditemukan atau ID tidak valid!");
+      return;
+    }
+
+    try {
+      const url1 = `/api/candidates/admin/applications/cancel-by-job`;
+      const url2 = `/api/job-openings/${jobId}/cancel`;
+      const res1 = await axios.put(url1, { job_opening_id: jobId });
+      const res2 = await axios.put(url2);
+
+      if (res1.data && res2.data) {
+        alert(
+          `Lowongan berhasil dibatalkan. Semua kandidat dan interview telah diberi status dibatalkan oleh perusahaan.`,
+        );
+        onSuccess?.(jobName);
+        // Refresh interview lists across the app so canceled interviews show in history
+        try {
+          if (typeof window !== "undefined" && window.dispatchEvent) {
+            window.dispatchEvent(new Event("refreshInterviewData"));
+          }
+        } catch (e) {
+          // ignore
+        }
+        // Switch UI to history tab so user sees the canceled interviews
+        try {
+          setActiveMenu("history");
+        } catch (e) {
+          // ignore if out of scope
+        }
+      } else {
+        alert("Gagal membatalkan lowongan. Respon tidak valid dari server.");
+      }
+    } catch (err) {
+      let msg = "Gagal membatalkan lowongan\n";
+      msg += `URL1: /api/candidates/admin/applications/cancel-by-job\n`;
+      msg += `URL2: /api/job-openings/${jobId}/cancel\n`;
+      msg += `Method: PUT\n`;
+      if (err?.response?.data?.message)
+        msg += `Pesan: ${err.response.data.message}`;
+      else if (err?.message) msg += `Pesan: ${err.message}`;
+      else msg += JSON.stringify(err);
+      alert(msg);
+    }
+  };
+
+  const getLowonganCancelInfo = (items, jobName) => {
+    const first = items?.[0] || {};
+    const jobOpeningId =
+      first?.job_opening_id || first?.position_id || first?.id || null;
+    const jobStatus = jobOpeningId ? jobStatusMap[jobOpeningId] : null;
+
+    return {
+      jobName:
+        jobName ||
+        first?.job_title ||
+        first?.position_name ||
+        first?.base_position ||
+        "Lainnya",
+      position:
+        first?.position_name ||
+        first?.base_position ||
+        jobStatus?.position_name ||
+        jobStatus?.base_position ||
+        jobStatus?.job_title ||
+        first?.job_title ||
+        "",
+      base_position: first?.base_position || jobStatus?.base_position || "",
+      location:
+        first?.location ||
+        first?.job_location ||
+        first?.work_location ||
+        jobStatus?.location ||
+        "-",
+    };
+  };
+
+  const openCancelLowonganModal = (items, jobName, onSuccess) => {
+    const first = items?.[0] || {};
+    const jobOpeningId =
+      first?.job_opening_id || first?.position_id || first?.id || null;
+
+    const open = async () => {
+      console.debug(
+        "openCancelLowonganModal: jobOpeningId=",
+        jobOpeningId,
+        "existingJobStatus=",
+        jobStatusMap[jobOpeningId],
+      );
+      // ensure job status (and location) is fetched before showing modal
+      if (jobOpeningId && !jobStatusMap[jobOpeningId]) {
+        try {
+          const res = await axios.get(`/api/job-openings/${jobOpeningId}`);
+          console.debug("fetch /api/job-openings/:id response", res?.data);
+          if (res.data && res.data.job) {
+            setJobStatusMap((prev) => ({
+              ...prev,
+              [jobOpeningId]: {
+                status: res.data.job.status,
+                hiring_status: res.data.job.hiring_status,
+                location:
+                  res.data.job.location ||
+                  res.data.job.job_location ||
+                  res.data.job.work_location ||
+                  "",
+                job_title: res.data.job.job_title || res.data.job.title || "",
+                position_name: res.data.job.position_name || "",
+                base_position: res.data.job.base_position || "",
+              },
+            }));
+          }
+        } catch (e) {
+          // ignore fetch error, fallback to existing info
+          console.error("Failed fetch job-opening on modal open", e);
+        }
+      }
+
+      const info = getLowonganCancelInfo(items, jobName);
+      console.debug(
+        "Resolved cancel info",
+        info,
+        "jobStatusAfterFetch=",
+        jobStatusMap[jobOpeningId],
+      );
+      setPendingCancelLowongan({ items, onSuccess, ...info });
+      setIsCancelLowonganModalOpen(true);
+    };
+
+    open();
+  };
+
+  const closeCancelLowonganModal = () => {
+    setIsCancelLowonganModalOpen(false);
+    setPendingCancelLowongan(null);
+  };
+
   const menu = [
     { key: "schedule", label: "Buatkan Jadwal" },
     { key: "list", label: "Jadwal Wawancara" },
     { key: "history", label: "Riwayat Jadwal" },
   ];
 
-  const [jobStatusMap, setJobStatusMap] = useState({}); // { [job_opening_id]: { status, hiring_status } }
+  const [jobStatusMap, setJobStatusMap] = useState({}); // { [job_opening_id]: { status, hiring_status, location } }
   const jobStatusLoading = useRef({}); // prevent duplicate fetch
 
   // Fungsi untuk fetch status job_openings jika belum ada di state
@@ -276,6 +430,14 @@ export default function HRInterview() {
             [jobOpeningId]: {
               status: res.data.job.status,
               hiring_status: res.data.job.hiring_status,
+              location:
+                res.data.job.location ||
+                res.data.job.job_location ||
+                res.data.job.work_location ||
+                "",
+              job_title: res.data.job.job_title || res.data.job.title || "",
+              position_name: res.data.job.position_name || "",
+              base_position: res.data.job.base_position || "",
             },
           }));
         }
@@ -298,10 +460,10 @@ export default function HRInterview() {
       return acc;
     }, {});
 
-  // Pastikan status/hiring_status selalu di-fetch untuk setiap job di groupedData (activeMenu === 'list')
+  // Pastikan status/hiring_status selalu di-fetch untuk setiap job di groupedData (schedule/list)
   // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => {
-    if (activeMenu === "history") {
+    if (activeMenu === "schedule" || activeMenu === "list") {
       Object.keys(groupedData).forEach((job) => {
         const first = groupedData[job]?.[0];
         const jobOpeningId =
@@ -437,7 +599,9 @@ export default function HRInterview() {
               ).map(([job, list], idx) => (
                 <div key={idx} className="border rounded-xl overflow-hidden">
                   <div className="bg-base-200 px-4 py-3 flex justify-between items-center">
-                    <span className="font-semibold">{job}</span>
+                    <span className="font-semibold">
+                      {formatJobAndPosFromFirst(groupedData[job]?.[0], job)}
+                    </span>
                     <div className="flex gap-2">
                       <button
                         className="
@@ -468,61 +632,16 @@ export default function HRInterview() {
                       </button>
                       <button
                         className="btn btn-error btn-xs"
-                        onClick={async () => {
-                          // Cari kandidat pertama pada list untuk ambil id
-                          const first = list[0];
-                          const jobId =
-                            first?.job_opening_id ||
-                            first?.position_id ||
-                            first?.id;
-                          if (!first || !jobId) {
-                            alert(
-                              "Data lowongan tidak ditemukan atau ID tidak valid!",
+                        onClick={() =>
+                          openCancelLowonganModal(list, job, () => {
+                            // Refresh data kandidat
+                            setCandidates((prev) =>
+                              prev.filter(
+                                (c) => (c.job_title || "Lainnya") !== job,
+                              ),
                             );
-                            return;
-                          }
-                          if (
-                            !window.confirm(
-                              "Yakin ingin membatalkan lowongan ini? Semua kandidat akan diberi status dibatalkan.",
-                            )
-                          )
-                            return;
-                          try {
-                            // Update semua aplikasi dan interview pada posisi ini menjadi canceled_by_company
-                            const url1 = `/api/hr/applications/cancel-by-job`;
-                            const url2 = `/api/job-openings/${jobId}/cancel`;
-                            const res1 = await axios.put(url1, {
-                              job_opening_id: jobId,
-                            });
-                            const res2 = await axios.put(url2);
-                            if (res1.data && res2.data) {
-                              alert(
-                                `Lowongan berhasil dibatalkan. Semua kandidat dan interview telah diberi status dibatalkan oleh perusahaan.`,
-                              );
-                              // Refresh data kandidat
-                              setCandidates((prev) =>
-                                prev.filter(
-                                  (c) => (c.job_title || "Lainnya") !== job,
-                                ),
-                              );
-                            } else {
-                              alert(
-                                "Gagal membatalkan lowongan. Respon tidak valid dari server.",
-                              );
-                            }
-                          } catch (err) {
-                            let msg = "Gagal membatalkan lowongan\n";
-                            msg += `URL1: /api/hr/applications/cancel-by-job\n`;
-                            msg += `URL2: /api/job-openings/${jobId}/cancel\n`;
-                            msg += `Method: PUT\n`;
-                            if (err?.response?.data?.message)
-                              msg += `Pesan: ${err.response.data.message}`;
-                            else if (err?.message)
-                              msg += `Pesan: ${err.message}`;
-                            else msg += JSON.stringify(err);
-                            alert(msg);
-                          }
-                        }}
+                          })
+                        }
                       >
                         Cancel Lowongan
                       </button>
@@ -689,8 +808,9 @@ export default function HRInterview() {
                 <div key={idx} className="border rounded-xl overflow-hidden">
                   {/* 🔥 HEADER POSISI */}
                   <div className="bg-base-200 px-4 py-3 flex justify-between items-center">
-                    <span className="font-semibold">{job}</span>
-
+                    <span className="font-semibold">
+                      {formatJobAndPosFromFirst(groupedData[job]?.[0], job)}
+                    </span>
                     <div className="flex gap-2">
                       <button
                         className="
@@ -719,58 +839,13 @@ export default function HRInterview() {
                       </button>
                       <button
                         className="btn btn-error btn-xs"
-                        onClick={async () => {
-                          // Cari kandidat pertama pada groupedData[job] untuk ambil id
-                          const first = groupedData[job]?.[0];
-                          const jobId =
-                            first?.job_opening_id ||
-                            first?.position_id ||
-                            first?.id;
-                          if (!first || !jobId) {
-                            alert(
-                              "Data lowongan tidak ditemukan atau ID tidak valid!",
+                        onClick={() =>
+                          openCancelLowonganModal(groupedData[job], job, () => {
+                            setData((prev) =>
+                              prev.filter((d) => d.job_title !== job),
                             );
-                            return;
-                          }
-                          if (
-                            !window.confirm(
-                              "Yakin ingin membatalkan lowongan ini? Semua kandidat akan diberi status dibatalkan.",
-                            )
-                          )
-                            return;
-                          try {
-                            // Update semua aplikasi dan interview pada posisi ini menjadi canceled_by_company
-                            const url1 = `/api/hr/applications/cancel-by-job`;
-                            const url2 = `/api/job-openings/${jobId}/cancel`;
-                            const res1 = await axios.put(url1, {
-                              job_opening_id: jobId,
-                            });
-                            const res2 = await axios.put(url2);
-                            if (res1.data && res2.data) {
-                              alert(
-                                `Lowongan berhasil dibatalkan. Semua kandidat dan interview telah diberi status dibatalkan oleh perusahaan.`,
-                              );
-                              setData((prev) =>
-                                prev.filter((d) => d.job_title !== job),
-                              );
-                            } else {
-                              alert(
-                                "Gagal membatalkan lowongan. Respon tidak valid dari server.",
-                              );
-                            }
-                          } catch (err) {
-                            let msg = "Gagal membatalkan lowongan\n";
-                            msg += `URL1: /api/hr/applications/cancel-by-job\n`;
-                            msg += `URL2: /api/job-openings/${jobId}/cancel\n`;
-                            msg += `Method: PUT\n`;
-                            if (err?.response?.data?.message)
-                              msg += `Pesan: ${err.response.data.message}`;
-                            else if (err?.message)
-                              msg += `Pesan: ${err.message}`;
-                            else msg += JSON.stringify(err);
-                            alert(msg);
-                          }
-                        }}
+                          })
+                        }
                       >
                         Cancel Lowongan
                       </button>
@@ -979,7 +1054,9 @@ export default function HRInterview() {
                     >
                       {/* HEADER POSISI */}
                       <div className="bg-base-200 px-4 py-3 flex justify-between items-center">
-                        <span className="font-semibold">{job}</span>
+                        <span className="font-semibold">
+                          {formatJobAndPosFromFirst(filteredHistory[job]?.[0], job)}
+                        </span>
                         <div className="flex gap-2">
                           <button
                             className="
@@ -1007,7 +1084,6 @@ export default function HRInterview() {
                           >
                             Detail Lowongan
                           </button>
-                        
                         </div>
                       </div>
 
@@ -1205,7 +1281,11 @@ export default function HRInterview() {
                     interviewer_id: form.interviewer_id,
                   },
                 );
-                alert("Jadwal interview berhasil diupdate");
+                NotificationManager.success(
+                  "Jadwal wawancara berhasil diperbarui.",
+                  "Berhasil",
+                  3000,
+                );
                 // Fetch data interview terbaru agar langsung update di UI
                 const res = await axios.get("/api/hr/interviews");
                 if (activeMenu === "list") {
@@ -1249,7 +1329,11 @@ export default function HRInterview() {
                   `/api/hr/applications/${selectedCandidate.application_id}/status`,
                   { status: "wawancara" },
                 );
-                alert("Jadwal interview berhasil dibuat");
+                NotificationManager.success(
+                  "Jadwal wawancara berhasil disimpan.",
+                  "Berhasil",
+                  3000,
+                );
                 // Ambil data interview yang baru dibuat (dari response atau fetch ulang)
                 let newInterview = null;
                 if (res.data && res.data.interview) {
@@ -1341,9 +1425,21 @@ export default function HRInterview() {
             }
           }}
           onCancelSubmit={async () => {
-            if (!cancelNotes) return alert("Notes wajib diisi!");
+            if (!cancelNotes) {
+              NotificationManager.warning(
+                "Alasan pengguguran wajib diisi.",
+                "Validasi",
+                3000,
+              );
+              return;
+            }
             if (!selectedCandidate || !selectedCandidate.id) {
-              return alert("ID interview tidak ditemukan!");
+              NotificationManager.error(
+                "ID interview tidak ditemukan.",
+                "Gagal",
+                3000,
+              );
+              return;
             }
             try {
               // Set result = 'failed' and add notes; mark status completed so it appears in history
@@ -1372,18 +1468,103 @@ export default function HRInterview() {
 
               // If currently in schedule view, move to history by switching menu
               setIsCancelModalOpen(false);
-              alert("Interview berhasil digugurkan dan dipindah ke riwayat.");
+              NotificationManager.success(
+                "Kandidat berhasil digugurkan dan dipindah ke riwayat wawancara.",
+                "Berhasil",
+                3000,
+              );
               setActiveMenu("history");
             } catch (err) {
-              let msg = "Gagal menggugurkan interview.";
+              let msg = "Gagal menggugurkan kandidat.";
               if (err?.response?.data?.message)
                 msg += " " + err.response.data.message;
               else if (err?.message) msg += " " + err.message;
-              alert(msg);
+              NotificationManager.error(msg, "Gagal", 4000);
               console.error("[Gugurkan Interview Error]", err);
             }
           }}
         />
+
+        {isCancelLowonganModalOpen && pendingCancelLowongan && (
+          <div className="modal modal-open">
+            <div className="modal-box max-w-md p-0 overflow-hidden rounded-2xl">
+              <div className="bg-error text-error-content px-6 py-5">
+                <div className="flex items-center gap-4">
+                  <div className="w-14 h-14 rounded-full bg-white/20 flex items-center justify-center text-3xl">
+                    ⚠️
+                  </div>
+
+                  <div>
+                    <h3 className="font-bold text-xl">Cancel Lowongan</h3>
+
+                    <p className="text-sm opacity-90 mt-1">
+                      Tindakan ini tidak dapat dibatalkan
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              <div className="p-6">
+                <div className="bg-base-200 rounded-xl p-4">
+                  <p className="text-sm text-base-content/60">
+                    Lowongan yang akan dibatalkan:
+                  </p>
+
+                  <h2 className="text-xl font-bold mt-2">
+                    {pendingCancelLowongan.jobName}
+                    {pendingCancelLowongan.position
+                      ? ` — ${pendingCancelLowongan.position}`
+                      : ""}
+                    {pendingCancelLowongan.base_position &&
+                    pendingCancelLowongan.base_position !==
+                      pendingCancelLowongan.position
+                      ? ` (${pendingCancelLowongan.base_position})`
+                      : ""}
+                  </h2>
+
+                  <p className="text-sm text-base-content/50 mt-1">
+                    {pendingCancelLowongan.location}
+                  </p>
+                </div>
+
+                <div className="alert alert-warning mt-5 text-sm">
+                  <span>
+                    Semua kandidat dan interview pada lowongan ini akan diberi
+                    status dibatalkan oleh perusahaan.
+                  </span>
+                </div>
+
+                <div className="modal-action mt-6">
+                  <button
+                    className="btn btn-ghost"
+                    onClick={closeCancelLowonganModal}
+                  >
+                    Batal
+                  </button>
+
+                  <button
+                    className="btn btn-error text-white"
+                    onClick={async () => {
+                      await handleCancelLowongan(
+                        pendingCancelLowongan.items,
+                        pendingCancelLowongan.jobName,
+                        pendingCancelLowongan.onSuccess,
+                      );
+                      closeCancelLowonganModal();
+                    }}
+                  >
+                    Ya, Batalkan
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            <div
+              className="modal-backdrop bg-black/40"
+              onClick={closeCancelLowonganModal}
+            ></div>
+          </div>
+        )}
 
         {/* Modal Detail Interview */}
         <HRInterviewDetailLowongan
@@ -1400,4 +1581,3 @@ export default function HRInterview() {
     </TitleCard>
   );
 }
-

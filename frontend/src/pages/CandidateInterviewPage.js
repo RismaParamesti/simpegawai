@@ -4,6 +4,7 @@ import { setPageTitle } from "../features/common/headerSlice";
 import TitleCard from "../components/Cards/TitleCard";
 import { NotificationManager } from "react-notifications";
 import axios from "axios";
+import { getStatusLabel } from "../utils/statusLabels";
 
 export default function CandidateInterviewPage() {
   const dispatch = useDispatch();
@@ -481,7 +482,7 @@ export default function CandidateInterviewPage() {
                   <div className="mt-4 pt-4 border-t border-base-300 text-xs text-gray-600">
                     <span className="font-semibold">Status Lamaran:</span>
                     <span className="ml-2 badge badge-outline">
-                      {app.status}
+                      {getStatusLabel(app.status)}
                     </span>
                     <p className="mt-1">
                       Diajukan:{" "}

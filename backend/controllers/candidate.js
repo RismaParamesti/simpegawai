@@ -1215,7 +1215,13 @@ router.get(
       const [applications] = await db.promise().query(query, [candidateId]);
 
       // Helper function to map database status to frontend status
-      const mapStatusToFrontend = (dbStatus, hasRealInterview) => {
+      // Before the job reaches the interview phase, keep shortlist/reject outcomes hidden.
+      const mapStatusToFrontend = (dbStatus, hiringStatus, hasRealInterview) => {
+        const isPublished = hiringStatus === 'interview' || hiringStatus === 'completed';
+        if (!isPublished && ['shortlisted', 'interview_scheduled', 'interviewed', 'accepted', 'rejected', 'canceled_by_company'].includes(dbStatus)) {
+          return 'screening';
+        }
+
         const statusMap = {
           'submitted': 'submitted',
           'reviewing': 'screening',
@@ -1231,7 +1237,12 @@ router.get(
       };
 
       // Helper function to determine last_stage for timeline (accept raw dbStatus)
-      const determineLastStage = (dbStatus, hasRealInterview) => {
+      const determineLastStage = (dbStatus, hiringStatus, hasRealInterview) => {
+        const isPublished = hiringStatus === 'interview' || hiringStatus === 'completed';
+        if (!isPublished && ['shortlisted', 'interview_scheduled', 'interviewed', 'accepted', 'rejected', 'canceled_by_company'].includes(dbStatus)) {
+          return 'screening';
+        }
+
         if (dbStatus === 'rejected') {
           return hasRealInterview ? 'wawancara' : 'screening';
         }
@@ -1264,6 +1275,7 @@ router.get(
           [jobIdForApp],
         );
         const hiringStatus = jobRows && jobRows[0] ? jobRows[0].hiring_status : null;
+        const isPublished = hiringStatus === 'interview' || hiringStatus === 'completed';
         const [interviewRows] = await db.promise().query(
           'SELECT * FROM interviews WHERE application_id = ? ORDER BY scheduled_date DESC, id DESC',
           [app.id],
@@ -1279,15 +1291,17 @@ router.get(
         app.interviews = interviewRows;
         const hasRealInterview = interviewRows.length > 0;
         app.has_interview = hasRealInterview;
+        app.hiring_status = hiringStatus;
+        app.is_published = isPublished;
 
         // keep raw DB status for debugging
         app.db_status = app.status;
 
         // Map status ke format frontend (dengan mempertimbangkan real interview data)
-        app.status = mapStatusToFrontend(app.status, hasRealInterview);
+        app.status = mapStatusToFrontend(app.status, hiringStatus, hasRealInterview);
 
         // Tentukan last_stage untuk timeline berdasarkan raw db_status
-        app.last_stage = determineLastStage(app.db_status, hasRealInterview);
+        app.last_stage = determineLastStage(app.db_status, hiringStatus, hasRealInterview);
       }
       res.json({ applications, total: applications.length });
     } catch (error) {
@@ -1349,7 +1363,12 @@ router.get(
       }
 
       // Helper function to map database status to frontend status
-      const mapStatusToFrontend = (dbStatus, hasRealInterview) => {
+      const mapStatusToFrontend = (dbStatus, hiringStatus, hasRealInterview) => {
+        const isPublished = hiringStatus === 'interview' || hiringStatus === 'completed';
+        if (!isPublished && ['shortlisted', 'interview_scheduled', 'interviewed', 'accepted', 'rejected', 'canceled_by_company'].includes(dbStatus)) {
+          return 'screening';
+        }
+
         const statusMap = {
           'submitted': 'submitted',
           'reviewing': 'screening',
@@ -1365,7 +1384,12 @@ router.get(
       };
 
       // Helper function to determine last_stage for timeline (accept raw dbStatus)
-      const determineLastStage = (dbStatus, hasRealInterview) => {
+      const determineLastStage = (dbStatus, hiringStatus, hasRealInterview) => {
+        const isPublished = hiringStatus === 'interview' || hiringStatus === 'completed';
+        if (!isPublished && ['shortlisted', 'interview_scheduled', 'interviewed', 'accepted', 'rejected', 'canceled_by_company'].includes(dbStatus)) {
+          return 'screening';
+        }
+
         if (dbStatus === 'rejected') {
           return hasRealInterview ? 'wawancara' : 'screening';
         }
@@ -1399,15 +1423,23 @@ router.get(
         app.interviews = interviewRows;
         const hasRealInterview = interviewRows.length > 0;
         app.has_interview = hasRealInterview;
+        const [jobRows] = await db.promise().query(
+          'SELECT hiring_status FROM job_openings WHERE id = ?',
+          [app.job_opening_id],
+        );
+        const hiringStatus = jobRows && jobRows[0] ? jobRows[0].hiring_status : null;
+        const isPublished = hiringStatus === 'interview' || hiringStatus === 'completed';
+        app.hiring_status = hiringStatus;
+        app.is_published = isPublished;
 
         // Keep raw DB status
         app.db_status = app.status;
 
         // Map status ke format frontend (dengan mempertimbangkan real interview data)
-        app.status = mapStatusToFrontend(app.status, hasRealInterview);
+        app.status = mapStatusToFrontend(app.status, hiringStatus, hasRealInterview);
 
         // Tentukan last_stage untuk timeline berdasarkan raw db_status
-        app.last_stage = determineLastStage(app.db_status, hasRealInterview);
+        app.last_stage = determineLastStage(app.db_status, hiringStatus, hasRealInterview);
 
         res.json({ application: app });
       } else {

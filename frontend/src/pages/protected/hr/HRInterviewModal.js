@@ -17,49 +17,37 @@ export default function InterviewModal({
   onSubmit,
   onCancelSubmit,
 }) {
-  const [interviewers, setInterviewers] = useState([]);
-  const [departments, setDepartments] = useState([]);
+  const [currentEmployeeId, setCurrentEmployeeId] = useState("");
   const [detailCandidate, setDetailCandidate] = useState(null);
-  const [detailLoading, setDetailLoading] = useState(false);
-  const [detailError, setDetailError] = useState("");
 
   // Fetch detail kandidat/interview dari backend saat popup detail dibuka ATAU saat form atur ulang dibuka
   useEffect(() => {
-    const shouldFetch = (isDetailOpen || (isFormOpen && mode === "update")) && selectedCandidate?.id;
+    const shouldFetch =
+      (isDetailOpen || (isFormOpen && mode === "update")) &&
+      selectedCandidate?.id;
     if (shouldFetch) {
-      setDetailLoading(true);
-      setDetailError("");
       let url = "";
       if (selectedCandidate.application_id) {
         url = `/api/candidates/admin/applications/${selectedCandidate.application_id}`;
       } else {
         url = `/api/candidates/interviews/${selectedCandidate.id}`;
       }
-      axios.get(url)
-        .then(res => {
+      axios
+        .get(url)
+        .then((res) => {
           if (res.data && (res.data.application || res.data.interview)) {
             setDetailCandidate(res.data.application || res.data.interview);
           } else {
             setDetailCandidate(selectedCandidate);
           }
         })
-        .catch(err => {
-          let msg = "Gagal mengambil detail pelamar/interview";
-          if (err.response && err.response.data && err.response.data.message) {
-            msg += ": " + err.response.data.message;
-          } else if (err.message) {
-            msg += ": " + err.message;
-          }
-          setDetailError(msg);
+        .catch((err) => {
           setDetailCandidate(selectedCandidate);
           // eslint-disable-next-line no-console
           console.error("[InterviewModal] Detail fetch error:", err);
-        })
-        .finally(() => setDetailLoading(false));
+        });
     } else if (!isDetailOpen && !(isFormOpen && mode === "update")) {
       setDetailCandidate(null);
-      setDetailLoading(false);
-      setDetailError("");
     }
   }, [isDetailOpen, isFormOpen, mode, selectedCandidate]);
   const formatDateOnly = (date) => {
@@ -72,17 +60,40 @@ export default function InterviewModal({
       : "-";
   };
 
-  // Fetch hanya pegawai dengan role HR saat modal dibuka
+  // Tampilkan nama lowongan dan posisi dalam format "nama lowongan - posisi"
+  const formatJobAndPos = (candidate) => {
+    const c = candidate || {};
+    if (Object.keys(c).length === 0) return "-";
+    const name =
+      c.job_title ||
+      c.job_opening_title ||
+      c.title ||
+      (c.job_opening && c.job_opening.title) ||
+      "";
+    const pos =
+      c.base_position ||
+      c.position_name ||
+      (c.job_opening && c.job_opening.base_position) ||
+      "";
+    if (!name && !pos) return "-";
+    if (name && pos) return `${name} - ${pos}`;
+    return name || pos;
+  };
+
+  // Ambil employee aktif saat modal dibuka, lalu isi interviewer otomatis
   useEffect(() => {
     if (!isFormOpen) return;
     axios
-      .get("/api/employees")
+      .get("/api/profile")
       .then((res) => {
-        const employees = res.data.employees || [];
-        setInterviewers(employees.filter((emp) => String(emp.position_id) === "12"));
+        const employeeId = res?.data?.employee?.id || "";
+        setCurrentEmployeeId(employeeId);
+        if (employeeId) {
+          setForm((prev) => ({ ...prev, interviewer_id: employeeId }));
+        }
       })
       .catch(() => {
-        setInterviewers([]);
+        setCurrentEmployeeId("");
       });
     // eslint-disable-next-line
   }, [isFormOpen]);
@@ -134,7 +145,7 @@ export default function InterviewModal({
             selectedCandidate.scheduled_date || selectedCandidate.date,
           ),
           interview_stage: departmentName,
-          interviewer_id: interviewerId,
+          interviewer_id: currentEmployeeId || interviewerId,
           duration_minutes: selectedCandidate.duration_minutes || "",
           interview_type: selectedCandidate.interview_type || "online",
           meeting_link: selectedCandidate.meeting_link || "",
@@ -144,26 +155,37 @@ export default function InterviewModal({
       fetchInterviewer();
     }
     // eslint-disable-next-line
-  }, [isFormOpen, mode, selectedCandidate]);
+  }, [isFormOpen, mode, selectedCandidate, currentEmployeeId]);
 
   const handleFormSubmit = () => {
     // Pastikan scheduled_date ada dan tidak sebelum sekarang
     if (!form.scheduled_date) {
-      NotificationManager.error("Tanggal & waktu harus diisi", "Validasi Gagal", 3000);
+      NotificationManager.error(
+        "Tanggal & waktu harus diisi",
+        "Validasi Gagal",
+        3000,
+      );
       return;
     }
     const selected = new Date(form.scheduled_date);
     const now = new Date();
     if (isNaN(selected.getTime())) {
-      NotificationManager.error("Format tanggal/waktu tidak valid", "Validasi Gagal", 3000);
+      NotificationManager.error(
+        "Format tanggal/waktu tidak valid",
+        "Validasi Gagal",
+        3000,
+      );
       return;
     }
     if (selected < now) {
-      NotificationManager.error("Tanggal & waktu tidak boleh sebelum saat ini", "Validasi Gagal", 4000);
+      NotificationManager.error(
+        "Tanggal & waktu tidak boleh sebelum saat ini",
+        "Validasi Gagal",
+        4000,
+      );
       return;
     }
 
-    
     const selHour = selected.getHours();
     const selMin = selected.getMinutes();
     if (selHour < 7 || selHour > 20 || (selHour === 20 && selMin > 0)) {
@@ -184,7 +206,7 @@ export default function InterviewModal({
       {/* ================= MODAL FORM (ASLI) ================= */}
       {isFormOpen && (
         <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50">
-          <div className="bg-base-100 p-6 rounded-xl w-full max-w-2xl shadow-lg overflow-y-auto max-h-[90vh]">
+          <div className="bg-base-100 p-6 rounded-xl w-full max-w-3xl shadow-lg overflow-y-auto max-h-[80vh]">
             <h3 className="font-bold text-lg mb-4">
               {mode === "create"
                 ? "Buat Jadwal Wawancara"
@@ -197,27 +219,50 @@ export default function InterviewModal({
                 <div className="avatar mb-3">
                   <div className="w-20 rounded-full ring ring-primary ring-offset-base-100 ring-offset-2">
                     <img
-                      src={
-                        (() => {
-                          // Prioritaskan photo_file dari detailCandidate jika ada, lalu selectedCandidate
-                          const photo = (detailCandidate?.photo_file ?? selectedCandidate?.photo_file) || "";
-                          if (photo && photo !== "-" && photo !== "null" && photo !== null && photo !== undefined && photo !== "") {
-                            return photo.startsWith("http")
-                              ? photo
-                              : `http://localhost:5000/${photo.replace(/^\//, "")}`;
-                          }
-                          // Fallback ke nama
-                          const name = detailCandidate?.name || detailCandidate?.candidate_name || selectedCandidate?.name || selectedCandidate?.candidate_name || "-";
-                          return `https://ui-avatars.com/api/?name=${encodeURIComponent(name)}&background=random`;
-                        })()
+                      src={(() => {
+                        // Prioritaskan photo_file dari detailCandidate jika ada, lalu selectedCandidate
+                        const photo =
+                          (detailCandidate?.photo_file ??
+                            selectedCandidate?.photo_file) ||
+                          "";
+                        if (
+                          photo &&
+                          photo !== "-" &&
+                          photo !== "null" &&
+                          photo !== null &&
+                          photo !== undefined &&
+                          photo !== ""
+                        ) {
+                          return photo.startsWith("http")
+                            ? photo
+                            : `http://localhost:5000/${photo.replace(/^\//, "")}`;
+                        }
+                        // Fallback ke nama
+                        const name =
+                          detailCandidate?.name ||
+                          detailCandidate?.candidate_name ||
+                          selectedCandidate?.name ||
+                          selectedCandidate?.candidate_name ||
+                          "-";
+                        return `https://ui-avatars.com/api/?name=${encodeURIComponent(name)}&background=random`;
+                      })()}
+                      alt={
+                        detailCandidate?.name ||
+                        detailCandidate?.candidate_name ||
+                        selectedCandidate?.name ||
+                        selectedCandidate?.candidate_name ||
+                        ""
                       }
-                      alt={detailCandidate?.name || detailCandidate?.candidate_name || selectedCandidate?.name || selectedCandidate?.candidate_name || ""}
                     />
                   </div>
                 </div>
 
                 <h2 className="font-bold text-md">
-                  {detailCandidate?.name || detailCandidate?.candidate_name || selectedCandidate?.name || selectedCandidate?.candidate_name || "-"}
+                  {detailCandidate?.name ||
+                    detailCandidate?.candidate_name ||
+                    selectedCandidate?.name ||
+                    selectedCandidate?.candidate_name ||
+                    "-"}
                 </h2>
               </div>
 
@@ -228,11 +273,16 @@ export default function InterviewModal({
                 </p>
                 <p>
                   <span className="font-semibold">Tanggal Lahir:</span>{" "}
-                  {formatDateOnly(detailCandidate?.date_of_birth || selectedCandidate?.date_of_birth)}
+                  {formatDateOnly(
+                    detailCandidate?.date_of_birth ||
+                      selectedCandidate?.date_of_birth,
+                  )}
                 </p>
                 <p>
                   <span className="font-semibold">Pendidikan:</span>{" "}
-                  {detailCandidate?.education_level || selectedCandidate?.education_level || "-"}
+                  {detailCandidate?.education_level ||
+                    selectedCandidate?.education_level ||
+                    "-"}
                 </p>
                 <p>
                   <span className="font-semibold">Jurusan:</span>{" "}
@@ -240,7 +290,9 @@ export default function InterviewModal({
                 </p>
                 <p>
                   <span className="font-semibold">Tahun Lulus:</span>{" "}
-                  {detailCandidate?.graduation_year || selectedCandidate?.graduation_year || "-"}
+                  {detailCandidate?.graduation_year ||
+                    selectedCandidate?.graduation_year ||
+                    "-"}
                 </p>
                 <p>
                   <span className="font-semibold">NPWP:</span>{" "}
@@ -251,6 +303,9 @@ export default function InterviewModal({
 
             {/* FORM */}
             <div className="grid gap-3">
+              <div className="rounded-xl border border-base-300 bg-base-200/50 px-4 py-3 text-sm text-base-content/70">
+                Interviewer akan terisi otomatis oleh HR.
+              </div>
               <input
                 type="datetime-local"
                 className="input input-bordered"
@@ -260,21 +315,6 @@ export default function InterviewModal({
                   setForm({ ...form, scheduled_date: e.target.value })
                 }
               />
-
-              <select
-                className="select select-bordered"
-                value={form.interviewer_id}
-                onChange={(e) =>
-                  setForm({ ...form, interviewer_id: e.target.value })
-                }
-              >
-                <option value="">Pilih Interviewer</option>
-                {interviewers.map((emp) => (
-                  <option key={emp.id} value={emp.id}>
-                    {emp.name} ({emp.position_name})
-                  </option>
-                ))}
-              </select>
 
               <input
                 type="number"
@@ -335,43 +375,92 @@ export default function InterviewModal({
           </div>
         </div>
       )}
-    
-    
-      {/* ================= MODAL CANCEL (ASLI) ================= */}
-        {isCancelOpen && (
-        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50">
-          <div className="bg-base-100 p-6 rounded-xl w-full max-w-md shadow-lg">
-            <h3 className="font-bold text-lg mb-4">
-              Batalkan Lamaran Kandidat ini
-            </h3>
 
-            <div className="flex items-center gap-3 mb-3">
-              <div>
-                <div className="font-semibold">{selectedCandidate?.name || selectedCandidate?.candidate_name || '-'}</div>
-                <div className="text-xs text-gray-500">{selectedCandidate?.job_title || selectedCandidate?.position_name || selectedCandidate?.job_opening_title || '-'}</div>
+      {/* ================= MODAL GUGURKAN KANDIDAT ================= */}
+      {isCancelOpen && (
+        <div className="modal modal-open">
+          <div className="modal-box w-full max-w-2xl p-0 rounded-2xl max-h-[80vh] overflow-y-auto">
+            <div className="bg-error text-error-content px-6 py-5">
+              <div className="flex items-center gap-4">
+                <div className="w-14 h-14 rounded-full bg-white/20 flex items-center justify-center text-3xl">
+                  ⚠️
+                </div>
+
+                <div>
+                  <h3 className="font-bold text-xl">Gugurkan Kandidat</h3>
+
+                  <p className="text-sm opacity-90 mt-1">
+                    Tindakan ini tidak dapat dibatalkan
+                  </p>
+                </div>
               </div>
             </div>
 
-            <textarea
-              className="textarea textarea-bordered w-full"
-              placeholder="Masukkan alasan pembatalan..."
-              value={cancelNotes}
-              onChange={(e) => setCancelNotes(e.target.value)}
-            />
+            <div className="p-6">
+              <div className="bg-base-200 rounded-xl p-4">
+                <p className="text-sm text-base-content/60">
+                  Kandidat yang akan digugurkan:
+                </p>
 
-            <div className="flex justify-end gap-2 mt-5">
-              <button className="btn btn-ghost" onClick={onCloseCancel}>
-                Batal
-              </button>
+                <h2 className="text-xl font-bold mt-2">
+                  {selectedCandidate?.name ||
+                    selectedCandidate?.candidate_name ||
+                    "-"}
+                </h2>
 
-              <button className="btn btn-error" onClick={onCancelSubmit}>
-                Konfirmasi Cancel
-              </button>
+                <p className="text-sm text-base-content/50 mt-1">
+                  {formatJobAndPos(detailCandidate || selectedCandidate)}
+                </p>
+              </div>
+
+              <div className="alert alert-warning mt-5 text-sm">
+                <span>
+                  Kandidat akan digugurkan dari proses rekrutmen. Tindakan ini
+                  dilakukan apabila kandidat tidak memenuhi ketentuan proses
+                  seleksi, seperti tidak hadir saat wawancara, tidak memberikan
+                  konfirmasi, atau alasan lain.
+                </span>
+              </div>
+              <div className="alert alert-warning mt-5 text-sm">
+                <span>Apakah Anda yakin ingin melanjutkan?</span>
+              </div>
+
+              <div className="mt-5">
+                <label className="label">
+                  <span className="label-text font-medium">
+                    Alasan pengguguran
+                  </span>
+                </label>
+
+                <textarea
+                  className="textarea textarea-bordered w-full min-h-28"
+                  placeholder="Masukkan alasan pengguguran..."
+                  value={cancelNotes}
+                  onChange={(e) => setCancelNotes(e.target.value)}
+                />
+              </div>
+
+              <div className="modal-action mt-6">
+                <button className="btn btn-ghost" onClick={onCloseCancel}>
+                  Batal
+                </button>
+
+                <button
+                  className="btn btn-error text-white"
+                  onClick={onCancelSubmit}
+                >
+                  Ya, Gugurkan
+                </button>
+              </div>
             </div>
           </div>
+
+          <div
+            className="modal-backdrop bg-black/40"
+            onClick={onCloseCancel}
+          ></div>
         </div>
       )}
     </>
   );
 }
-
