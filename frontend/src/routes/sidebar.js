@@ -19,7 +19,7 @@ import {
   ScaleIcon,
   BuildingOffice2Icon,
   CalculatorIcon,
-  ExclamationTriangleIcon ,
+  ExclamationTriangleIcon,
 } from "@heroicons/react/24/outline";
 
 const iconClasses = `h-6 w-6`;
@@ -237,30 +237,20 @@ const atasanRoutes = [
   },
   {
     path: "",
-    icon: <ClipboardDocumentListIcon className={iconClasses} />,
-    name: "Cuti dan Izin Anggota Tim",
+    icon: <UserGroupIcon className={iconClasses} />,
+    name: "Kehadiran Tim",
     submenu: [
       {
-        path: "/app/leave-requests",
-        icon: <ClipboardDocumentCheckIcon className={iconClasses} />,
-        name: "Persetujuan Cuti & Izin",
+        path: "/app/team-attendance",
+        icon: <CalendarDaysIcon className={iconClasses} />,
+        name: "Rekap Kehadiran",
       },
       {
-        path: "/app/leave-requests-history",
-        icon: <ClockIcon className={iconClasses} />,
-        name: "Riwayat Cuti & Izin",
+        path: "/app/active-violations",
+        icon: <ExclamationTriangleIcon className={iconClasses} />,
+        name: "Disiplin Kehadiran Tim",
       },
     ],
-  },
-  {
-    path: "/app/team-attendance",
-    icon: <CalendarDaysIcon className={iconClasses} />,
-    name: "Kehadiran Tim",
-  },
-  {
-    path: "/app/active-violations",
-    icon: <ExclamationTriangleIcon className={iconClasses} />,
-    name: "Disiplin Kehadiran Tim",
   },
 ];
 

@@ -314,7 +314,7 @@ export default function CandidateJobList() {
                         className="btn btn-primary btn-sm"
                         onClick={() => {
                           const jid = job.id || job.job_opening_id || job.job_openingId || job.jobId;
-                          navigate(`/app/candidate/${jid}?job_id=${jid}`, { state: { job } });
+                          navigate(`/app/recruitment-process/${jid}?job_id=${jid}`, { state: { job } });
                         }}
                       >
                         Lihat Kandidat

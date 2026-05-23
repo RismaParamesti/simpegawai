@@ -76,7 +76,7 @@ export default function CandidateRequestsPage() {
       setFilteredApplications(applications.filter((app) => app));
     } else {
       setFilteredApplications(
-        applications.filter((app) => app && app.status === status),
+        applications.filter((app) => app && getVisibleStatus(app) === status),
       );
     }
   };
@@ -86,7 +86,7 @@ export default function CandidateRequestsPage() {
     let result = applications.filter((app) => app);
 
     if (selectedStatus && selectedStatus !== "all") {
-      result = result.filter((app) => app.status === selectedStatus);
+      result = result.filter((app) => getVisibleStatus(app) === selectedStatus);
     }
 
     if (jobTitleFilter) {
@@ -261,6 +261,29 @@ export default function CandidateRequestsPage() {
     return map[status] || status;
   };
 
+  const getVisibleStatus = (app) => {
+    const rawStatus = app?.status || "submitted";
+    const isPublished =
+      app?.is_published ||
+      app?.hiring_status === "interview" ||
+      app?.hiring_status === "completed";
+
+    if (
+      !isPublished &&
+      [
+        "ditolak",
+        "diterima",
+        "lolos_dokumen",
+        "wawancara",
+        "interview_rescheduled",
+      ].includes(rawStatus)
+    ) {
+      return "screening";
+    }
+
+    return rawStatus;
+  };
+
   return (
     <>
       <TitleCard
@@ -376,10 +399,10 @@ export default function CandidateRequestsPage() {
                     <span
                       className={`
     inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-semibold
-    ${getStatusBadge(app.status)}
+    ${getStatusBadge(getVisibleStatus(app))}
   `}
                     >
-                      {getStatusLabel(app.status)}
+                      {getStatusLabel(getVisibleStatus(app))}
                     </span>
                   </div>
 
@@ -403,7 +426,7 @@ export default function CandidateRequestsPage() {
                   )}
 
                   {/* NOTES */}
-                  {app.admin_notes && (
+                  {app.is_published && app.admin_notes && (
                     <div className="mt-3 p-3 bg-base-200 rounded-lg text-sm">
                       {app.admin_notes}
                     </div>
@@ -422,7 +445,7 @@ export default function CandidateRequestsPage() {
                     </button>
 
                     <div className="flex gap-2">
-                      {["submitted", "screening"].includes(app.status) && (
+                      {["submitted", "screening"].includes(getVisibleStatus(app)) && (
                         <button
                           className={`btn btn-sm btn-error ${
                             withdrawingId === app.id ? "loading" : ""
@@ -433,7 +456,7 @@ export default function CandidateRequestsPage() {
                         </button>
                       )}
 
-                      {app.status === "wawancara" && (
+                      {getVisibleStatus(app) === "wawancara" && (
                         <button
                           className="btn btn-sm btn-primary"
                           onClick={() => navigate("/candidate/interview")}

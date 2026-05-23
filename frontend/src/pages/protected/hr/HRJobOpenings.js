@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from "react";
 import { useDispatch } from "react-redux";
+import { useNavigate } from "react-router-dom";
 import { setPageTitle } from "../../../features/common/headerSlice";
 import jobService, { hrApi } from "../../../features/hr/api";
 import TitleCard from "../../../components/Cards/TitleCard";
@@ -54,6 +55,7 @@ export default function HRJobOpenings() {
   const [showCancelPopup, setShowCancelPopup] = useState(false);
   const [pendingCancelJob, setPendingCancelJob] = useState(null);
   const dispatch = useDispatch();
+  const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState("add");
 
   useEffect(() => {
@@ -181,12 +183,6 @@ export default function HRJobOpenings() {
       setError(e.message);
     }
     setLoading(false);
-  }
-
-  function handleView(id) {
-    const data = jobOpenings.find((j) => j.id === id);
-    setDetailData(data);
-    setShowDetail(true);
   }
 
   function handleEdit(id) {
@@ -725,7 +721,7 @@ export default function HRJobOpenings() {
                               <td><span className={`badge ${j.status === "open" ? "badge-success" : j.status === "closed" ? "badge-error" : "badge-warning"}`}>{j.status}</span></td>
                               <td className="text-center">
                                 <div className="flex items-center justify-center gap-2">
-                                  <button className="px-3 py-1 text-xs bg-gradient-to-b from-blue-400 to-blue-600 text-white rounded-full shadow-md hover:shadow-lg border border-blue-600 hover:from-blue-500 hover:to-blue-700 transition-all duration-200" type="button" onClick={() => handleView(j.id)}>Lihat</button>
+                                  <button className="px-3 py-1 text-xs bg-gradient-to-b from-blue-400 to-blue-600 text-white rounded-full shadow-md hover:shadow-lg border border-blue-600 hover:from-blue-500 hover:to-blue-700 transition-all duration-200" type="button" onClick={() => navigate(`/app/job-openings/${j.id}`)}>Lihat</button>
                                   <button className="px-3 py-1 text-xs bg-gradient-to-b from-yellow-300 to-yellow-500 text-black rounded-full shadow-md hover:shadow-lg border border-yellow-500 hover:from-yellow-400 hover:to-yellow-600 transition-all duration-200" type="button" onClick={() => handleEdit(j.id)}>Edit</button>
                                   <button className="btn btn-xs btn-error text-white" type="button" onClick={() => handleCancelJob(j.id)}>Tutup</button>
                                 </div>
@@ -780,7 +776,7 @@ export default function HRJobOpenings() {
                               <td><span className={`badge ${j.status === "open" ? "badge-success" : j.status === "closed" ? "badge-error" : "badge-warning"}`}>{j.status}</span></td>
                               <td className="text-center">
                                 <div className="flex items-center justify-center gap-2">
-                                  <button className="px-3 py-1 text-xs bg-gradient-to-b from-blue-400 to-blue-600 text-white rounded-full shadow-md hover:shadow-lg border border-blue-600 hover:from-blue-500 hover:to-blue-700 transition-all duration-200" type="button" onClick={() => { setDetailData(j); setShowDetail(true); }}>Lihat</button>
+                                  <button className="px-3 py-1 text-xs bg-gradient-to-b from-blue-400 to-blue-600 text-white rounded-full shadow-md hover:shadow-lg border border-blue-600 hover:from-blue-500 hover:to-blue-700 transition-all duration-200" type="button" onClick={() => navigate(`/app/job-openings/${j.id}`)}>Lihat</button>
                                   <button className="px-3 py-1 text-xs bg-gradient-to-b from-yellow-300 to-yellow-500 text-black rounded-full shadow-md hover:shadow-lg border border-yellow-500 hover:from-yellow-400 hover:to-yellow-600 transition-all duration-200" type="button" onClick={() => handleEdit(j.id)}>Edit</button>
                                 </div>
                               </td>

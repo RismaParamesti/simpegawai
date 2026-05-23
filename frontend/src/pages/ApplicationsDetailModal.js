@@ -35,6 +35,29 @@ export default function ApplicationDetailModal({ isOpen, onClose, app }) {
   const jobOpeningId =
     app?.job_opening_id || app?.job_openingId || app?.job_id || app?.jobId;
 
+  const getVisibleStatus = (value) => {
+    const rawStatus = value?.status || "submitted";
+    const isPublished =
+      value?.is_published ||
+      value?.hiring_status === "interview" ||
+      value?.hiring_status === "completed";
+
+    if (
+      !isPublished &&
+      [
+        "ditolak",
+        "diterima",
+        "lolos_dokumen",
+        "wawancara",
+        "interview_rescheduled",
+      ].includes(rawStatus)
+    ) {
+      return "screening";
+    }
+
+    return rawStatus;
+  };
+
   useEffect(() => {
     if (isOpen && jobOpeningId) {
       setLoadingJob(true);
@@ -88,14 +111,16 @@ export default function ApplicationDetailModal({ isOpen, onClose, app }) {
     return map[status] || status;
   };
 
+  const visibleStatus = getVisibleStatus(app);
+
   // Progress bar: jika withdrawn, hanya tampil satu step "Dibatalkan"
   let steps, currentStep;
-  if (app.status === "withdrawn") {
+  if (visibleStatus === "withdrawn") {
     steps = ["withdrawn"];
     currentStep = 0;
   } else {
     // Samakan urutan dan value steps progress dengan status lamaran utama
-    let statusForStep = app.status;
+    let statusForStep = visibleStatus;
     if (statusForStep === "shortlisted") statusForStep = "screening";
     const hasInterview = !!app.has_interview;
     steps = ["submitted", "screening"];
@@ -162,7 +187,9 @@ export default function ApplicationDetailModal({ isOpen, onClose, app }) {
     if (typeof value === "object") {
       if (value.type === "Buffer" && Array.isArray(value.data)) {
         try {
-          return new TextDecoder("utf-8").decode(new Uint8Array(value.data)).trim();
+          return new TextDecoder("utf-8")
+            .decode(new Uint8Array(value.data))
+            .trim();
         } catch (e) {
           return "";
         }
@@ -170,7 +197,9 @@ export default function ApplicationDetailModal({ isOpen, onClose, app }) {
       if (typeof value.data === "string") return value.data;
       if (Array.isArray(value.data)) {
         try {
-          return new TextDecoder("utf-8").decode(new Uint8Array(value.data)).trim();
+          return new TextDecoder("utf-8")
+            .decode(new Uint8Array(value.data))
+            .trim();
         } catch (e) {
           return "";
         }
@@ -475,29 +504,34 @@ export default function ApplicationDetailModal({ isOpen, onClose, app }) {
           </div>
 
           {/* DOKUMEN */}
-          <div className="card bg-base-200 text-base-content border border-base-300">
-            <div className="card-body">
-              <h3 className="card-title text-lg text-base-content">
-                📄 Dokumen
-              </h3>
+          <div className="card bg-base-100 border border-base-300 shadow-sm">
+            <div className="card-body p-5">
+              <div className="mb-4 flex items-center justify-between">
+                <div>
+                  <h3 className="text-lg font-bold text-base-content">
+                    Dokumen
+                  </h3>
+                  <p className="text-xs text-base-content/60">
+                    Berkas pendukung kandidat
+                  </p>
+                </div>
+              </div>
 
-              <div className="divide-y divide-base-300 border border-base-300 rounded-lg overflow-hidden">
-                {dokumenFields.map((doc, idx) => {
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                {dokumenFields.map((doc) => {
                   const val = normalizeDocumentValue(app[doc.key]);
                   if (!val) return null;
 
                   return (
                     <div
                       key={doc.key}
-                      className={`flex justify-between items-center px-4 py-3 ${
-                        idx % 2 === 0 ? "bg-base-100" : ""
-                      }`}
+                      className="flex items-center justify-between gap-3 rounded-xl border border-base-300 bg-base-200/40 px-4 py-3"
                     >
-                      <div>
-                        <p className="text-xs text-base-content/70 font-semibold">
+                      <div className="min-w-0">
+                        <p className="text-xs font-semibold text-base-content/60">
                           {doc.label}
                         </p>
-                        <p className="font-semibold break-all text-base-content">
+                        <p className="max-w-[180px] truncate text-sm font-medium text-base-content">
                           {val}
                         </p>
                       </div>
@@ -505,7 +539,7 @@ export default function ApplicationDetailModal({ isOpen, onClose, app }) {
                       <button
                         type="button"
                         onClick={() => openPreviewUrl(getDocumentUrl(val), val)}
-                        className="px-3 py-1 text-xs bg-gradient-to-b from-blue-400 to-blue-600 text-white rounded-full shadow-md hover:shadow-lg border border-blue-600 hover:from-blue-500 hover:to-blue-700 transition-all duration-200"
+                        className="btn btn-primary btn-xs rounded-lg shrink-0"
                       >
                         Lihat
                       </button>
@@ -518,43 +552,54 @@ export default function ApplicationDetailModal({ isOpen, onClose, app }) {
 
           {/* COVER LETTER */}
           {coverLetterPath && (
-            <div className="card bg-base-200 text-base-content border border-base-300">
-              <div className="card-body">
-                <h3 className="card-title text-lg text-base-content">
-                  💌 Surat Lamaran
-                </h3>
-                <div className="bg-base-100 p-4 rounded border border-base-300 text-sm text-base-content">
-                  <div className="flex items-center justify-between">
-                    <div className="font-semibold break-all text-base-content">
+            <div className="card bg-base-100 border border-base-300 shadow-sm">
+              <div className="card-body p-5">
+                <div className="mb-4">
+                  <h3 className="text-lg font-bold text-base-content">
+                    Surat Lamaran
+                  </h3>
+                  <p className="text-xs text-base-content/60">
+                    Dokumen surat lamaran kandidat
+                  </p>
+                </div>
+
+                <div className="flex items-center justify-between gap-3 rounded-xl border border-base-300 bg-base-200/40 px-4 py-3">
+                  <div className="min-w-0">
+                    <p className="text-xs font-semibold text-base-content/60">
+                      File Surat Lamaran
+                    </p>
+                    <p className="max-w-[220px] truncate text-sm font-medium text-base-content">
                       {coverLetterPath}
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <button
-                        type="button"
-                        onClick={() =>
-                          openPreviewUrl(
-                            getDocumentUrl(coverLetterPath),
-                            coverLetterPath,
-                          )
-                        }
-                        className="px-3 py-1 text-xs bg-gradient-to-b from-blue-400 to-blue-600 text-white rounded-full shadow-md hover:shadow-lg border border-blue-600 hover:from-blue-500 hover:to-blue-700 transition-all duration-200"
-                      >
-                        Lihat
-                      </button>
-                    </div>
+                    </p>
                   </div>
+
+                  <button
+                    type="button"
+                    onClick={() =>
+                      openPreviewUrl(
+                        getDocumentUrl(coverLetterPath),
+                        coverLetterPath,
+                      )
+                    }
+                    className="btn btn-primary btn-xs rounded-lg shrink-0"
+                  >
+                    Lihat
+                  </button>
                 </div>
               </div>
             </div>
           )}
-
           {/* STATUS */}
           <div className="card bg-base-200 text-base-content border border-base-300">
             <div className="card-body text-sm">
-              <h3 className="card-title text-lg text-base-content">Status Lamaran</h3>
+              <h3 className="card-title text-lg text-base-content">
+                Status Lamaran
+              </h3>
               <div>
-                <span className={`inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-semibold ${getStatusBadgeClass(app.status)}`}>
-                  {getStatusLabel(app.status)}
+                <span
+                  className={`inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-semibold ${getStatusBadgeClass(visibleStatus)}`}
+                >
+                  {getStatusLabel(visibleStatus)}
                 </span>
               </div>
               <p>📅 Apply: {formatDate(app.submitted_at)}</p>
@@ -660,4 +705,3 @@ export default function ApplicationDetailModal({ isOpen, onClose, app }) {
     </div>
   );
 }
-
