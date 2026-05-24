@@ -11,6 +11,16 @@ import { NotificationManager } from "react-notifications";
 export default function HRInterview() {
   const [activeMenu, setActiveMenu] = useState("schedule");
   const [canceledMap, setCanceledMap] = useState({});
+  const mergeHistoryRows = useCallback((currentRows, incomingRows) => {
+    const map = new Map();
+    [...(currentRows || []), ...(incomingRows || [])].forEach((row) => {
+      if (!row) return;
+      const key = row.id || row.interview_id || `${row.application_id || ""}-${row.scheduled_date || row.date || ""}`;
+      if (!key) return;
+      map.set(String(key), row);
+    });
+    return Array.from(map.values());
+  }, []);
   // Listener untuk refresh data interview dari modal detail
   useEffect(() => {
     const handler = () => {
@@ -19,9 +29,12 @@ export default function HRInterview() {
         axios
           .get("/api/hr/interviews/history-combined")
           .then((res) => {
-            setData(res.data.history || []);
+            const historyRows = res.data.history || [];
+            setData((prev) => mergeHistoryRows(prev, historyRows));
           })
-          .catch(() => setData([]));
+          .catch(() => {
+            // Jangan reset data lokal saat fetch history gagal
+          });
       } else {
         axios
           .get("/api/hr/interviews")
@@ -39,9 +52,9 @@ export default function HRInterview() {
                 ...i,
                 status: i.status || i.interview_status || "scheduled",
                 job_title:
-                  i.job_title ||
                   i.position_name ||
                   i.base_position ||
+                  i.job_title ||
                   "Lainnya",
                 id: i.id || i.interview_id,
                 candidate_name: i.candidate_name || i.name || "-",
@@ -57,7 +70,7 @@ export default function HRInterview() {
     };
     window.addEventListener("refreshInterviewData", handler);
     return () => window.removeEventListener("refreshInterviewData", handler);
-  }, [activeMenu]);
+  }, [activeMenu, mergeHistoryRows]);
 
   const [data, setData] = useState([]); // interview data
   const [candidates, setCandidates] = useState([]); // kandidat lolos dokumen
@@ -106,23 +119,23 @@ export default function HRInterview() {
           console.log("[DEBUG] DATA INTERVIEWS", res.data.interviews);
           if (!res.data.interviews || res.data.interviews.length === 0) {
             console.warn(
-              "[DEBUG] Tidak ada data interview yang diterima dari API",
+              
             );
           }
-          setData(
-            (res.data.interviews || []).map((i) => ({
-              ...i,
-              status: i.status || i.interview_status || "scheduled",
-              job_title:
-                i.job_title || i.position_name || i.base_position || "Lainnya",
-              id: i.id || i.interview_id,
-              candidate_name: i.candidate_name || i.name || "-",
-              scheduled_date: i.scheduled_date || i.date,
-              interview_type: i.interview_type || i.type || "-",
-              interviewer_name:
-                i.interviewer_name || i.interviewer || i.full_name || "-",
-            })),
-          );
+                setData(
+                  (res.data.interviews || []).map((i) => ({
+                    ...i,
+                    status: i.status || i.interview_status || "scheduled",
+                    job_title:
+                      i.job_title || i.position_name || i.base_position || "Lainnya",
+                    id: i.id || i.interview_id,
+                    candidate_name: i.candidate_name || i.name || "-",
+                    scheduled_date: i.scheduled_date || i.date,
+                    interview_type: i.interview_type || i.type || "-",
+                    interviewer_name:
+                      i.interviewer_name || i.interviewer || i.full_name || "-",
+                  })),
+                );
         })
         .catch((err) => {
           console.error("[DEBUG] Error ambil data interviews:", err);
@@ -132,11 +145,14 @@ export default function HRInterview() {
       axios
         .get("/api/hr/interviews/history-combined")
         .then((res) => {
-          setData(res.data.history || []);
+          const historyRows = res.data.history || [];
+          setData((prev) => mergeHistoryRows(prev, historyRows));
         })
-        .catch(() => setData([]));
+        .catch(() => {
+          // Jangan reset data lokal saat fetch history gagal
+        });
     }
-  }, [activeMenu]);
+  }, [activeMenu, mergeHistoryRows]);
 
   const [form, setForm] = useState({
     datetime: "",
@@ -144,7 +160,152 @@ export default function HRInterview() {
     stage: "HR",
     interviewer: "",
     location: "",
+    searchName: "",
   });
+  const [unscheduledFilter, setUnscheduledFilter] = useState(null); // 'jobs' | 'candidates' | null
+  const [timelineFilter, setTimelineFilter] = useState(null); // 'today' | 'tomorrow' | 'overdue' | null
+
+  const unscheduledCandidates = React.useMemo(() => {
+    const list = (candidates || []).filter((c) => {
+      const hasInterview = (data || []).some(
+        (d) =>
+          d.application_id && String(d.application_id) === String(c.id) &&
+          ["scheduled", "rescheduled"].includes(d.status),
+      );
+      return !hasInterview;
+    });
+    return list;
+  }, [candidates, data]);
+
+  const unscheduledCandidateIds = React.useMemo(() => new Set((unscheduledCandidates || []).map((c) => String(c.id))), [unscheduledCandidates]);
+
+  const unscheduledJobTitles = React.useMemo(() => new Set((unscheduledCandidates || []).map((c) => c.job_title || "Lainnya")), [unscheduledCandidates]);
+
+  const groupedCandidates = React.useMemo(() => {
+    const nameFilter = (form.searchName || "").toString().trim().toLowerCase();
+    const base = (candidates || []).filter((c) => {
+      if (form.positionFilter && (c.job_title || "Lainnya") !== form.positionFilter) return false;
+      if (nameFilter) {
+        const nm = ((c.name || c.candidate_name) || "").toString().toLowerCase();
+        if (!nm.includes(nameFilter)) return false;
+      }
+      return true;
+    });
+
+    let list = base;
+    if (unscheduledFilter === "candidates") {
+      list = base.filter((c) => unscheduledCandidateIds.has(String(c.id)));
+    }
+    if (unscheduledFilter === "jobs") {
+      list = base.filter((c) => unscheduledJobTitles.has(c.job_title || "Lainnya"));
+    }
+
+    return list.reduce((acc, curr) => {
+      const job = curr.job_title || "Lainnya";
+      if (!acc[job]) acc[job] = [];
+      acc[job].push(curr);
+      return acc;
+    }, {});
+  }, [candidates, form.positionFilter, unscheduledFilter, unscheduledCandidateIds, unscheduledJobTitles, form.searchName]);
+
+  const groupedData = data
+    .filter((d) => ["scheduled", "rescheduled"].includes(d.status))
+    .reduce((acc, curr) => {
+      if (!acc[curr.job_title]) {
+        acc[curr.job_title] = [];
+      }
+      acc[curr.job_title].push(curr);
+      return acc;
+    }, {});
+
+  const scheduleItems = React.useMemo(
+    () => (data || []).filter((d) => ["scheduled", "rescheduled"].includes(d.status)),
+    [data],
+  );
+  const getDayKey = (value) => {
+    const date = new Date(value);
+    if (Number.isNaN(date.getTime())) return "";
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, "0");
+    const day = String(date.getDate()).padStart(2, "0");
+    return `${year}-${month}-${day}`;
+  };
+  const getTimelineType = React.useCallback((item) => {
+    const scheduledAt = new Date(item?.scheduled_date || item?.date || 0);
+    if (Number.isNaN(scheduledAt.getTime())) return "";
+    const now = new Date();
+    const todayKey = getDayKey(now);
+    const tomorrow = new Date(now);
+    tomorrow.setDate(now.getDate() + 1);
+    const tomorrowKey = getDayKey(tomorrow);
+    const itemKey = getDayKey(scheduledAt);
+
+    if (itemKey === todayKey) return "today";
+    if (itemKey === tomorrowKey) return "tomorrow";
+    if (scheduledAt < now) return "overdue";
+    return "future";
+  }, []);
+
+  const scheduleTimelineMetrics = React.useMemo(() => {
+    const todayItems = scheduleItems.filter((item) => getTimelineType(item) === "today");
+    const tomorrowItems = scheduleItems.filter((item) => getTimelineType(item) === "tomorrow");
+    const overdueItems = scheduleItems.filter((item) => getTimelineType(item) === "overdue");
+
+    return {
+      todayItems,
+      tomorrowItems,
+      overdueItems,
+    };
+  }, [scheduleItems, getTimelineType]);
+
+  const visibleListGroups = React.useMemo(() => {
+    const nameFilter = (form.searchName || "").toString().trim().toLowerCase();
+    const filteredByPosition = Object.fromEntries(
+      Object.entries(groupedData).filter(
+        ([job]) => !form.positionFilterList || job === form.positionFilterList,
+      ),
+    );
+
+    const filteredByTimeline = Object.fromEntries(
+      Object.entries(filteredByPosition)
+        .map(([job, list]) => [
+          job,
+          timelineFilter
+            ? (list || []).filter((item) => getTimelineType(item) === timelineFilter)
+            : list,
+        ])
+        .map(([job, list]) => {
+          if (nameFilter) {
+            const filteredList = (list || []).filter((item) => {
+              const nm = ((item.candidate_name || item.name) || "").toString().toLowerCase();
+              return nm.includes(nameFilter);
+            });
+            return [job, filteredList];
+          }
+          return [job, list];
+        })
+        .filter(([, list]) => Array.isArray(list) && list.length > 0),
+    );
+
+    return filteredByTimeline;
+  }, [form.positionFilterList, groupedData, timelineFilter, getTimelineType, form.searchName]);
+
+  const openTimelineFilter = (filter) => {
+    setTimelineFilter(filter);
+    setUnscheduledFilter(null);
+    setForm((prev) => ({
+      ...prev,
+      positionFilterList: "",
+    }));
+    setActiveMenu("list");
+    setShowAll({});
+    window.setTimeout(() => {
+      const el = document.getElementById("list-groups");
+      if (el) {
+        el.scrollIntoView({ behavior: "smooth", block: "start" });
+      }
+    }, 80);
+  };
 
   const handleSchedule = (candidate) => {
     // Cek apakah kandidat sudah punya jadwal interview (scheduled/rescheduled)
@@ -154,8 +315,10 @@ export default function HRInterview() {
         ["scheduled", "rescheduled"].includes(d.status),
     );
     if (alreadyScheduled) {
-      alert(
+      NotificationManager.warning(
         "Kandidat ini sudah memiliki jadwal wawancara. Silakan atur ulang jadwal terlebih dahulu pada menu Jadwal Wawancara.",
+        "Validasi",
+        3500,
       );
       return;
     }
@@ -182,8 +345,10 @@ export default function HRInterview() {
         return false;
       });
       if (conflict) {
-        alert(
+        NotificationManager.warning(
           "Interviewer sudah memiliki jadwal wawancara yang bentrok di waktu tersebut. Silakan pilih waktu lain.",
+          "Validasi",
+          3500,
         );
         return;
       }
@@ -253,14 +418,47 @@ export default function HRInterview() {
     return `${hari} ${namaBulan} ${tahun}, pukul ${jam}:${menit}`;
   };
 
-  // Format header: "jobName - posisi (base_position if different)"
+  // Format header: "jobName - posisi base_position"
   const formatJobAndPosFromFirst = (first, jobName) => {
     const f = first || {};
+    const pickText = (...values) =>
+      values.find((value) => typeof value === "string" && value.trim()) || "";
     const name =
-      jobName || f.job_title || f.job_opening_title || f.title || "Lainnya";
-    const pos = f.position_name || f.base_position || (f.job_opening && f.job_opening.base_position) || "";
-    if (!pos) return name;
-    return `${name} - ${pos}`;
+      pickText(jobName, f.job_title, f.job_opening_title, f.title) ||
+      "Lainnya";
+    const jobOpeningId =
+      f.job_opening?.id ||
+      f.job_opening_id ||
+      f.position_id ||
+      f.id ||
+      f.job_id ||
+      f.job?.id ||
+      f.position?.job_opening_id ||
+      null;
+    const jobStatus = jobOpeningId ? jobStatusMap[jobOpeningId] : null;
+    const position = pickText(
+      f.position_name,
+      f.position?.name,
+      f.position_title,
+      f.job_opening?.position_name,
+      f.job_opening?.position?.name,
+      f.job?.position?.name,
+      jobStatus?.position_name,
+      jobStatus?.job_title,
+      f.role,
+    );
+    const basePosition = pickText(
+      f.base_position,
+      f.basePosition,
+      f.base_position_name,
+      jobStatus?.base_position,
+      f.job_opening?.base_position,
+      f.job?.base_position,
+      f.position?.base_position,
+    );
+    const jobLabel = [position, basePosition].filter(Boolean).join(" ").trim();
+    if (name && jobLabel) return `${name} - ${jobLabel}`;
+    return name || jobLabel || "Lainnya";
   };
 
   const handleCancelLowongan = async (items, jobName, onSuccess) => {
@@ -268,7 +466,11 @@ export default function HRInterview() {
     const jobId = first?.job_opening_id || first?.position_id || first?.id;
 
     if (!first || !jobId) {
-      alert("Data lowongan tidak ditemukan atau ID tidak valid!");
+      NotificationManager.error(
+        "Data lowongan tidak ditemukan atau ID tidak valid!",
+        "Gagal",
+        3500,
+      );
       return;
     }
 
@@ -279,8 +481,10 @@ export default function HRInterview() {
       const res2 = await axios.put(url2);
 
       if (res1.data && res2.data) {
-        alert(
+        NotificationManager.success(
           `Lowongan berhasil dibatalkan. Semua kandidat dan interview telah diberi status dibatalkan oleh perusahaan.`,
+          "Berhasil",
+          3500,
         );
         onSuccess?.(jobName);
         // Refresh interview lists across the app so canceled interviews show in history
@@ -298,7 +502,11 @@ export default function HRInterview() {
           // ignore if out of scope
         }
       } else {
-        alert("Gagal membatalkan lowongan. Respon tidak valid dari server.");
+        NotificationManager.error(
+          "Gagal membatalkan lowongan. Respon tidak valid dari server.",
+          "Gagal",
+          3500,
+        );
       }
     } catch (err) {
       let msg = "Gagal membatalkan lowongan\n";
@@ -309,7 +517,7 @@ export default function HRInterview() {
         msg += `Pesan: ${err.response.data.message}`;
       else if (err?.message) msg += `Pesan: ${err.message}`;
       else msg += JSON.stringify(err);
-      alert(msg);
+      NotificationManager.error(msg, "Gagal", 4500);
     }
   };
 
@@ -424,20 +632,19 @@ export default function HRInterview() {
       jobStatusLoading.current[jobOpeningId] = true;
       try {
         const res = await axios.get(`/api/job-openings/${jobOpeningId}`);
-        if (res.data && res.data.job) {
+        const job = res?.data?.job || res?.data?.jobOpening || res?.data?.data || res?.data || null;
+        if (job) {
           setJobStatusMap((prev) => ({
             ...prev,
             [jobOpeningId]: {
-              status: res.data.job.status,
-              hiring_status: res.data.job.hiring_status,
+              status: job.status || job.job_status || "",
+              hiring_status: job.hiring_status || job.hiringStatus || "",
               location:
-                res.data.job.location ||
-                res.data.job.job_location ||
-                res.data.job.work_location ||
-                "",
-              job_title: res.data.job.job_title || res.data.job.title || "",
-              position_name: res.data.job.position_name || "",
-              base_position: res.data.job.base_position || "",
+                job.location || job.job_location || job.work_location || "",
+              job_title: job.job_title || job.title || "",
+              position_name:
+                job.position_name || job.position?.name || job.positionName || "",
+              base_position: job.base_position || job.position?.base_position || "",
             },
           }));
         }
@@ -449,16 +656,6 @@ export default function HRInterview() {
     },
     [jobStatusMap],
   );
-
-  const groupedData = data
-    .filter((d) => ["scheduled", "rescheduled"].includes(d.status))
-    .reduce((acc, curr) => {
-      if (!acc[curr.job_title]) {
-        acc[curr.job_title] = [];
-      }
-      acc[curr.job_title].push(curr);
-      return acc;
-    }, {});
 
   // Pastikan status/hiring_status selalu di-fetch untuk setiap job di groupedData (schedule/list)
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -473,12 +670,17 @@ export default function HRInterview() {
     }
   }, [activeMenu, groupedData, fetchJobStatus]);
 
-  // Gabungkan data interviews (completed) dan applications/interviews (canceled_by_company) untuk history
-  // Hanya tampilkan interview dengan status 'completed' dan 'canceled_by_company' (bukan 'cancelled')
+  // Gabungkan data interviews (completed/disqualified) dan applications/interviews (canceled_by_company) untuk history
+  // Hanya tampilkan interview dengan status 'completed', 'disqualified', dan 'canceled_by_company'
   // Urutkan data riwayat terbaru di atas
   const sortedHistory = [...data]
     .filter(
-      (d) => d.status === "completed" || d.status === "canceled_by_company",
+      (d) =>
+        d.status === "completed" ||
+        d.status === "disqualified" ||
+        d.status === "cancelled" ||
+        (d.status === "" && d.interviewer_notes) ||
+        d.status === "canceled_by_company",
     )
     .sort((a, b) => {
       // Urutkan descending berdasarkan tanggal interview
@@ -498,15 +700,15 @@ export default function HRInterview() {
   // Filter by posisi dan status
   const filteredHistory = Object.fromEntries(
     Object.entries(groupedHistory).filter(([job, list]) => {
+      const nameFilter = (form.searchName || "").toString().trim().toLowerCase();
       // Filter posisi
-      if (form.positionFilterHistory && job !== form.positionFilterHistory)
-        return false;
+      if (form.positionFilterHistory && job !== form.positionFilterHistory) return false;
       // Filter status
-      if (
-        form.statusFilterHistory &&
-        !list.some((d) => d.status === form.statusFilterHistory)
-      )
-        return false;
+      if (form.statusFilterHistory && !list.some((d) => d.status === form.statusFilterHistory)) return false;
+      // Filter by candidate name
+      if (nameFilter) {
+        return list.some((d) => ((d.candidate_name || d.name) || "").toString().toLowerCase().includes(nameFilter));
+      }
       return true;
     }),
   );
@@ -551,6 +753,57 @@ export default function HRInterview() {
         {/* CONTENT */}
         {activeMenu === "schedule" && (
           <div>
+            {/* SUMMARY METRICS: lowongan & kandidat tanpa jadwal */}
+            <div className="w-full mb-4 grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div
+                role="button"
+                tabIndex={0}
+                onClick={() => {
+                  setUnscheduledFilter("jobs");
+                  setForm((f) => ({ ...f, positionFilter: "" }));
+                  setTimeout(() => {
+                    const el = document.getElementById("schedule-groups");
+                    if (el) el.scrollIntoView({ behavior: "smooth", block: "start" });
+                  }, 50);
+                }}
+                className="rounded-2xl border border-base-300 bg-base-100 p-4 shadow-sm flex items-center justify-between cursor-pointer"
+              >
+                <div>
+                  <p className="text-xs font-semibold uppercase tracking-wide text-base-content/60">
+                    Lowongan Belum Dijadwalkan
+                  </p>
+                  <p className="mt-2 text-2xl font-bold text-primary">{unscheduledJobTitles.size}</p>
+                </div>
+                <div className="hidden sm:block">
+                  <span className="text-sm text-base-content/50">Lihat</span>
+                </div>
+              </div>
+
+              <div
+                role="button"
+                tabIndex={0}
+                onClick={() => {
+                  setUnscheduledFilter("candidates");
+                  setForm((f) => ({ ...f, positionFilter: "" }));
+                  setTimeout(() => {
+                    const el = document.getElementById("schedule-groups");
+                    if (el) el.scrollIntoView({ behavior: "smooth", block: "start" });
+                  }, 50);
+                }}
+                className="rounded-2xl border border-base-300 bg-base-100 p-4 shadow-sm flex items-center justify-between cursor-pointer"
+              >
+                <div>
+                  <p className="text-xs font-semibold uppercase tracking-wide text-base-content/60">
+                    Kandidat Belum Dijadwalkan
+                  </p>
+                  <p className="mt-2 text-2xl font-bold text-primary">{unscheduledCandidates.length}</p>
+                </div>
+                <div className="hidden sm:block">
+                  <span className="text-sm text-base-content/50">Lihat</span>
+                </div>
+              </div>
+            </div>
+
             {/* FILTER SCHEDULE */}
             <div className="w-full mb-6">
               <div className="flex flex-col sm:flex-row gap-3 w-full">
@@ -563,7 +816,11 @@ export default function HRInterview() {
                 >
                   <option value="">Semua Posisi</option>
                   {Array.from(
-                    new Set(candidates.map((c) => c.job_title || "Lainnya")),
+                    new Set(
+                      (candidates || []).map(
+                        (c) => c.position_name || c.base_position || c.job_title || "Lainnya",
+                      ),
+                    ),
                   ).map((pos, idx) => (
                     <option key={idx} value={pos}>
                       {pos}
@@ -571,36 +828,41 @@ export default function HRInterview() {
                   ))}
                 </select>
                 <input
-                  type="date"
+                  type="text"
+                  placeholder="Cari berdasarkan nama"
                   className="input input-bordered flex-1 min-w-[160px]"
+                  value={form.searchName || ""}
+                  onChange={(e) =>
+                    setForm((f) => ({ ...f, searchName: e.target.value }))
+                  }
                 />
-                <button className="btn btn-primary w-full sm:w-auto">
-                  Apply Filters
+                <button
+                  className="btn btn-primary w-full sm:w-auto"
+                  onClick={() => {
+                    setForm((f) => ({ ...f, positionFilter: "", searchName: "" }));
+                    setUnscheduledFilter(null);
+                    setTimelineFilter(null);
+                    setShowAll({});
+                  }}
+                >
+                  Reset 
                 </button>
               </div>
             </div>
 
             {/* GROUPED LIST */}
-            <div className="space-y-6">
+            <div id="schedule-groups" className="space-y-6">
               {/* Group kandidat berdasarkan posisi (job_title) */}
-              {Object.entries(
-                candidates
-                  .filter(
-                    (c) =>
-                      !form.positionFilter ||
-                      (c.job_title || "Lainnya") === form.positionFilter,
-                  )
-                  .reduce((acc, curr) => {
-                    const job = curr.job_title || "Lainnya";
-                    if (!acc[job]) acc[job] = [];
-                    acc[job].push(curr);
-                    return acc;
-                  }, {}),
-              ).map(([job, list], idx) => (
+              {Object.entries(groupedCandidates).map(([job, list], idx) => (
                 <div key={idx} className="border rounded-xl overflow-hidden">
                   <div className="bg-base-200 px-4 py-3 flex justify-between items-center">
                     <span className="font-semibold">
-                      {formatJobAndPosFromFirst(groupedData[job]?.[0], job)}
+                      {formatJobAndPosFromFirst(
+                        (list || []).find(
+                          (it) => it.position_name || it.base_position || (it.job_opening && it.job_opening.base_position),
+                        ) || list?.[0],
+                        job,
+                      )}
                     </span>
                     <div className="flex gap-2">
                       <button
@@ -637,7 +899,7 @@ export default function HRInterview() {
                             // Refresh data kandidat
                             setCandidates((prev) =>
                               prev.filter(
-                                (c) => (c.job_title || "Lainnya") !== job,
+                                (c) => (c.position_name || c.base_position || c.job_title || "Lainnya") !== job,
                               ),
                             );
                           })
@@ -758,6 +1020,80 @@ export default function HRInterview() {
         )}
         {activeMenu === "list" && (
           <div>
+            {/* SUMMARY TIMELINE: jadwal hari ini / besok / lewat jadwal */}
+            <div className="w-full mb-4 grid grid-cols-1 md:grid-cols-3 gap-3">
+              <button
+                type="button"
+                onClick={() => openTimelineFilter("today")}
+                className="rounded-2xl border border-info/30 bg-info/10 p-4 shadow-sm text-left transition hover:-translate-y-0.5 hover:shadow-md"
+              >
+                <p className="text-xs font-semibold uppercase tracking-wide text-info/80">
+                  Jadwal Hari Ini
+                </p>
+                <p className="mt-2 text-2xl font-bold text-info">
+                  {scheduleTimelineMetrics.todayItems.length}
+                </p>
+                <p className="mt-1 text-sm text-base-content/60">
+                  Klik untuk lihat interview hari ini
+                </p>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => openTimelineFilter("tomorrow")}
+                className="rounded-2xl border border-success/30 bg-success/10 p-4 shadow-sm text-left transition hover:-translate-y-0.5 hover:shadow-md"
+              >
+                <p className="text-xs font-semibold uppercase tracking-wide text-success/80">
+                  Jadwal Besok
+                </p>
+                <p className="mt-2 text-2xl font-bold text-success">
+                  {scheduleTimelineMetrics.tomorrowItems.length}
+                </p>
+                <p className="mt-1 text-sm text-base-content/60">
+                  Klik untuk lihat interview besok
+                </p>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => openTimelineFilter("overdue")}
+                className="rounded-2xl border border-warning/30 bg-warning/10 p-4 shadow-sm text-left transition hover:-translate-y-0.5 hover:shadow-md"
+              >
+                <p className="text-xs font-semibold uppercase tracking-wide text-warning/80">
+                  Lewat Jadwal / Nilai Kandidat
+                </p>
+                <p className="mt-2 text-2xl font-bold text-warning">
+                  {scheduleTimelineMetrics.overdueItems.length}
+                </p>
+                <p className="mt-1 text-sm text-base-content/60">
+                  Klik untuk lihat kandidat yang sudah lewat jadwal
+                </p>
+              </button>
+            </div>
+
+            {timelineFilter && (
+              <div className="mb-4 rounded-2xl border border-base-300 bg-base-100 px-4 py-3 shadow-sm flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                <div>
+                  <p className="text-xs font-semibold uppercase tracking-wide text-base-content/60">
+                    Filter Timeline Aktif
+                  </p>
+                  <p className="mt-1 font-semibold">
+                    {timelineFilter === "today"
+                      ? "Jadwal Hari Ini"
+                      : timelineFilter === "tomorrow"
+                      ? "Jadwal Besok"
+                      : "Lewat Jadwal / Nilai Kandidat"}
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  className="btn btn-sm btn-outline"
+                  onClick={() => setTimelineFilter(null)}
+                >
+                  Hapus Filter
+                </button>
+              </div>
+            )}
             {/* FILTER LIST */}
             <div className="w-full mb-6">
               <div className="flex flex-col sm:flex-row gap-3 w-full">
@@ -778,7 +1114,9 @@ export default function HRInterview() {
                         .filter((d) =>
                           ["scheduled", "rescheduled"].includes(d.status),
                         )
-                        .map((c) => c.job_title || "Lainnya"),
+                        .map(
+                          (c) => c.position_name || c.base_position || c.job_title || "Lainnya",
+                        ),
                     ),
                   ).map((pos, idx) => (
                     <option key={idx} value={pos}>
@@ -787,29 +1125,38 @@ export default function HRInterview() {
                   ))}
                 </select>
                 <input
-                  type="date"
+                  type="text"
+                  placeholder="Cari berdasarkan nama"
                   className="input input-bordered flex-1 min-w-[160px]"
+                  value={form.searchName || ""}
+                  onChange={(e) =>
+                    setForm((f) => ({ ...f, searchName: e.target.value }))
+                  }
                 />
-                <button className="btn btn-primary w-full sm:w-auto">
-                  Apply Filters
+                <button
+                  className="btn btn-primary w-full sm:w-auto"
+                  onClick={() => {
+                    setForm((f) => ({ ...f, positionFilterList: "", searchName: "" }));
+                    setTimelineFilter(null);
+                    setShowAll({});
+                  }}
+                >
+                  Reset Filters
                 </button>
               </div>
             </div>
-            <div className="space-y-6">
-              {Object.keys(
-                Object.fromEntries(
-                  Object.entries(groupedData).filter(
-                    ([job]) =>
-                      !form.positionFilterList ||
-                      job === form.positionFilterList,
-                  ),
-                ),
-              ).map((job, idx) => (
+            <div id="list-groups" className="space-y-6">
+              {Object.keys(visibleListGroups).map((job, idx) => (
                 <div key={idx} className="border rounded-xl overflow-hidden">
                   {/* 🔥 HEADER POSISI */}
                   <div className="bg-base-200 px-4 py-3 flex justify-between items-center">
                     <span className="font-semibold">
-                      {formatJobAndPosFromFirst(groupedData[job]?.[0], job)}
+                      {formatJobAndPosFromFirst(
+                        (visibleListGroups[job] || []).find(
+                          (it) => it.position_name || it.base_position || (it.job_opening && it.job_opening.base_position),
+                        ) || visibleListGroups[job]?.[0],
+                        job,
+                      )}
                     </span>
                     <div className="flex gap-2">
                       <button
@@ -824,7 +1171,7 @@ export default function HRInterview() {
     "
                         onClick={() => {
                           // Cari kandidat pertama pada groupedData[job] untuk ambil id
-                          const first = groupedData[job]?.[0];
+                          const first = visibleListGroups[job]?.[0];
                           navigate("/app/DetailInterview-process", {
                             state: {
                               job: {
@@ -840,7 +1187,7 @@ export default function HRInterview() {
                       <button
                         className="btn btn-error btn-xs"
                         onClick={() =>
-                          openCancelLowonganModal(groupedData[job], job, () => {
+                          openCancelLowonganModal(visibleListGroups[job], job, () => {
                             setData((prev) =>
                               prev.filter((d) => d.job_title !== job),
                             );
@@ -855,8 +1202,8 @@ export default function HRInterview() {
                   {/* 🔥 LIST KANDIDAT */}
                   <div className="divide-y">
                     {(showAll[job]
-                      ? groupedData[job]
-                      : groupedData[job].slice(0, 1)
+                      ? visibleListGroups[job]
+                      : visibleListGroups[job].slice(0, 1)
                     ).map((d) => (
                       <div
                         key={d.id}
@@ -950,7 +1297,7 @@ export default function HRInterview() {
                       </div>
                     ))}
                   </div>
-                  {groupedData[job].length > 1 && (
+                  {visibleListGroups[job].length > 1 && (
                     <div className="p-4 text-center">
                       <button
                         className="btn-sm"
@@ -963,7 +1310,7 @@ export default function HRInterview() {
                       >
                         {showAll[job]
                           ? "Tampilkan Sedikit Data"
-                          : `Tampilkan Semua (${groupedData[job].length})`}
+                          : `Tampilkan Semua (${visibleListGroups[job].length})`}
                       </button>
                     </div>
                   )}
@@ -1023,18 +1370,30 @@ export default function HRInterview() {
                 >
                   <option value="">Semua Status</option>
                   <option value="completed">Selesai</option>
+                  <option value="disqualified">Gugur</option>
                   <option value="canceled_by_company">
                     Dibatalkan Perusahaan
                   </option>
                 </select>
 
                 <input
-                  type="date"
+                  type="text"
+                  placeholder="Cari berdasarkan nama"
                   className="input input-bordered flex-1 min-w-[160px]"
+                  value={form.searchName || ""}
+                  onChange={(e) =>
+                    setForm((f) => ({ ...f, searchName: e.target.value }))
+                  }
                 />
 
-                <button className="btn btn-primary w-full sm:w-auto">
-                  Apply Filters
+                <button
+                  className="btn btn-primary w-full sm:w-auto"
+                  onClick={() => {
+                    setForm((f) => ({ ...f, positionFilterHistory: "", statusFilterHistory: "", searchName: "" }));
+                    setShowAll({});
+                  }}
+                >
+                  Reset Filters
                 </button>
               </div>
             </div>
@@ -1055,9 +1414,21 @@ export default function HRInterview() {
                       {/* HEADER POSISI */}
                       <div className="bg-base-200 px-4 py-3 flex justify-between items-center">
                         <span className="font-semibold">
-                          {formatJobAndPosFromFirst(filteredHistory[job]?.[0], job)}
+                          {formatJobAndPosFromFirst(
+                            (filteredHistory[job] || []).find(
+                              (it) => it.position_name || it.base_position || (it.job_opening && it.job_opening.base_position),
+                            ) || filteredHistory[job]?.[0],
+                            job,
+                          )}
                         </span>
                         <div className="flex gap-2">
+                          {(filteredHistory[job] || []).some(
+                            (it) => it.status === "canceled_by_company",
+                          ) && (
+                            <span className="badge badge-error">
+                              Dibatalkan oleh perusahaan
+                            </span>
+                          )}
                           <button
                             className="
       px-3 py-1 text-xs
@@ -1095,23 +1466,6 @@ export default function HRInterview() {
                         ).map((d) => (
                           <div key={d.id} className="p-4 bg-base-100">
                             <div className="flex flex-col gap-1">
-                              {/* ATAS (warning) */}
-                              {/* BARIS ATAS (WARNING DI KANAN) */}
-                              <div className="flex justify-end">
-                                {d.result === "pending" && (
-                                  <span className="text-warning">
-                                    Silakan ubah hasil interview ini pada menu
-                                    lihat detail.
-                                  </span>
-                                )}
-
-                                {(d.status === "cancelled" ||
-                                  d.status === "canceled_by_company") && (
-                                  <p className="text-error">
-                                    Lowongan ini dibatalkan oleh perusahaan
-                                  </p>
-                                )}
-                              </div>
                               <div className="flex justify-between items-center">
                                 {/* KIRI: NAMA */}
                                 <h2 className="font-semibold">
@@ -1130,14 +1484,20 @@ export default function HRInterview() {
                                       Tidak Ditampilkan
                                     </span>
                                   )}
+                                  {d.result === "disqualified" &&
+                                    d.status !== "disqualified" && (
+                                      <span className="badge badge-error mr-1">
+                                        Didiskualifikasi
+                                      </span>
+                                    )}
                                   {d.status === "completed" ? (
                                     <span className="badge badge-success">
                                       Selesai
                                     </span>
                                   ) : d.status === "cancelled" ||
-                                    d.status === "canceled_by_company" ? (
+                                    d.status === "disqualified" ? (
                                     <span className="badge badge-error">
-                                      Dibatalkan
+                                      Gugur
                                     </span>
                                   ) : null}
                                   <button
@@ -1215,12 +1575,20 @@ export default function HRInterview() {
           setCancelNotes={setCancelNotes}
           onSubmit={async () => {
             if (!selectedCandidate?.application_id) {
-              alert("Data aplikasi kandidat tidak ditemukan!");
+              NotificationManager.error(
+                "Data aplikasi kandidat tidak ditemukan!",
+                "Gagal",
+                3500,
+              );
               return;
             }
             // Validasi sederhana
             if (!form.scheduled_date) {
-              alert("Tanggal wajib diisi!");
+              NotificationManager.warning(
+                "Tanggal wajib diisi!",
+                "Validasi",
+                3000,
+              );
               return;
             }
             // Validasi bentrok interviewer (waktu overlap)
@@ -1248,8 +1616,10 @@ export default function HRInterview() {
                 return false;
               });
               if (conflict) {
-                alert(
+                NotificationManager.warning(
                   "Interviewer sudah memiliki jadwal wawancara yang bentrok di waktu tersebut. Silakan pilih waktu lain.",
+                  "Validasi",
+                  3500,
                 );
                 return;
               }
@@ -1294,9 +1664,7 @@ export default function HRInterview() {
                       ...i,
                       status: i.status || i.interview_status || "scheduled",
                       job_title:
-                        i.job_title ||
-                        i.position_name ||
-                        i.base_position ||
+                        i.position_name || i.base_position || i.job_title ||
                         "Lainnya",
                       id: i.id || i.interview_id,
                       candidate_name: i.candidate_name || i.name || "-",
@@ -1357,14 +1725,14 @@ export default function HRInterview() {
                 // Filter otomatis ke posisi interview baru agar langsung terlihat
                 if (
                   newInterview &&
-                  (newInterview.job_title ||
-                    newInterview.position_name ||
-                    newInterview.base_position)
+                  (newInterview.position_name ||
+                    newInterview.base_position ||
+                    newInterview.job_title)
                 ) {
                   const jobTitle =
-                    newInterview.job_title ||
                     newInterview.position_name ||
                     newInterview.base_position ||
+                    newInterview.job_title ||
                     "Lainnya";
                   setForm((prev) => ({
                     ...prev,
@@ -1400,10 +1768,7 @@ export default function HRInterview() {
                     ...i,
                     status: i.status || i.interview_status || "scheduled",
                     job_title:
-                      i.job_title ||
-                      i.position_name ||
-                      i.base_position ||
-                      "Lainnya",
+                      i.job_title || i.position_name || i.base_position || "Lainnya",
                     id: i.id || i.interview_id,
                     candidate_name: i.candidate_name || i.name || "-",
                     scheduled_date: i.scheduled_date || i.date,
@@ -1416,11 +1781,13 @@ export default function HRInterview() {
               setIsModalOpen(false);
               // Data interview sudah di-refresh otomatis
             } catch (err) {
-              alert(
+              NotificationManager.error(
                 err?.response?.data?.message ||
                   (mode === "update"
                     ? "Gagal mengupdate jadwal interview"
                     : "Gagal membuat jadwal interview"),
+                "Gagal",
+                4000,
               );
             }
           }}
@@ -1442,34 +1809,52 @@ export default function HRInterview() {
               return;
             }
             try {
-              // Set result = 'failed' and add notes; mark status completed so it appears in history
+              // Simpan status disqualified + result disqualified dan interviewer_notes
               await axios.put(
                 `/api/admin/interviews/${selectedCandidate.id}/result`,
                 {
                   interviewer_notes: cancelNotes,
-                  result: "failed",
-                  status: "completed",
+                  status: "disqualified",
+                  result: "disqualified",
                 },
               );
 
-              // Update local state: mark interview as completed/failed
+              // Update local state: mark interview as disqualified
               setData((prev) =>
                 prev.map((item) =>
                   item.id === selectedCandidate.id
                     ? {
                         ...item,
-                        status: "completed",
-                        result: "failed",
+                        status: "disqualified",
+                        result: "disqualified",
                         interviewer_notes: cancelNotes,
                       }
                     : item,
                 ),
               );
 
+              // Pastikan item langsung muncul di history walau fetch belum selesai
+              setData((prev) => {
+                const nextItem = {
+                  ...selectedCandidate,
+                  status: "disqualified",
+                  result: "disqualified",
+                  interviewer_notes: cancelNotes,
+                };
+                const filtered = prev.filter((item) => item.id !== selectedCandidate.id);
+                return [nextItem, ...filtered];
+              });
+
+              setForm((prev) => ({
+                ...prev,
+                statusFilterHistory: "",
+                positionFilterHistory: "",
+              }));
+
               // If currently in schedule view, move to history by switching menu
               setIsCancelModalOpen(false);
               NotificationManager.success(
-                "Kandidat berhasil digugurkan dan dipindah ke riwayat wawancara.",
+                "Kandidat berhasil digugurkan.",
                 "Berhasil",
                 3000,
               );

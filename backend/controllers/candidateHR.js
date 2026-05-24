@@ -38,7 +38,7 @@ const applicationsTableHasCoverLetterFile = async () => {
 };
 
 // ============================
-// GET INTERVIEW COMPLETED & APPLICATIONS CANCELED BY COMPANY (HR/Admin)
+// GET INTERVIEW COMPLETED, DISQUALIFIED & APPLICATIONS CANCELED BY COMPANY (HR/Admin)
 // ============================
 router.get(
   "/interviews/history-combined",
@@ -46,7 +46,12 @@ router.get(
   verifyRole(["hr"]),
   async (req, res) => {
     try {
-      // Ambil interview status completed dan canceled_by_company
+      const includeActive = String(req.query.include_active || "").toLowerCase() === "true";
+      const historyStatuses = includeActive
+        ? "('scheduled', 'rescheduled', 'completed', 'disqualified', 'cancelled', 'canceled_by_company', '')"
+        : "('completed', 'disqualified', 'cancelled', 'canceled_by_company', '')";
+
+      // Ambil interview status completed, disqualified, cancelled, dan canceled_by_company
       const [interviews] = await db.promise().query(`
         SELECT i.*, 
                c.name AS candidate_name, c.email AS candidate_email,
@@ -60,7 +65,7 @@ router.get(
         LEFT JOIN job_openings jo ON a.job_opening_id = jo.id
         LEFT JOIN positions p ON jo.position_id = p.id
         LEFT JOIN employees e ON i.interviewer_id = e.id
-        WHERE i.status IN ('completed', 'canceled_by_company')
+        WHERE i.status IN ${historyStatuses}
         ORDER BY i.scheduled_date DESC
       `);
 
@@ -372,7 +377,7 @@ router.post(
 router.put(
   "/interviews/:id/result",
   verifyToken,
-  verifyRole(["hr"]),
+  verifyRole(["hr", "admin"]),
   async (req, res) => {
     try {
       const { id } = req.params;

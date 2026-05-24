@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState, useCallback } from "react";
+import axios from "axios";
 import { useLocation } from "react-router-dom";
 import { useDispatch } from "react-redux";
 import {
@@ -12,7 +13,8 @@ import { MagnifyingGlassIcon } from "@heroicons/react/24/outline";
 const normalizeText = (value = "") =>
   String(value).toLowerCase().replace(/\s+/g, " ").trim();
 
-const isManagerLevelPosition = (position) => normalizeText(position?.level) === "manager";
+const isManagerLevelPosition = (position) =>
+  normalizeText(position?.level) === "manager";
 const formatRupiah = (value) =>
   `Rp. ${Number(value || 0).toLocaleString("id-ID")}`;
 
@@ -181,6 +183,10 @@ function HREmployees() {
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [createForm, setCreateForm] = useState(INITIAL_FORM);
   const [createDocuments, setCreateDocuments] = useState(INITIAL_DOCUMENTS);
+  const [candidateApplications, setCandidateApplications] = useState([]);
+  const [candidatePickerLoading, setCandidatePickerLoading] = useState(false);
+  const [candidatePickerSearch, setCandidatePickerSearch] = useState("");
+  const [showCandidatePicker, setShowCandidatePicker] = useState(false);
 
   const [editingEmployee, setEditingEmployee] = useState(null);
   const [editDocuments, setEditDocuments] = useState(INITIAL_DOCUMENTS);
@@ -314,7 +320,7 @@ function HREmployees() {
     );
 
     if (match) {
-      setViewingEmployee(mapEmployeeToForm(match));
+      setViewingEmployee(match);
     }
   }, [employees, location.state?.employeeId]);
 
@@ -424,6 +430,118 @@ function HREmployees() {
     );
   };
 
+  const mapEmployeeToForm = useCallback(
+    (employee) => {
+      const currentPositionId = employee.position_id
+        ? String(employee.position_id)
+        : "";
+      const currentPosition = positions.find(
+        (position) => String(position.id) === currentPositionId,
+      );
+
+      return {
+        ...employee,
+        name: employee.full_name || employee.name || "",
+        email: employee.email || "",
+        username: employee.username || "",
+        phone: employee.phone || "",
+        photo: employee.photo || "",
+        gender: employee.gender || "",
+        birth_place: employee.birth_place || "",
+        date_of_birth: employee.date_of_birth
+          ? String(employee.date_of_birth).slice(0, 10)
+          : "",
+        marital_status: employee.marital_status || "",
+        nationality: employee.nationality || "Indonesian",
+        address: employee.address || "",
+        nik: employee.nik || "",
+        npwp: employee.npwp || "",
+        bpjs_number: employee.bpjs_number || "",
+        bank_account: employee.bank_account || "",
+        account_holder_name: employee.account_holder_name || "",
+        bank_name: employee.bank_name || "",
+        department_name:
+          employee.department_name || currentPosition?.department_name || "",
+        position_id: currentPositionId,
+        join_date: employee.join_date
+          ? String(employee.join_date).slice(0, 10)
+          : "",
+        user_status: employee.status || "",
+        employment_status: employee.employment_status || " ",
+        roles: getRawAutoRolesForForm(
+          {
+            department_name:
+              employee.department_name || currentPosition?.department_name || "",
+            position_id: currentPositionId,
+          },
+          positions,
+        ),
+      };
+    },
+    [positions],
+  );
+
+  const mapCandidateToCreateForm = useCallback((candidate) => {
+    const candidatePositionLabel =
+      candidate?.position_name || candidate?.base_position || candidate?.job_title || "";
+    const matchedPosition = positions.find((position) => {
+      const positionName = normalizeText(position.name);
+      return (
+        positionName === normalizeText(candidatePositionLabel) ||
+        positionName === normalizeText(candidate?.job_title || "")
+      );
+    });
+
+    const nextForm = {
+      ...INITIAL_FORM,
+      name: candidate?.name || candidate?.candidate_name || "",
+      email: candidate?.email || candidate?.candidate_email || "",
+      username:
+        String(candidate?.email || candidate?.candidate_email || "").split("@")[0] ||
+        "",
+      phone: candidate?.phone || "",
+      gender: candidate?.gender || "",
+      birth_place: candidate?.birth_place || "",
+      date_of_birth: candidate?.date_of_birth
+        ? String(candidate.date_of_birth).slice(0, 10)
+        : "",
+      marital_status: candidate?.marital_status || "",
+      nationality: candidate?.nationality || "Indonesian",
+      address: candidate?.address || "",
+      nik: candidate?.nik || "",
+      npwp: candidate?.npwp || "",
+      department_name: matchedPosition?.department_name || "",
+      position_id: matchedPosition?.id ? String(matchedPosition.id) : "",
+      join_date: "",
+      user_status: "active",
+      employment_status: matchedPosition?.level === "intern" ? "intern" : "",
+      roles: [],
+    };
+
+    return {
+      ...nextForm,
+      roles: getRawAutoRolesForForm(nextForm, positions),
+    };
+  }, [positions]);
+
+  useEffect(() => {
+    const candidateToCreate = location.state?.candidateToCreate;
+    if (!candidateToCreate) return;
+
+    setCreateForm(mapCandidateToCreateForm(candidateToCreate));
+    setCreateDocuments(INITIAL_DOCUMENTS);
+    setCandidateApplications([]);
+    setCandidatePickerSearch("");
+    setShowCandidatePicker(false);
+    setShowCreateModal(true);
+  }, [location.state?.candidateToCreate, positions, mapCandidateToCreateForm]);
+
+  const applyCandidateToCreateForm = (candidate) => {
+    if (!candidate) return;
+    setCreateForm(mapCandidateToCreateForm(candidate));
+    setShowCandidatePicker(false);
+  };
+
   const updateCreateForm = (field, value) => {
     setCreateForm((prev) => {
       const next = { ...prev, [field]: value };
@@ -447,62 +565,59 @@ function HREmployees() {
     handleFilterChange("search", normalizedSearch);
   };
 
-  const mapEmployeeToForm = (employee) => {
-    const currentPositionId = employee.position_id
-      ? String(employee.position_id)
-      : "";
-    const currentPosition = positions.find(
-      (position) => String(position.id) === currentPositionId,
-    );
-
-    return {
-      ...employee,
-      name: employee.full_name || employee.name || "",
-      email: employee.email || "",
-      username: employee.username || "",
-      phone: employee.phone || "",
-      photo: employee.photo || "",
-      gender: employee.gender || "",
-      birth_place: employee.birth_place || "",
-      date_of_birth: employee.date_of_birth
-        ? String(employee.date_of_birth).slice(0, 10)
-        : "",
-      marital_status: employee.marital_status || "",
-      nationality: employee.nationality || "Indonesian",
-      address: employee.address || "",
-      nik: employee.nik || "",
-      npwp: employee.npwp || "",
-      bpjs_number: employee.bpjs_number || "",
-      bank_account: employee.bank_account || "",
-      account_holder_name: employee.account_holder_name || "",
-      bank_name: employee.bank_name || "",
-      department_name:
-        employee.department_name || currentPosition?.department_name || "",
-      position_id: currentPositionId,
-      join_date: employee.join_date
-        ? String(employee.join_date).slice(0, 10)
-        : "",
-      user_status: employee.status || "",
-      employment_status: employee.employment_status || " ",
-      roles: getRawAutoRolesForForm(
-        {
-          department_name:
-            employee.department_name || currentPosition?.department_name || "",
-          position_id: currentPositionId,
-        },
-        positions,
-      ),
-    };
-  };
-
   const openCreateModal = () => {
     setCreateForm({
       ...INITIAL_FORM,
       roles: getRawAutoRolesForForm(INITIAL_FORM, positions),
     });
     setCreateDocuments(INITIAL_DOCUMENTS);
+    setCandidateApplications([]);
+    setCandidatePickerSearch("");
+    setShowCandidatePicker(false);
     setShowCreateModal(true);
   };
+
+  useEffect(() => {
+    if (!showCreateModal) return;
+
+    const loadCandidateApplications = async () => {
+      try {
+        setCandidatePickerLoading(true);
+        const response = await axios.get("/api/hr/applications", {
+          params: { status: "diterima" },
+        });
+        setCandidateApplications(Array.isArray(response.data?.applications) ? response.data.applications : []);
+      } catch (error) {
+        setCandidateApplications([]);
+      } finally {
+        setCandidatePickerLoading(false);
+      }
+    };
+
+    loadCandidateApplications();
+  }, [showCreateModal]);
+
+  const filteredCandidateApplications = useMemo(() => {
+    const keyword = normalizeText(candidatePickerSearch);
+    return (candidateApplications || []).filter((candidate) => {
+      if (!keyword) return true;
+      const searchable = normalizeText(
+        [
+          candidate.name,
+          candidate.candidate_name,
+          candidate.email,
+          candidate.candidate_email,
+          candidate.phone,
+          candidate.position_name,
+          candidate.base_position,
+          candidate.job_title,
+        ]
+          .filter(Boolean)
+          .join(" "),
+      );
+      return searchable.includes(keyword);
+    });
+  }, [candidateApplications, candidatePickerSearch]);
 
   const openEditModal = async (employee) => {
     setEditDocuments(INITIAL_DOCUMENTS);
@@ -923,17 +1038,14 @@ function HREmployees() {
                       </span>
                     </td>
                     <td className="text-center">
-                      <span
-                        className={getStatusBadge(employee.status)}
-                      >
+                      <span className={getStatusBadge(employee.status)}>
                         {getStatusLabel(employee.status)}
                       </span>
                     </td>
                     <td>
-  <div className="flex items-center gap-3 whitespace-nowrap">
-    
-    <button
-      className="
+                      <div className="flex items-center gap-3 whitespace-nowrap">
+                        <button
+                          className="
         px-3 py-1 text-xs
         bg-gradient-to-b from-blue-400 to-blue-600
         text-white rounded-full
@@ -942,13 +1054,13 @@ function HREmployees() {
         hover:from-blue-500 hover:to-blue-700
         transition-all duration-200
       "
-      onClick={() => openViewModal(employee)}
-    >
-      Lihat
-    </button>
+                          onClick={() => openViewModal(employee)}
+                        >
+                          Lihat
+                        </button>
 
-    <button
-      className="
+                        <button
+                          className="
         px-3 py-1 text-xs
         bg-gradient-to-b from-yellow-300 to-yellow-500
         text-black rounded-full
@@ -957,13 +1069,13 @@ function HREmployees() {
         hover:from-yellow-400 hover:to-yellow-600
         transition-all duration-200
       "
-      onClick={() => openEditModal(employee)}
-    >
-      Edit
-    </button>
+                          onClick={() => openEditModal(employee)}
+                        >
+                          Edit
+                        </button>
 
-    <button
-      className="
+                        <button
+                          className="
         px-3 py-1 text-xs
         bg-gradient-to-b from-red-400 to-red-600
         text-white rounded-full
@@ -972,14 +1084,13 @@ function HREmployees() {
         hover:from-red-500 hover:to-red-700
         transition-all duration-200
       "
-      onClick={() => setDeleteTarget(employee)}
-      disabled={submitting}
-    >
-      Hapus
-    </button>
-
-  </div>
-</td>
+                          onClick={() => setDeleteTarget(employee)}
+                          disabled={submitting}
+                        >
+                          Hapus
+                        </button>
+                      </div>
+                    </td>
                   </tr>
                 ))}
               </tbody>
@@ -1001,7 +1112,21 @@ function HREmployees() {
       />
       <div className="modal">
         <div className="modal-box max-w-6xl">
-          <h3 className="font-bold text-lg">Tambah Pegawai</h3>
+          <div className="flex flex-col gap-3 border-b border-base-300 pb-4 md:flex-row md:items-center md:justify-between">
+            <div>
+              <h3 className="font-bold text-lg">Tambah Pegawai</h3>
+              <p className="text-xs text-base-content/60">
+                Isi manual atau ambil data dasar dari kandidat yang sudah lolos.
+              </p>
+            </div>
+            <button
+              type="button"
+              className="btn btn-outline btn-sm"
+              onClick={() => setShowCandidatePicker(true)}
+            >
+              Pilih Kandidat
+            </button>
+          </div>
           <form className="space-y-4 mt-4" onSubmit={handleCreateEmployee}>
             <div className="border border-base-300 rounded-lg p-4">
               <p className="font-semibold mb-3">Akun Pengguna</p>
@@ -1314,6 +1439,89 @@ function HREmployees() {
         </div>
       </div>
 
+      {showCreateModal && showCandidatePicker ? (
+        <div className="fixed inset-0 z-[70] flex items-center justify-center bg-black/50 p-3 md:p-6">
+          <div className="w-full max-w-5xl rounded-2xl bg-base-100 shadow-2xl border border-base-300 max-h-[90vh] overflow-hidden flex flex-col">
+            <div className="flex items-center justify-between gap-3 border-b border-base-300 px-5 py-4">
+              <div>
+                <h3 className="font-bold text-lg">Pilih Kandidat</h3>
+                <p className="text-xs text-base-content/60">
+                  Data kandidat akan dipakai untuk mengisi form pegawai.
+                </p>
+              </div>
+              <button
+                type="button"
+                className="btn btn-sm btn-ghost"
+                onClick={() => setShowCandidatePicker(false)}
+              >
+                ✕
+              </button>
+            </div>
+
+            <div className="p-5 border-b border-base-300">
+              <input
+                type="text"
+                className="input input-bordered w-full"
+                placeholder="Cari nama, email, telepon, atau posisi..."
+                value={candidatePickerSearch}
+                onChange={(e) => setCandidatePickerSearch(e.target.value)}
+              />
+            </div>
+
+            <div className="flex-1 overflow-y-auto p-5">
+              {candidatePickerLoading ? (
+                <div className="flex min-h-[180px] items-center justify-center text-sm text-base-content/60">
+                  Memuat data kandidat...
+                </div>
+              ) : filteredCandidateApplications.length > 0 ? (
+                <div className="grid grid-cols-1 gap-3">
+                  {filteredCandidateApplications.map((candidate) => (
+                    <div
+                      key={candidate.application_id || candidate.candidate_id || `${candidate.name}-${candidate.email}`}
+                      className="rounded-xl border border-base-300 bg-base-200/40 p-4"
+                    >
+                      <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+                        <div className="min-w-0">
+                          <p className="font-semibold text-base-content truncate">
+                            {candidate.name || candidate.candidate_name || "-"}
+                          </p>
+                          <p className="text-xs text-base-content/60 truncate">
+                            {candidate.email || candidate.candidate_email || "-"}
+                          </p>
+                          <div className="mt-2 flex flex-wrap gap-2 text-xs text-base-content/70">
+                            <span className="badge badge-outline">
+                              {candidate.phone || "Telepon kosong"}
+                            </span>
+                            <span className="badge badge-outline">
+                              {candidate.position_name || candidate.base_position || candidate.job_title || "Posisi kosong"}
+                            </span>
+                            <span className="badge badge-outline">
+                              {candidate.department_name || "Kandidat lolos"}
+                            </span>
+                          </div>
+                        </div>
+
+                        <button
+                          type="button"
+                          className="btn btn-primary btn-sm"
+                          onClick={() => applyCandidateToCreateForm(candidate)}
+                        >
+                          Gunakan Data
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div className="flex min-h-[180px] items-center justify-center text-sm text-base-content/60">
+                  Tidak ada kandidat yang cocok.
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      ) : null}
+
       <input
         type="checkbox"
         id="view-employee-modal-hr"
@@ -1548,7 +1756,10 @@ function HREmployees() {
             </div>
           ) : null}
           <div className="modal-action">
-            <button className=" btn btn-primary rounded-fullpx-5" onClick={() => setViewingEmployee(null)}>
+            <button
+              className=" btn btn-primary rounded-fullpx-5"
+              onClick={() => setViewingEmployee(null)}
+            >
               Tutup
             </button>
           </div>
@@ -2054,4 +2265,3 @@ function HREmployees() {
 }
 
 export default HREmployees;
-
