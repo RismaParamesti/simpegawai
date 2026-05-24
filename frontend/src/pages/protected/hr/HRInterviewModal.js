@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import axios from "axios";
 import { NotificationManager } from "react-notifications";
 
@@ -19,6 +19,7 @@ export default function InterviewModal({
 }) {
   const [currentEmployeeId, setCurrentEmployeeId] = useState("");
   const [detailCandidate, setDetailCandidate] = useState(null);
+  const fetchedJobOpeningIdsRef = useRef(new Set());
 
   // Fetch detail kandidat/interview dari backend saat popup detail dibuka ATAU saat form atur ulang dibuka
   useEffect(() => {
@@ -50,6 +51,68 @@ export default function InterviewModal({
       setDetailCandidate(null);
     }
   }, [isDetailOpen, isFormOpen, mode, selectedCandidate]);
+
+  // Jika detailCandidate tidak punya informasi base_position/position_name,
+  // coba fetch langsung job-opening berdasarkan id yang tersedia.
+  useEffect(() => {
+    const cj = detailCandidate || selectedCandidate || {};
+    const jobOpeningId =
+      cj.job_opening?.id ||
+      cj.job_opening_id ||
+      cj.job_opening?.job_opening_id ||
+      cj.job?.id ||
+      cj.position?.job_opening_id ||
+      cj.jobOpeningId ||
+      selectedCandidate?.application?.job_opening_id ||
+      selectedCandidate?.job_opening_id ||
+      selectedCandidate?.jobOpeningId ||
+      null;
+    const hasBase =
+      Boolean(cj.base_position) ||
+      Boolean(cj.basePosition) ||
+      Boolean(cj.base_position_name) ||
+      Boolean(cj.job_opening?.base_position) ||
+      Boolean(cj.job_opening?.basePosition) ||
+      Boolean(cj.job_opening?.base_position_name);
+    if (!jobOpeningId || hasBase) return;
+    if (fetchedJobOpeningIdsRef.current.has(String(jobOpeningId))) return;
+    fetchedJobOpeningIdsRef.current.add(String(jobOpeningId));
+
+    let cancelled = false;
+    axios
+      .get(`/api/job-openings/${jobOpeningId}`)
+      .then((res) => {
+        if (cancelled) return;
+        // Accept multiple response shapes: { job }, { jobOpening }, { data }, or direct object
+        const jobData =
+          res?.data?.job || res?.data?.jobOpening || res?.data?.data || res?.data || null;
+        if (jobData) {
+          setDetailCandidate((prev) => {
+            const existing = prev || {};
+            // Prefer existing top-level fields, fallback to jobData
+            const position_name =
+              existing.position_name || jobData.position_name || jobData.position?.name || "";
+            const base_position =
+              existing.base_position || jobData.base_position || jobData.position?.base_position || "";
+            const job_opening = existing.job_opening || jobData;
+            return {
+              ...existing,
+              ...(position_name ? { position_name } : {}),
+              ...(base_position ? { base_position } : {}),
+              job_opening,
+            };
+          });
+        }
+      })
+      .catch(() => {
+        // ignore
+      });
+
+    return () => {
+      cancelled = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [detailCandidate, selectedCandidate]);
   const formatDateOnly = (date) => {
     return date
       ? new Date(date).toLocaleDateString("id-ID", {
@@ -60,24 +123,41 @@ export default function InterviewModal({
       : "-";
   };
 
-  // Tampilkan nama lowongan dan posisi dalam format "nama lowongan - posisi"
+  // Format job label: "nama lowongan - posisi base_position" menggunakan candidate/detailCandidate
   const formatJobAndPos = (candidate) => {
     const c = candidate || {};
     if (Object.keys(c).length === 0) return "-";
+    const pickText = (...values) =>
+      values.find((value) => typeof value === "string" && value.trim()) || "";
     const name =
-      c.job_title ||
-      c.job_opening_title ||
-      c.title ||
-      (c.job_opening && c.job_opening.title) ||
-      "";
-    const pos =
-      c.base_position ||
-      c.position_name ||
-      (c.job_opening && c.job_opening.base_position) ||
-      "";
-    if (!name && !pos) return "-";
-    if (name && pos) return `${name} - ${pos}`;
-    return name || pos;
+      pickText(
+        c.job_title,
+        c.job_opening_title,
+        c.title,
+        c.job_opening?.title,
+      );
+    const position = pickText(
+      c.position_name,
+      c.position?.name,
+      c.position_title,
+      c.job_opening?.position_name,
+      c.job_opening?.position?.name,
+      c.job?.position?.name,
+      c.role,
+    );
+    const basePosition = pickText(
+      c.base_position,
+      c.basePosition,
+      c.base_position_name,
+      c.job_opening?.base_position,
+      c.job_opening?.position?.base_position,
+      c.job?.base_position,
+      c.position?.base_position,
+    );
+    const jobLabel = [position, basePosition].filter(Boolean).join(" ").trim();
+    if (name && jobLabel) return `${name} - ${jobLabel}`;
+    if (name) return name;
+    return jobLabel || "-";
   };
 
   // Ambil employee aktif saat modal dibuka, lalu isi interviewer otomatis
@@ -151,22 +231,13 @@ export default function InterviewModal({
           meeting_link: selectedCandidate.meeting_link || "",
           location: selectedCandidate.location || "",
         });
-      };
+    };
       fetchInterviewer();
     }
     // eslint-disable-next-line
   }, [isFormOpen, mode, selectedCandidate, currentEmployeeId]);
 
   const handleFormSubmit = () => {
-    // Pastikan scheduled_date ada dan tidak sebelum sekarang
-    if (!form.scheduled_date) {
-      NotificationManager.error(
-        "Tanggal & waktu harus diisi",
-        "Validasi Gagal",
-        3000,
-      );
-      return;
-    }
     const selected = new Date(form.scheduled_date);
     const now = new Date();
     if (isNaN(selected.getTime())) {
@@ -207,11 +278,14 @@ export default function InterviewModal({
       {isFormOpen && (
         <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50">
           <div className="bg-base-100 p-6 rounded-xl w-full max-w-3xl shadow-lg overflow-y-auto max-h-[80vh]">
-            <h3 className="font-bold text-lg mb-4">
-              {mode === "create"
-                ? "Buat Jadwal Wawancara"
-                : "Atur Ulang Jadwal Wawancara"}
-            </h3>
+            <div className="flex justify-between items-start mb-4">
+              <h3 className="font-bold text-lg">
+                {mode === "create" ? "Buat Jadwal Wawancara" : "Atur Ulang Jadwal Wawancara"}
+              </h3>
+              <div className="text-sm text-base-content/60 ml-4 text-right">
+                {formatJobAndPos(detailCandidate || selectedCandidate)}
+              </div>
+            </div>
 
             {/* PROFILE KANDIDAT */}
             <div className="rounded-xl border border-base-300 p-4 mb-5">
@@ -398,9 +472,6 @@ export default function InterviewModal({
 
             <div className="p-6">
               <div className="bg-base-200 rounded-xl p-4">
-                <p className="text-sm text-base-content/60">
-                  Kandidat yang akan digugurkan:
-                </p>
 
                 <h2 className="text-xl font-bold mt-2">
                   {selectedCandidate?.name ||

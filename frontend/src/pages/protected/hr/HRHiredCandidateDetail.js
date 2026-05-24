@@ -41,7 +41,7 @@ const HRHiredCandidateDetail = () => {
       .catch(() => {
         setLoading(false);
       });
-  }, [id]);
+  }, [dispatch, id]);
 
   // Debug: cek isi candidate
   console.log("DEBUG candidate:", candidate);
@@ -274,7 +274,15 @@ const HRHiredCandidateDetail = () => {
             </button>
           </div>
 
-          <button className="btn btn-success w-full sm:w-auto">
+          <button
+            className="btn btn-success w-full sm:w-auto"
+            onClick={() =>
+              navigate("/app/employees", {
+                state: { candidateToCreate: candidate },
+              })
+            }
+            type="button"
+          >
             Buatkan Data Pegawai
           </button>
         </div>

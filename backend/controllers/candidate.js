@@ -23,14 +23,21 @@ router.get(
     try {
       const { id } = req.params;
 
+      const hasCoverLetterFileColumn = await applicationsTableHasCoverLetterFile();
+      const coverLetterSelect = hasCoverLetterFileColumn
+        ? "a.cover_letter_file AS cover_letter_file"
+        : "a.cover_letter AS cover_letter_file";
+
       const query = `
         SELECT a.*, 
             jo.title AS job_title, jo.description, jo.requirements, jo.responsibilities, jo.salary_range_min, jo.salary_range_max, jo.quota, jo.deadline, jo.location, jo.employment_type,
             p.name AS position_name, p.level,
             d.name AS department_name,
             i.scheduled_date, i.meeting_link, i.location AS interview_location,
-            i.interview_type, i.result AS interview_result, i.status AS interview_status,
-            c.name as candidate_name, c.email as candidate_email, c.phone, c.gender, c.birth_place, c.date_of_birth, c.marital_status, c.nationality, c.address, c.nik, c.npwp, c.education_level, c.university, c.major, c.graduation_year, c.linkedin, c.portfolio, c.expected_salary
+            i.interview_type, i.rating, i.recommendation, i.interviewer_notes,
+            i.result AS interview_result, i.status AS interview_status,
+            c.name as candidate_name, c.email as candidate_email, c.phone, c.gender, c.birth_place, c.date_of_birth, c.marital_status, c.nationality, c.address, c.nik, c.npwp, c.education_level, c.university, c.major, c.graduation_year, c.linkedin, c.portfolio, c.expected_salary,
+            ${coverLetterSelect}
         FROM applications a
         JOIN job_openings jo ON a.job_opening_id = jo.id
         JOIN positions p ON jo.position_id = p.id
@@ -70,7 +77,7 @@ router.get(
 );
 
 // ============================
-// GET INTERVIEW COMPLETED & APPLICATIONS CANCELED BY COMPANY (HR/Admin)
+// GET INTERVIEW COMPLETED, DISQUALIFIED & APPLICATIONS CANCELED BY COMPANY (HR/Admin)
 // ============================
 router.get(
   "/admin/interviews/history-combined",
@@ -78,7 +85,7 @@ router.get(
   verifyRole(["hr"]),
   async (req, res) => {
     try {
-      // Ambil interview status completed dan canceled_by_company
+      // Ambil interview status completed, disqualified, cancelled, dan canceled_by_company
       const [interviews] = await db.promise().query(`
         SELECT i.*, 
                c.name AS candidate_name, c.email AS candidate_email,
@@ -92,7 +99,7 @@ router.get(
         LEFT JOIN job_openings jo ON a.job_opening_id = jo.id
         LEFT JOIN positions p ON jo.position_id = p.id
         LEFT JOIN employees e ON i.interviewer_id = e.id
-        WHERE i.status IN ('completed', 'canceled_by_company')
+        WHERE i.status IN ('completed', 'disqualified', 'cancelled', 'canceled_by_company', '')
         ORDER BY i.scheduled_date DESC
       `);
 
@@ -1781,7 +1788,7 @@ router.put(
   async (req, res) => {
     try {
       const { id } = req.params;
-      const { interviewer_notes, rating, result, status, recommendation } = req.body;
+      const { interviewer_notes, status } = req.body;
 
       const [interview] = await db
         .promise()
@@ -1795,12 +1802,9 @@ router.put(
       await db.promise().query(
         `UPDATE interviews SET
                 interviewer_notes = COALESCE(?, interviewer_notes),
-                rating = COALESCE(?, rating),
-                result = COALESCE(?, result),
-                status = COALESCE(?, status, 'completed'),
-                recommendation = COALESCE(?, recommendation)
+                status = COALESCE(?, status)
              WHERE id = ?`,
-        [interviewer_notes, rating, result, status, recommendation, id],
+        [interviewer_notes, status, id],
       );
 
       // Tidak perlu update status aplikasi saat hasil interview disimpan
