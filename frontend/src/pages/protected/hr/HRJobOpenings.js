@@ -159,7 +159,7 @@ export default function HRJobOpenings() {
     setError("");
     try {
       let payload = { ...form };
-      // Pastikan base_position, developer_specialization, dan hiring_status tetap dikirim walau kosong
+      // Pastikan base_position, developer_specialization
       if (!payload.base_position) payload.base_position = "";
       if (!payload.developer_specialization)
         payload.developer_specialization = "";

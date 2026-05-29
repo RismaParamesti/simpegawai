@@ -961,7 +961,7 @@ function FinancePayroll() {
       const result = await financeApi.generatePayroll(payload);
       setLatestGenerated(result);
       setSuccessMessage(
-        "Slip gaji berhasil dibuat, perhitungan payroll tampil pada tabel di bawah",
+        "Slip gaji berhasil dibuat, silahkan publish slip gaji ini",
       );
     } catch (err) {
       setError(err.message);

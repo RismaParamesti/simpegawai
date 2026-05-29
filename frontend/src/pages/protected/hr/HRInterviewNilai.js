@@ -190,6 +190,7 @@ export default function InterviewModal({
       } else {
         url = `/api/candidates/interviews/${selectedCandidate.id}`;
       }
+      //nilai kandidat
       axios
         .get(url)
         .then((res) => {
@@ -218,8 +219,6 @@ export default function InterviewModal({
       setDetailError("");
     }
   }, [isDetailOpen, selectedCandidate]);
-
-  // ...existing logic, hooks, useEffect, etc (jika ada)...
 
   return (
   <>

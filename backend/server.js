@@ -184,6 +184,9 @@ const PORT = process.env.PORT || 5000;
 
 const startServer = async () => {
   try {
+    await db.promise().query("SELECT 1");
+    console.log(`Berhasil menyambungkan ke database ${process.env.DB_NAME || "(nama database belum diset)"}`);
+
     // Bootstrap schema agar fitur soft delete tidak gagal di DB lama.
     if (typeof db.ensureSoftDeleteColumns === "function") {
       await db.ensureSoftDeleteColumns();
