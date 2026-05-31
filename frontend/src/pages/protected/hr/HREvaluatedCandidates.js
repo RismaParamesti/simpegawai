@@ -716,7 +716,7 @@ const HREvaluatedCandidates = () => {
                           <tr>
                             <th className="min-w-[180px]">Kandidat</th>
                             <th className="min-w-[110px]">Tanggal</th>
-                            <th className="min-w-[120px]">Rating</th>
+                            <th className="min-w-[120px]">Nilai</th>
                             <th className="min-w-[180px]">Rekomendasi</th>
                             <th className="min-w-[130px]">Hasil</th>
                             <th className="min-w-[220px]">Catatan</th>
