@@ -1,21 +1,6 @@
 /**
- * Pagination Component - Reusable pagination for all tables
- *
- * Props:
- * - page: current page number (required)
- * - totalPages: total number of pages (required)
- * - onChangePage: callback function when page changes (required)
- * - itemsPerPage: optional, display text for items per page (default: 10)
- * - disabled: optional, disable pagination buttons (default: false)
- *
- * Example usage:
- * <Pagination
- *   page={pagination.page}
- *   totalPages={pagination.totalPages}
- *   onChangePage={handleChangePage}
- * />
+ * Reusable pagination for tables.
  */
-
 export default function Pagination({
   page,
   totalPages,
@@ -30,7 +15,7 @@ export default function Pagination({
   const handleLastPage = () => onChangePage(totalPages || 1);
 
   return (
-    <div className="flex flex-col sm:flex-row items-center justify-between gap-4 mt-6">
+    <div className="mt-6 flex flex-col items-center justify-between gap-4 sm:flex-row">
       <div className="text-sm opacity-70">
         Menampilkan halaman <span className="font-semibold">{page}</span> dari{" "}
         <span className="font-semibold">{totalPages}</span> halaman
@@ -38,6 +23,7 @@ export default function Pagination({
           ({itemsPerPage} item per halaman)
         </span>
       </div>
+
       <div className="join">
         <button
           className="join-item btn btn-sm"
@@ -45,22 +31,24 @@ export default function Pagination({
           onClick={handleFirstPage}
           title="Halaman Pertama"
         >
-          ⟨⟨
+          Awal
         </button>
         <button
           className="join-item btn btn-sm"
           disabled={page <= 1 || disabled}
           onClick={handlePrevPage}
         >
-          « Sebelumnya
+          Sebelumnya
         </button>
-        <button className="join-item btn btn-sm btn-disabled">{page}</button>
+        <button className="join-item btn btn-sm btn-primary btn-disabled">
+          {page}
+        </button>
         <button
           className="join-item btn btn-sm"
           disabled={page >= totalPages || disabled}
           onClick={handleNextPage}
         >
-          Selanjutnya »
+          Selanjutnya
         </button>
         <button
           className="join-item btn btn-sm"
@@ -68,7 +56,7 @@ export default function Pagination({
           onClick={handleLastPage}
           title="Halaman Terakhir"
         >
-          ⟩⟩
+          Akhir
         </button>
       </div>
     </div>

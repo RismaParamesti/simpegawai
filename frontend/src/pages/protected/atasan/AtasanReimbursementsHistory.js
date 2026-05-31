@@ -227,7 +227,7 @@ function AtasanReimbursementsHistory() {
                                             </td>
                                             <td>
                                                 <div className="flex gap-2 items-center">
-                                                    <button className="btn btn-ghost btn-xs" onClick={() => openDetailModal(item)}>
+                                                    <button className="btn btn-xs action-view" onClick={() => openDetailModal(item)}>
                                                         Detail
                                                     </button>
                                                     {item.attachment ? (

@@ -151,7 +151,7 @@ function ApproveHRAllowance() {
 
                       <td>
                         <button
-                          className="btn btn-primary btn-sm"
+                          className="btn btn-sm action-view"
                           onClick={() => setSelected(item)}
                           disabled={submitting}
                         >

@@ -1,16 +1,52 @@
 import { useState, useMemo, useEffect } from "react";
 import { useLocation } from "react-router-dom";
 import {
+  ArrowLeft,
+  BriefcaseBusiness,
+  CheckCircle2,
+  ClipboardCheck,
+  Eye,
+  FileText,
+  GraduationCap,
+  Mail,
+  RotateCcw,
+  Search,
+  ShieldCheck,
+  UserCheck,
+  Users,
+  X,
+} from "lucide-react";
+import {
   getRequiredDocuments,
   DOCUMENT_FIELD_METADATA,
 } from "../../../utils/documentRequirements";
 import { useDispatch } from "react-redux";
-import TitleCard from "../../../components/Cards/TitleCard";
 import Pagination from "../../../components/Pagination/Pagination";
 import { setPageTitle } from "../../../features/common/headerSlice";
 import api from "../../../lib/api";
 import CheckBadgeIcon from "@heroicons/react/24/outline/UserPlusIcon";
 import { getStatusLabel } from "../../../utils/statusLabels";
+
+const normalizeStatus = (value) => String(value || "").toLowerCase().trim();
+const rejectedStatuses = new Set(["ditolak", "rejected"]);
+const publishedHiringStatuses = new Set([
+  "interview",
+  "offering",
+  "completed",
+  "canceled",
+  "cancelled",
+]);
+const submittedStatuses = new Set(["submitted", "pending"]);
+const screeningStatuses = new Set(["screening"]);
+const acceptedStatuses = new Set(["diterima", "accepted"]);
+
+const gradientButtonBase =
+  "inline-flex items-center justify-center gap-2 rounded-full px-4 py-2 text-sm font-semibold transition-all duration-200 shadow-sm";
+const gradientBlueButtonClass =
+  `${gradientButtonBase} border border-blue-600 bg-gradient-to-b from-blue-400 to-blue-600 text-white hover:from-blue-500 hover:to-blue-700`;
+const gradientRedButtonClass =
+  `${gradientButtonBase} border border-red-600 bg-gradient-to-b from-red-400 to-red-600 text-white hover:from-red-500 hover:to-red-700`;
+
 // Komponen Modal sederhana
 function Modal({
   open,
@@ -19,7 +55,7 @@ function Modal({
   children,
   title,
   submitLabel = "Tolak",
-  submitButtonClassName = "btn-error",
+  submitButtonClassName = gradientRedButtonClass,
 }) {
   if (!open) return null;
   return (
@@ -28,11 +64,11 @@ function Modal({
         <h3 className="mb-4 text-lg font-bold text-base-content">{title}</h3>
         {children}
         <div className="flex justify-end gap-2 mt-4">
-          <button className="btn btn-sm btn-outline" onClick={onClose}>
+          <button className="btn btn-sm btn-ghost rounded-xl" onClick={onClose}>
             Batal
           </button>
           <button
-            className={`btn btn-sm ${submitButtonClassName}`}
+            className={submitButtonClassName}
             onClick={onSubmit}
           >
             {submitLabel}
@@ -135,6 +171,34 @@ function isExternalLink(value) {
   if (!/^https?:\/\//i.test(value)) return false;
   return !/^(https?:\/\/)?(localhost|127\.0\.0\.1)(:\d+)?\//i.test(value);
 }
+
+const RecruitmentHeroIllustration = () => (
+  <div className="pointer-events-none absolute right-10 top-2 hidden h-32 w-80 lg:block">
+    <div className="absolute bottom-2 right-0 h-20 w-72 rounded-full bg-orange-100/80 blur-[1px] dark:bg-orange-900/30" />
+    <div className="absolute right-36 top-1 h-24 w-20 rotate-[-3deg] rounded-2xl border border-slate-200 bg-white shadow-lg dark:border-slate-700 dark:bg-slate-900">
+      <div className="flex items-center gap-2 border-b border-orange-100 px-2 py-2 dark:border-slate-700">
+        <div className="flex h-7 w-7 items-center justify-center rounded-full bg-orange-100 text-orange-500 dark:bg-orange-900/40 dark:text-orange-300">
+          <Users className="h-4 w-4" />
+        </div>
+        <div className="space-y-1">
+          <div className="h-1.5 w-8 rounded-full bg-orange-400 dark:bg-orange-300" />
+          <div className="h-1.5 w-6 rounded-full bg-slate-200 dark:bg-slate-600" />
+        </div>
+      </div>
+      <div className="space-y-1.5 px-3 py-2">
+        <div className="h-1.5 w-12 rounded-full bg-orange-300 dark:bg-orange-400" />
+        <div className="h-1.5 w-10 rounded-full bg-emerald-200 dark:bg-emerald-400" />
+        <div className="h-1.5 w-12 rounded-full bg-slate-200 dark:bg-slate-600" />
+        <div className="h-1.5 w-8 rounded-full bg-orange-200 dark:bg-orange-800" />
+      </div>
+    </div>
+    <div className="absolute right-24 top-16 h-14 w-14 rounded-2xl bg-orange-400 shadow-md dark:bg-orange-500" />
+    <div className="absolute right-8 top-8 h-14 w-14 rounded-2xl bg-emerald-200 shadow-sm dark:bg-emerald-500/70" />
+    <div className="absolute right-12 top-20 h-2 w-20 rounded-full bg-slate-300 dark:bg-slate-600" />
+    <div className="absolute right-14 top-24 h-8 w-2 rounded-full bg-slate-400 dark:bg-slate-500" />
+    <div className="absolute right-28 top-24 h-8 w-2 rounded-full bg-slate-400 dark:bg-slate-500" />
+  </div>
+);
 
 export default function HRRecruitmentProcessDetail() {
   // Untuk popup Tolak
@@ -346,16 +410,20 @@ export default function HRRecruitmentProcessDetail() {
   };
 
   const passedApplicants = useMemo(() => {
-    return applications.filter((app) => app.status === "screening");
+    return applications.filter((app) =>
+      screeningStatuses.has(normalizeStatus(app.status)),
+    );
   }, [applications]);
 
-  const isResultPublished =
-    job?.hiring_status === "interview" || job?.hiring_status === "completed";
+  const isResultPublished = publishedHiringStatuses.has(
+    normalizeStatus(job?.hiring_status),
+  );
 
   const shortlistedApplications = useMemo(() => {
     return applications.filter((app) => {
-      if (app.status === "screening") return true;
-      if (app.status === "ditolak") return !isResultPublished;
+      const status = normalizeStatus(app.status);
+      if (screeningStatuses.has(status)) return true;
+      if (rejectedStatuses.has(status)) return !isResultPublished;
       return false;
     });
   }, [applications, isResultPublished]);
@@ -363,29 +431,35 @@ export default function HRRecruitmentProcessDetail() {
   // Untuk tabel riwayat, jika lowongan sudah closed & completed, tampilkan SEMUA aplikasi kecuali yang diterima
   // Jika belum completed, hanya tampilkan yang ditolak saja
   const historyApplications = useMemo(() => {
+    const historyStatusesBeforePublish = new Set(["withdrawn", "ditolak", "rejected"]);
+
     const isClosedCompleted =
       job && job.status === "closed" && job.hiring_status === "completed";
     if (isClosedCompleted) {
       // Tampilkan semua aplikasi kecuali yang statusnya 'diterima'
-      return applications.filter((app) => app.status !== "diterima");
-    } else if (job?.hiring_status === "interview") {
-      // Setelah mass update, shortlist yang sudah jadi lolos_dokumen juga masuk riwayat
       return applications.filter(
-        (app) =>
-          app.status === "ditolak" ||
-          app.status === "lolos_dokumen" ||
-          app.status === "withdrawn",
+        (app) => !acceptedStatuses.has(normalizeStatus(app.status)),
       );
-    } else {
-      // Default: hanya yang dibatalkan; hasil screening menunggu publish
-      return applications.filter((app) => app.status === "withdrawn");
     }
-  }, [applications, job]);
+
+    if (isResultPublished) {
+      // Setelah publish, tampilkan semua status final/non-antrian agar data mengikuti database.
+      return applications.filter((app) => {
+        const status = normalizeStatus(app.status);
+        return !submittedStatuses.has(status) && !screeningStatuses.has(status);
+      });
+    } else {
+      // Sebelum publish, yang sudah final (ditolak/rejected/withdrawn) tetap muncul di riwayat.
+      return applications.filter((app) =>
+        historyStatusesBeforePublish.has(normalizeStatus(app.status)),
+      );
+    }
+  }, [applications, job, isResultPublished]);
 
   // ================= FILTER =================
   const filteredApplications = useMemo(() => {
     return applications
-      .filter((app) => app.status === "submitted")
+      .filter((app) => submittedStatuses.has(normalizeStatus(app.status)))
       .filter(
         (app) =>
           (app.candidate_name || app.name || "")
@@ -517,473 +591,384 @@ export default function HRRecruitmentProcessDetail() {
 
   // Sudah digabung di atas
 
+  const submittedCount = filteredApplications.length;
+  const shortlistCount = filteredShortlistedApplications.length;
+  const historyCount = filteredHistoryApplications.length;
+
+  const activeFilterState = tabFilters[activeTab] || { name: "", education: "", year: "" };
+  const currentPage =
+    activeTab === "submitted"
+      ? submittedPage
+      : activeTab === "screening"
+        ? screeningPage
+        : historyPage;
+  const currentTotalPages =
+    activeTab === "submitted"
+      ? submittedTotalPages
+      : activeTab === "screening"
+        ? screeningTotalPages
+        : historyTotalPages;
+  const setCurrentPage =
+    activeTab === "submitted"
+      ? setSubmittedPage
+      : activeTab === "screening"
+        ? setScreeningPage
+        : setHistoryPage;
+  const currentItemsPerPage =
+    activeTab === "submitted"
+      ? submittedItemsPerPage
+      : activeTab === "screening"
+        ? screeningItemsPerPage
+        : historyItemsPerPage;
+
+  const activeRows =
+    activeTab === "submitted"
+      ? paginatedSubmittedApplications
+      : activeTab === "screening"
+        ? paginatedShortlistedApplications
+        : paginatedHistoryApplications;
+  const activeTotal =
+    activeTab === "submitted"
+      ? filteredApplications.length
+      : activeTab === "screening"
+        ? filteredShortlistedApplications.length
+        : filteredHistoryApplications.length;
+
+  const menu = [
+    {
+      key: "submitted",
+      label: "Data Pelamar",
+      count: submittedCount,
+      icon: Users,
+      description: "Lamaran baru masuk",
+    },
+    {
+      key: "screening",
+      label: "Shortlisted Kandidat",
+      count: shortlistCount,
+      icon: UserCheck,
+      description: "Kandidat tahap screening",
+    },
+    {
+      key: "history",
+      label: "Riwayat Pelamar",
+      count: historyCount,
+      icon: ClipboardCheck,
+      description: "Hasil proses terdahulu",
+    },
+  ];
+
+  const statusBadgeClass = (status) => {
+    const normalized = String(status || "").toLowerCase();
+    if (["screening", "lolos_dokumen", "diterima"].includes(normalized)) {
+      return "!bg-emerald-500 !text-white";
+    }
+    if (["ditolak", "rejected"].includes(normalized)) return "!bg-red-500 !text-white";
+    if (["withdrawn"].includes(normalized)) return "!bg-slate-400 !text-white";
+    return "!bg-orange-500 !text-white";
+  };
+
+  const renderFilterCard = () => (
+    <div className="rounded-2xl border border-slate-200 bg-slate-50/70 p-4 dark:border-slate-700 dark:bg-slate-950/50">
+      <div className="grid grid-cols-1 gap-3 lg:grid-cols-12">
+        <label className="input input-bordered flex w-full items-center gap-2 rounded-xl bg-white text-slate-900 lg:col-span-4 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100">
+          <Search className="h-4 w-4 text-slate-400 dark:text-slate-500" />
+          <input
+            type="text"
+            placeholder="Cari nama kandidat..."
+            className="grow bg-transparent text-sm outline-none placeholder:text-slate-400 dark:placeholder:text-slate-500"
+            value={activeFilterState.name}
+            onChange={(e) => handleTabFilterChange(activeTab, "name", e.target.value)}
+          />
+        </label>
+
+        <input
+          className="input input-bordered w-full rounded-xl bg-white text-slate-900 lg:col-span-3 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100"
+          placeholder="Cari pendidikan..."
+          value={activeFilterState.education}
+          onChange={(e) => handleTabFilterChange(activeTab, "education", e.target.value)}
+        />
+
+        <input
+          className="input input-bordered w-full rounded-xl bg-white text-slate-900 lg:col-span-3 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100"
+          placeholder="Cari tahun lulus..."
+          value={activeFilterState.year}
+          onChange={(e) => handleTabFilterChange(activeTab, "year", e.target.value)}
+        />
+
+        <button
+          type="button"
+          className="btn btn-outline rounded-xl border-primary text-primary hover:bg-primary hover:text-primary-content lg:col-span-2"
+          onClick={() => resetTabFilters(activeTab)}
+        >
+          <RotateCcw className="h-4 w-4" />
+          Reset
+        </button>
+      </div>
+    </div>
+  );
+
+  const renderCandidateTable = () => (
+    <>
+      <div className="overflow-x-auto rounded-2xl border border-slate-200 dark:border-slate-700">
+        <table className="table w-full">
+          <thead className="bg-slate-50 text-center text-slate-700 dark:bg-slate-800 dark:text-slate-200">
+            <tr>
+              <th className="text-left">Kandidat</th>
+              <th>Email</th>
+              <th>Pendidikan</th>
+              <th>Tahun Lulus</th>
+              <th>NPWP</th>
+              {activeTab !== "submitted" && <th>Status/Hasil</th>}
+              <th>Aksi</th>
+            </tr>
+          </thead>
+          <tbody>
+            {activeRows.length === 0 ? (
+              <tr>
+                <td
+                  colSpan={activeTab !== "submitted" ? 7 : 6}
+                  className="py-10 text-center text-slate-500 dark:text-slate-400"
+                >
+                  Tidak ada data kandidat pada tab ini.
+                </td>
+              </tr>
+            ) : (
+              activeRows.map((item) => (
+                <tr
+                  key={item?.application_id || item?.id}
+                  className="hover:bg-orange-50/40 dark:hover:bg-slate-800/70"
+                >
+                  <td>
+                    <div className="flex items-center gap-3">
+                      <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-orange-100 text-orange-600 dark:bg-orange-950/50 dark:text-orange-300">
+                        <Users className="h-5 w-5" />
+                      </div>
+                      <div>
+                        <p className="font-extrabold text-slate-900 dark:text-slate-50">
+                          {item.candidate_name || item.name || "-"}
+                        </p>
+                      </div>
+                    </div>
+                  </td>
+                  <td className="text-center text-sm text-slate-600 dark:text-slate-300">
+                    {item.candidate_email || item.email || "-"}
+                  </td>
+                  <td className="text-center text-sm text-slate-600 dark:text-slate-300">
+                    {item.education_level ? `${item.education_level} - ${item.major || "-"}` : "-"}
+                  </td>
+                  <td className="text-center text-sm text-slate-600 dark:text-slate-300">
+                    {item.graduation_year || "-"}
+                  </td>
+                  <td className="text-center text-sm text-slate-600 dark:text-slate-300">
+                    {item.npwp || "-"}
+                  </td>
+                  {activeTab !== "submitted" && (
+                    <td className="text-center">
+                      <span className={`badge badge-sm rounded-full border-none px-3 py-3 font-bold ${statusBadgeClass(item.status)}`}>
+                        {activeTab === "screening"
+                          ? rejectedStatuses.has(normalizeStatus(item.status))
+                            ? "Ditolak"
+                            : "Lolos Dokumen"
+                          : getStatusLabel(item.status)}
+                      </span>
+                    </td>
+                  )}
+                  <td className="text-center">
+                    <button
+                      className={`${gradientBlueButtonClass} px-3 py-1 text-xs`}
+                      onClick={() => {
+                        setSelected({
+                          ...item,
+                          isHistory: activeTab === "history",
+                        });
+                        setView("detail");
+                      }}
+                    >
+                      <Eye className="h-3 w-3" />
+                      Detail
+                    </button>
+                  </td>
+                </tr>
+              ))
+            )}
+          </tbody>
+        </table>
+      </div>
+
+      {activeTotal > 0 && (
+        <div className="mt-4">
+          <Pagination
+            page={currentPage}
+            totalPages={Math.max(1, currentTotalPages)}
+            onChangePage={setCurrentPage}
+            itemsPerPage={currentItemsPerPage}
+          />
+        </div>
+      )}
+    </>
+  );
+
   return (
     <>
-      {/* ===================== LIST ===================== */}
-      {view === "list" &&
-        (() => {
-          const menu = [
-            { key: "submitted", label: "Data Pelamar" },
-            { key: "screening", label: "Shortlisted Kandidat" },
-            { key: "history", label: "Riwayat Pelamar" },
-          ];
+      {view === "list" && (
+        <div className="mt-4 overflow-hidden rounded-[1.5rem] border border-slate-200/80 bg-white p-4 shadow-[0_20px_70px_rgba(15,23,42,0.07)] dark:border-slate-700 dark:bg-slate-950 dark:shadow-[0_20px_70px_rgba(2,6,23,0.45)] sm:p-7">
+          <div className="space-y-6">
+            <div className="relative overflow-hidden rounded-[1.4rem] bg-gradient-to-r from-white via-white to-orange-50/80 px-4 py-5 dark:from-slate-950 dark:via-slate-950 dark:to-slate-900 sm:px-6 sm:py-6">
+              <RecruitmentHeroIllustration />
+              <div className="relative z-10 max-w-3xl">
+                <div className="mb-4 flex items-start justify-between gap-3">
+                  <div className="inline-flex items-center gap-2 rounded-full border border-orange-200 bg-orange-50 px-3 py-1 text-xs font-bold text-orange-600 dark:border-orange-900/60 dark:bg-orange-950/70 dark:text-orange-300">
+                    <BriefcaseBusiness className="h-4 w-4" />
+                    Proses Rekrutmen
+                  </div>
 
-          return (
-            <TitleCard
-              title={
-                job
-                  ? `Data Pelamar - ${job.position_name || job.title}`
-                  : "Data Pelamar"
-              }
-              topMargin="mt-4"
-              TopSideButtons={
-                <button
-                  className="btn btn-primary btn-sm"
-                  onClick={() => window.history.back()}
-                >
-                  Kembali
-                </button>
-              }
-            >
-              <div className="space-y-6">
-                <div className="flex w-full bg-base-200 p-2 rounded-2xl gap-2">
-                  {menu.map((m) => (
-                    <button
-                      key={m.key}
-                      onClick={() => setActiveTab(m.key)}
-                      className={`flex-1 text-center py-3 rounded-xl text-sm font-medium transition-all ${
-                        activeTab === m.key
-                          ? "bg-primary text-white shadow-md"
-                          : "text-base-content hover:bg-base-300"
-                      }`}
-                    >
-                      {m.label}
-                    </button>
-                  ))}
+                  <button
+                    type="button"
+                    className={`${gradientBlueButtonClass} h-9 px-3.5 py-0 text-xs sm:h-10 sm:px-4 sm:text-sm`}
+                    onClick={() => window.history.back()}
+                  >
+                    <ArrowLeft className="h-4 w-4" />
+                    Kembali
+                  </button>
                 </div>
 
-                {activeTab === "submitted" && (
-                  <div className="rounded-2xl border border-base-200 bg-base-100 p-6">
-                    <div className="grid grid-cols-1 md:grid-cols-4 gap-3 mb-4">
-                      <input
-                        className="input input-bordered w-full"
-                        placeholder="Cari nama..."
-                        value={tabFilters.submitted.name}
-                        onChange={(e) =>
-                          handleTabFilterChange(
-                            "submitted",
-                            "name",
-                            e.target.value,
-                          )
-                        }
-                      />
-                      <input
-                        className="input input-bordered w-full"
-                        placeholder="Cari pendidikan..."
-                        value={tabFilters.submitted.education}
-                        onChange={(e) =>
-                          handleTabFilterChange(
-                            "submitted",
-                            "education",
-                            e.target.value,
-                          )
-                        }
-                      />
-                      <input
-                        className="input input-bordered w-full"
-                        placeholder="Cari tahun lulus..."
-                        value={tabFilters.submitted.year}
-                        onChange={(e) =>
-                          handleTabFilterChange(
-                            "submitted",
-                            "year",
-                            e.target.value,
-                          )
-                        }
-                      />
-                      <div className="flex items-center gap-2 h-full">
-                        <button
-                          type="button"
-                          className="btn btn-secondary btn-sm rounded-full w-full -translate-y-0.5"
-                          onClick={() => resetTabFilters("submitted")}
-                        >
-                          Reset
-                        </button>
-                      </div>
-                    </div>
+                <h1 className="text-[28px] font-extrabold leading-tight text-slate-900 dark:text-slate-50">
+                  {job ? `Data Pelamar - ${job.position_name || job.title || "-"}` : "Data Pelamar"}
+                </h1>
+                <p className="mt-2 max-w-2xl text-sm font-medium text-slate-500 dark:text-slate-400">
+                  Kelola kandidat berdasarkan status lamaran, screening dokumen,
+                  dan riwayat proses rekrutmen secara lebih rapi.
+                </p>
+              </div>
+            </div>
 
-                    {loading ? (
-                      <div className="text-center py-10">Loading...</div>
-                    ) : (
-                      <>
-                        <div className="overflow-x-auto">
-                          <table className="table table-zebra">
-                            <thead className="text-center">
-                              <tr>
-                                <th>Nama</th>
-                                <th>Email</th>
-                                <th>Pendidikan</th>
-                                <th>Tahun Lulus</th>
-                                <th>NPWP</th>
-                                <th>Aksi</th>
-                              </tr>
-                            </thead>
-                            <tbody>
-                              {paginatedSubmittedApplications.map((item) => (
-                                <tr key={item?.application_id}>
-                                  <td>{item.candidate_name || item.name}</td>
-                                  <td>{item.candidate_email || item.email}</td>
-                                  <td className="text-center">
-                                    {item.education_level} - {item.major}
-                                  </td>
-                                  <td className="text-center">
-                                    {item.graduation_year || "-"}
-                                  </td>
-                                  <td className="text-center">
-                                    {item.npwp || "-"}
-                                  </td>
-                                  <td className="text-center">
-                                    <button
-                                      className="btn btn-ghost btn-xs"
-                                      onClick={() => {
-                                        setSelected({
-                                          ...item,
-                                          isHistory: false,
-                                        });
-                                        setView("detail");
-                                      }}
-                                    >
-                                      Detail
-                                    </button>
-                                  </td>
-                                </tr>
-                              ))}
-                              {filteredApplications.length === 0 && (
-                                <tr>
-                                  <td
-                                    colSpan={6}
-                                    className="text-center opacity-70"
-                                  >
-                                    Tidak ada data
-                                  </td>
-                                </tr>
-                              )}
-                            </tbody>
-                          </table>
-                        </div>
-                        {filteredApplications.length > 0 && (
-                          <Pagination
-                            page={submittedPage}
-                            totalPages={submittedTotalPages}
-                            onChangePage={setSubmittedPage}
-                            itemsPerPage={submittedItemsPerPage}
-                          />
-                        )}
-                      </>
-                    )}
-                  </div>
-                )}
+            <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
+  {menu.map((item) => {
+    const Icon = item.icon;
+    const isActive = activeTab === item.key;
+
+    return (
+      <button
+        key={item.key}
+        type="button"
+        onClick={() => setActiveTab(item.key)}
+        className={`relative overflow-hidden rounded-2xl border p-5 text-left shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md ${
+          isActive
+            ? "border-orange-200 bg-white text-orange-500 ring-1 ring-orange-100"
+            : "border-slate-200 bg-slate-50 text-slate-700 hover:bg-orange-50 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200 dark:hover:bg-slate-800"
+        }`}
+      >
+        {/* Garis bawah seperti HRJobOpenings */}
+        {isActive && (
+          <div className="absolute bottom-0 left-0 h-1 w-full bg-orange-500" />
+        )}
+
+        <div className="flex items-start justify-between gap-4">
+          <div>
+            <p
+              className={`text-sm font-semibold ${
+                isActive
+                  ? "text-orange-500"
+                  : "text-slate-500 dark:text-slate-400"
+              }`}
+            >
+              {item.label}
+            </p>
+
+            <p
+              className={`mt-2 text-3xl font-extrabold ${
+                isActive
+                  ? "text-orange-600"
+                  : "text-slate-900 dark:text-slate-50"
+              }`}
+            >
+              {item.count}
+            </p>
+
+            <p
+              className={`mt-1 text-xs font-medium ${
+                isActive
+                  ? "text-orange-500/80"
+                  : "text-slate-500 dark:text-slate-400"
+              }`}
+            >
+              {item.description}
+            </p>
+          </div>
+
+          <div
+            className={`flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl ${
+              isActive
+                ? "bg-orange-100 text-orange-600"
+                : "bg-slate-100 text-slate-500 dark:bg-slate-800 dark:text-slate-300"
+            }`}
+          >
+            <Icon className="h-6 w-6" />
+          </div>
+        </div>
+      </button>
+    );
+  })}
+</div>
+
+            <div className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-700 dark:bg-slate-900 sm:p-6">
+              <div className="mb-5 flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+                <div>
+                  <h2 className="text-xl font-extrabold text-slate-900 dark:text-slate-50">
+                    {menu.find((item) => item.key === activeTab)?.label}
+                  </h2>
+                  <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
+                    Gunakan filter untuk mencari kandidat berdasarkan nama,
+                    pendidikan, atau tahun kelulusan.
+                  </p>
+                </div>
 
                 {activeTab === "screening" && (
-                  <div className="rounded-2xl border border-base-200 bg-base-100 p-5">
-                    {/* FILTER + ACTION */}
-                    <div className="mb-5 flex flex-col xl:flex-row gap-4 xl:items-end xl:justify-between">
-                      {/* FILTER */}
-                      <div className="grid flex-1 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-                        <input
-                          className="input input-bordered w-full"
-                          placeholder="Cari nama..."
-                          value={tabFilters.screening.name}
-                          onChange={(e) =>
-                            handleTabFilterChange(
-                              "screening",
-                              "name",
-                              e.target.value,
-                            )
-                          }
-                        />
-
-                        <input
-                          className="input input-bordered w-full"
-                          placeholder="Cari pendidikan..."
-                          value={tabFilters.screening.education}
-                          onChange={(e) =>
-                            handleTabFilterChange(
-                              "screening",
-                              "education",
-                              e.target.value,
-                            )
-                          }
-                        />
-
-                        <input
-                          className="input input-bordered w-full"
-                          placeholder="Cari tahun lulus..."
-                          value={tabFilters.screening.year}
-                          onChange={(e) =>
-                            handleTabFilterChange(
-                              "screening",
-                              "year",
-                              e.target.value,
-                            )
-                          }
-                        />
-                      </div>
-
-                      {/* BUTTON */}
-                      <div className="flex flex-col sm:flex-row gap-2 xl:flex-shrink-0">
-                        <button
-                          type="button"
-                          className="btn btn-secondary rounded-xl"
-                          onClick={() => resetTabFilters("screening")}
-                        >
-                          Reset Filter
-                        </button>
-                        <button
-                          type="button"
-                          className="btn btn-success rounded-xl gap-2"
-                          onClick={() => setShowMassUpdatePopup(true)}
-                        >
-                          Publish Hasil
-                        </button>
-                      </div>
-                    </div>
-
-                    {/* TABLE */}
-                    <div className="overflow-x-auto">
-                      <table className="table table-zebra">
-                        <thead className="text-center">
-                          <tr>
-                            <th>Nama</th>
-                            <th>Email</th>
-                            <th>Pendidikan</th>
-                            <th>Tahun Lulus</th>
-                            <th>NPWP</th>
-                            <th>Hasil</th>
-                            <th>Aksi</th>
-                          </tr>
-                        </thead>
-                        <tbody>
-                          {paginatedShortlistedApplications.length === 0 ? (
-                            <tr>
-                              <td
-                                colSpan={7}
-                                className="text-center opacity-70"
-                              >
-                                Belum ada kandidat shortlist
-                              </td>
-                            </tr>
-                          ) : (
-                            paginatedShortlistedApplications.map((item) => (
-                              <tr key={item?.application_id}>
-                                <td>{item.candidate_name || item.name}</td>
-                                <td>{item.candidate_email || item.email}</td>
-                                <td className="text-center">
-                                  {item.education_level} - {item.major}
-                                </td>
-                                <td className="text-center">
-                                  {item.graduation_year || "-"}
-                                </td>
-                                <td className="text-center">
-                                  {item.npwp || "-"}
-                                </td>
-                                <td className="text-center">
-                                  <span
-                                    className={`badge ${item.status === "ditolak" ? "badge-error" : "badge-success"}`}
-                                  >
-                                    {item.status === "ditolak"
-                                      ? "Ditolak"
-                                      : "Lolos Dokumen"}
-                                  </span>
-                                </td>
-                                <td className="text-center">
-                                  <button
-                                    className="btn btn-ghost btn-xs"
-                                    onClick={() => {
-                                      setSelected({
-                                        ...item,
-                                        isHistory: false,
-                                      });
-                                      setView("detail");
-                                    }}
-                                  >
-                                    Detail
-                                  </button>
-                                </td>
-                              </tr>
-                            ))
-                          )}
-                        </tbody>
-                      </table>
-                    </div>
-                    {filteredShortlistedApplications.length > 0 && (
-                      <Pagination
-                        page={screeningPage}
-                        totalPages={screeningTotalPages}
-                        onChangePage={setScreeningPage}
-                        itemsPerPage={screeningItemsPerPage}
-                      />
-                    )}
-                  </div>
-                )}
-
-                {activeTab === "history" && (
-                  <div className="rounded-2xl border border-base-200 bg-base-100 p-6">
-                    <div className="grid grid-cols-1 md:grid-cols-4 gap-3 mb-4">
-                      <input
-                        className="input input-bordered w-full"
-                        placeholder="Cari nama..."
-                        value={tabFilters.history.name}
-                        onChange={(e) =>
-                          handleTabFilterChange(
-                            "history",
-                            "name",
-                            e.target.value,
-                          )
-                        }
-                      />
-                      <input
-                        className="input input-bordered w-full"
-                        placeholder="Cari pendidikan..."
-                        value={tabFilters.history.education}
-                        onChange={(e) =>
-                          handleTabFilterChange(
-                            "history",
-                            "education",
-                            e.target.value,
-                          )
-                        }
-                      />
-                      <input
-                        className="input input-bordered w-full"
-                        placeholder="Cari tahun lulus..."
-                        value={tabFilters.history.year}
-                        onChange={(e) =>
-                          handleTabFilterChange(
-                            "history",
-                            "year",
-                            e.target.value,
-                          )
-                        }
-                      />
-                      <div className="flex items-center gap-2 h-full">
-                        <button
-                          type="button"
-                          className="btn btn-secondary btn-sm rounded-full w-full -translate-y-0.5"
-                          onClick={() => resetTabFilters("history")}
-                        >
-                          Reset
-                        </button>
-                      </div>
-                    </div>
-
-                    {loading ? (
-                      <div className="text-center py-6">Loading...</div>
-                    ) : (
-                      <>
-                      <div className="overflow-x-auto">
-                        <table className="table table-zebra">
-                          <thead className="text-center">
-                            <tr>
-                              <th>Nama</th>
-                              <th>Pendidikan</th>
-                              <th>Tahun Lulus</th>
-                              <th>NPWP</th>
-                              <th>Status</th>
-                              <th>Aksi</th>
-                            </tr>
-                          </thead>
-                          <tbody>
-                            {paginatedHistoryApplications.length === 0 ? (
-                              <tr>
-                                <td
-                                  colSpan={6}
-                                  className="text-center opacity-70 py-6"
-                                >
-                                  Belum ada riwayat
-                                </td>
-                              </tr>
-                            ) : (
-                              paginatedHistoryApplications.map((item) => (
-                                <tr key={item.application_id}>
-                                  <td>
-                                    {item.candidate_name || item.name || "-"}
-                                  </td>
-                                  <td className="text-center">
-                                    {item.education_level
-                                      ? `${item.education_level} - ${item.major || "-"}`
-                                      : "-"}
-                                  </td>
-                                  <td className="text-center">
-                                    {item.graduation_year || "-"}
-                                  </td>
-                                  <td className="text-center">
-                                    {item.npwp || "-"}
-                                  </td>
-                                  <td className="text-center">
-                                    <span
-                                      className={`badge ${item.status === "ditolak" ? "badge-error" : ""} ${item.status === "lolos_dokumen" ? "badge-success" : ""} ${item.status === "withdrawn" ? "badge-ghost" : ""}`}
-                                    >
-                                      {getStatusLabel(item.status)}
-                                    </span>
-                                  </td>
-                                  <td className="text-center">
-                                    <button
-                                      className="btn btn-ghost btn-xs"
-                                      onClick={() => {
-                                        setSelected({
-                                          ...item,
-                                          isHistory: true,
-                                        });
-                                        setView("detail");
-                                      }}
-                                    >
-                                      Detail
-                                    </button>
-                                  </td>
-                                </tr>
-                              ))
-                            )}
-                          </tbody>
-                        </table>
-                      </div>
-                      {filteredHistoryApplications.length > 0 && (
-                        <Pagination
-                          page={historyPage}
-                          totalPages={historyTotalPages}
-                          onChangePage={setHistoryPage}
-                          itemsPerPage={historyItemsPerPage}
-                        />
-                      )}
-                      </>
-                    )}
-                  </div>
+                  <button
+                    type="button"
+                    className={gradientBlueButtonClass}
+                    onClick={() => setShowMassUpdatePopup(true)}
+                  >
+                    <ShieldCheck className="h-4 w-4" />
+                    Publish Hasil
+                  </button>
                 )}
               </div>
-            </TitleCard>
-          );
-        })()}
 
-      {/* ===================== DETAIL ===================== */}
+              <div className="space-y-5">
+                {renderFilterCard()}
+
+                {loading ? (
+                  <div className="flex flex-col items-center justify-center rounded-2xl border border-dashed border-slate-200 py-12 text-slate-500 dark:border-slate-700 dark:text-slate-400">
+                    <span className="loading loading-spinner loading-lg text-orange-500" />
+                    <p className="mt-3 text-sm font-medium">Memuat data kandidat...</p>
+                  </div>
+                ) : (
+                  renderCandidateTable()
+                )}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
       {view === "detail" && selected && (
-        <>
-          <TitleCard
-            title="Detail Pelamar"
-            TopSideButtons={
+        <div className="mt-4 overflow-hidden rounded-[1.5rem] border border-slate-200/80 bg-white p-4 shadow-[0_20px_70px_rgba(15,23,42,0.07)] dark:border-slate-700 dark:bg-slate-950 dark:shadow-[0_20px_70px_rgba(2,6,23,0.45)] sm:p-7">
+          <div className="space-y-6">
+            <div className="relative overflow-hidden rounded-[1.4rem] bg-gradient-to-r from-white via-white to-orange-50/80 p-5 dark:from-slate-950 dark:via-slate-950 dark:to-slate-900">
               <button
-                className="btn btn-sm btn-primary"
+                type="button"
+                className={`${gradientBlueButtonClass} absolute right-4 top-4 z-20 px-4 py-2`}
                 onClick={() => setView("list")}
               >
+                <ArrowLeft className="h-4 w-4" />
                 Kembali
               </button>
-            }
-          >
-            <div className="space-y-4">
-              {/* ================= DATA DIRI ================= */}
-              <div className="card bg-base-200 border">
-                <div className="card-body">
-                  <div className="avatar mb-3 flex justify-center">
-                    <div className="w-24 rounded-full ring ring-primary ring-offset-base-100 ring-offset-2">
+              <div className="flex flex-col gap-5 lg:flex-row lg:items-center lg:justify-between">
+                <div className="flex items-center gap-4">
+                  <div className="avatar">
+                    <div className="h-20 w-20 rounded-3xl ring ring-orange-200 ring-offset-2 ring-offset-white dark:ring-orange-900 dark:ring-offset-slate-950">
                       <img
                         src={
                           selected.photo_file
@@ -991,360 +976,390 @@ export default function HRRecruitmentProcessDetail() {
                               ? selected.photo_file
                               : `http://localhost:5000/${selected.photo_file.replace(/^\//, "")}`
                             : "https://ui-avatars.com/api/?name=" +
-                              encodeURIComponent(
-                                selected.candidate_name || selected.name || "-",
-                              ) +
-                              "&background=random"
+                              encodeURIComponent(selected.candidate_name || selected.name || "-") +
+                              "&background=fb923c&color=fff"
                         }
                         alt="Foto Kandidat"
                         className="object-cover"
                       />
                     </div>
                   </div>
-                  <h3 className="card-title text-lg">Data Diri Lengkap</h3>
-                  <div className="grid md:grid-cols-2 gap-4 text-sm">
-                    {[
-                      { key: "candidate_name", label: "Nama Lengkap" },
-                      { key: "candidate_email", label: "Email" },
-                      { key: "phone", label: "Nomor HP" },
-                      { key: "gender", label: "Jenis Kelamin" },
-                      { key: "birth_place", label: "Tempat Lahir" },
-                      { key: "date_of_birth", label: "Tanggal Lahir" },
-                      { key: "marital_status", label: "Status Pernikahan" },
-                      { key: "nationality", label: "Kebangsaan" },
-                      { key: "address", label: "Alamat" },
-                      { key: "nik", label: "NIK" },
-                      { key: "npwp", label: "No. NPWP" },
-                      { key: "education_level", label: "Tingkat Pendidikan" },
-                      { key: "university", label: "Sekolah/Universitas" },
-                      { key: "major", label: "Jurusan" },
-                      { key: "graduation_year", label: "Tahun Lulus" },
-                      { key: "linkedin", label: "LinkedIn" },
-                      { key: "portfolio", label: "Portfolio Website" },
-                      { key: "expected_salary", label: "Ekspektasi Gaji" },
-                    ].map((f) => (
-                      <div key={f.key}>
-                        <p className="text-xs opacity-60">{f.label}</p>
-                        <p className="font-semibold break-words">
-                          {f.key === "date_of_birth"
+                  <div>
+                    <div className="mb-2 inline-flex items-center gap-2 rounded-full border border-orange-200 bg-orange-50 px-3 py-1 text-xs font-bold text-orange-600 dark:border-orange-900/60 dark:bg-orange-950/70 dark:text-orange-300">
+                      <UserCheck className="h-4 w-4" />
+                      Detail Kandidat
+                    </div>
+                    <h1 className="text-2xl font-extrabold text-slate-900 dark:text-slate-50">
+                      {selected.candidate_name || selected.name || "-"}
+                    </h1>
+                    <p className="mt-1 flex items-center gap-2 text-sm text-slate-500 dark:text-slate-400">
+                      <Mail className="h-4 w-4" />
+                      {selected.candidate_email || selected.email || "-"}
+                    </p>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 gap-6 xl:grid-cols-3">
+              <div className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-700 dark:bg-slate-900 xl:col-span-2">
+                <div className="mb-5 flex items-center gap-3">
+                  <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-orange-100 text-orange-600 dark:bg-orange-950/50 dark:text-orange-300">
+                    <Users className="h-5 w-5" />
+                  </div>
+                  <div>
+                    <h2 className="text-lg font-extrabold text-slate-900 dark:text-slate-50">Data Diri Lengkap</h2>
+                    <p className="text-sm text-slate-500 dark:text-slate-400">Informasi profil dan pendidikan kandidat.</p>
+                  </div>
+                </div>
+                <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
+                  {[
+                    { key: "candidate_name", label: "Nama Lengkap" },
+                    { key: "candidate_email", label: "Email" },
+                    { key: "phone", label: "Nomor HP" },
+                    { key: "gender", label: "Jenis Kelamin" },
+                    { key: "birth_place", label: "Tempat Lahir" },
+                    { key: "date_of_birth", label: "Tanggal Lahir" },
+                    { key: "marital_status", label: "Status Pernikahan" },
+                    { key: "nationality", label: "Kebangsaan" },
+                    { key: "address", label: "Alamat" },
+                    { key: "nik", label: "NIK" },
+                    { key: "npwp", label: "No. NPWP" },
+                    { key: "education_level", label: "Tingkat Pendidikan" },
+                    { key: "university", label: "Sekolah/Universitas" },
+                    { key: "major", label: "Jurusan" },
+                    { key: "graduation_year", label: "Tahun Lulus" },
+                    { key: "linkedin", label: "LinkedIn" },
+                    { key: "portfolio", label: "Portfolio Website" },
+                    { key: "expected_salary", label: "Ekspektasi Gaji" },
+                  ].map((f) => (
+                    <div key={f.key} className="rounded-2xl border border-slate-200 bg-slate-50/70 p-4 dark:border-slate-700 dark:bg-slate-950/50">
+                      <p className="text-xs font-semibold text-slate-500 dark:text-slate-400">{f.label}</p>
+                      <p className="mt-1 break-words text-sm font-extrabold text-slate-900 dark:text-slate-50">
+                        {f.key === "date_of_birth"
+                          ? selected[f.key]
+                            ? new Date(selected[f.key]).toLocaleDateString("id-ID", { day: "numeric", month: "long", year: "numeric" })
+                            : "-"
+                          : f.key === "expected_salary"
                             ? selected[f.key]
-                              ? new Date(selected[f.key]).toLocaleDateString(
-                                  "id-ID",
-                                  {
-                                    day: "numeric",
-                                    month: "long",
-                                    year: "numeric",
-                                  },
-                                )
+                              ? new Intl.NumberFormat("id-ID", { style: "currency", currency: "IDR", minimumFractionDigits: 0 }).format(selected[f.key])
                               : "-"
-                            : f.key === "expected_salary"
-                              ? selected[f.key]
-                                ? new Intl.NumberFormat("id-ID", {
-                                    style: "currency",
-                                    currency: "IDR",
-                                    minimumFractionDigits: 0,
-                                  }).format(selected[f.key])
-                                : "-"
-                              : selected[f.key] ||
-                                selected[f.key.replace("candidate_", "")] ||
-                                "-"}
-                        </p>
-                      </div>
-                    ))}
-                  </div>
+                            : selected[f.key] || selected[f.key.replace("candidate_", "")] || "-"}
+                      </p>
+                    </div>
+                  ))}
                 </div>
               </div>
 
-              {/* ================= DOKUMEN ================= */}
-              <div className="card bg-base-200 border">
-                <div className="card-body">
-                  <h3 className="card-title text-lg">📄 Dokumen</h3>
-                  <div className="divide-y border rounded-lg overflow-hidden">
-                    {(() => {
-                      // Ambil dokumen requirements sesuai posisi dan base_position LANGSUNG
-                      const pos =
-                        selected.position_name || selected.position || "";
-                      const basePos = selected.base_position || "";
-                      const req = getRequiredDocuments(pos, basePos);
-                      const meta = DOCUMENT_FIELD_METADATA;
-                      const shownFields = [
-                        ...(req.required || []),
-                        ...(req.optional || []),
-                      ];
-                      let idx = 0;
-                      return shownFields.map((key) => {
-                        const val = selected[key];
-                        const label = meta[key]?.label || key;
-                        const externalLink = isExternalLink(val);
-                        let url = "";
-                        if (val) {
-                          if (val.startsWith("http")) {
-                            url = val;
-                          } else if (
-                            val.startsWith("/uploads") ||
-                            val.startsWith("uploads/")
-                          ) {
-                            url = `http://localhost:5000/${val.replace(/^\//, "")}`;
-                          } else {
-                            url = `http://localhost:5000/uploads/candidate_documents/${val}`;
-                          }
+              <div className="space-y-6">
+                {!selected?.isHistory && (
+                  <div className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-700 dark:bg-slate-900">
+                    <h2 className="mb-4 text-lg font-extrabold text-slate-900 dark:text-slate-50">Aksi Screening</h2>
+                    <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                      <button
+                        className={`${gradientRedButtonClass} disabled:cursor-not-allowed disabled:opacity-60`}
+                        onClick={() => setShowRejectPopup(true)}
+                        disabled={rejectedStatuses.has(normalizeStatus(selected?.status))}
+                      >
+                        <X className="h-4 w-4" />
+                        Tolak
+                      </button>
+                      <button
+                        className={`${gradientBlueButtonClass} disabled:cursor-not-allowed disabled:opacity-60`}
+                        onClick={handleAccept}
+                        disabled={
+                          passedApplicants.some((p) => p.application_id === selected?.application_id) ||
+                          rejectedStatuses.has(normalizeStatus(selected?.status))
                         }
-                        const isRequired = (req.required || []).includes(key);
-                        const bg = idx % 2 === 0 ? "bg-base-100" : "";
-                        idx++;
-                        return (
-                          <div
-                            key={key}
-                            className={`flex justify-between items-center px-4 py-3 ${bg}`}
-                          >
-                            <div>
-                              <p className="text-xs opacity-60">
-                                {label}
-                                {!isRequired && (
-                                  <span className="ml-1 text-xs text-warning">
-                                    (Opsional)
-                                  </span>
-                                )}
-                              </p>
-                              <p
-                                className={`font-semibold break-all ${!val ? "text-error opacity-60" : ""}`}
-                              >
-                                {getFileDisplayText(val) || "Tidak diupload"}
-                              </p>
-                            </div>
-                            {val ? externalLink ? (
-                              <a
-                                href={val}
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                className="px-3 py-1 text-xs bg-gradient-to-b from-blue-400 to-blue-600 text-white rounded-full shadow-md hover:from-blue-500 hover:to-blue-700 border border-blue-600"
-                              >
-                                Lihat
-                              </a>
-                            ) : (
-                              <button
-                                type="button"
-                                onClick={() => openPreviewModal(url, label)}
-                                className="px-3 py-1 text-xs bg-gradient-to-b from-blue-400 to-blue-600 text-white rounded-full shadow-md hover:from-blue-500 hover:to-blue-700 border border-blue-600"
-                              >
-                                Lihat
-                              </button>
-                            ) : (
-                              <span className="btn btn-xs btn-disabled opacity-60">
-                                Tidak ada file
-                              </span>
-                            )}
-                          </div>
-                        );
-                      });
-                    })()}
+                      >
+                        <UserCheck className="h-4 w-4" />
+                        Shortlist
+                      </button>
+                    </div>
                   </div>
-                </div>
-              </div>
-
-              {/* ================= COVER LETTER ================= */}
-              <div className="card bg-base-200 border">
-                <div className="card-body text-sm">
-                  <h3 className="card-title text-lg">Cover Letter</h3>
-                  <div className="whitespace-pre-line break-words p-2 border rounded bg-base-100 min-h-[48px]">
-                    {selected.cover_letter_file ? (
-                      (() => {
-                        const coverLetterUrl = getCoverLetterFileUrl(
-                          selected.cover_letter_file,
-                        );
-                        const externalLink = isExternalLink(
-                          selected.cover_letter_file,
-                        );
-                        return (
-                          <div className="flex items-center justify-between">
-                            <div className="font-semibold break-all">
-                              {getFileDisplayText(selected.cover_letter_file) ||
-                                "Cover letter"}
-                            </div>
-                            {externalLink ? (
-                              <a
-                                href={selected.cover_letter_file}
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                className="px-3 py-1 text-xs bg-gradient-to-b from-blue-400 to-blue-600 text-white rounded-full shadow-md hover:from-blue-500 hover:to-blue-700 border border-blue-600"
-                              >
-                                Lihat
-                              </a>
-                            ) : (
-                              <button
-                                type="button"
-                                onClick={() =>
-                                  openPreviewModal(coverLetterUrl, "Cover Letter")
-                                }
-                                className="px-3 py-1 text-xs bg-gradient-to-b from-blue-400 to-blue-600 text-white rounded-full shadow-md hover:from-blue-500 hover:to-blue-700 border border-blue-600"
-                              >
-                                Lihat
-                              </button>
-                            )}
-                          </div>
-                        );
-                      })()
-                    ) : (
-                      <span className="opacity-60 italic">
-                        Tidak ada cover letter
+                )}
+                <div className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-700 dark:bg-slate-900">
+                  <div className="mb-4 flex items-center gap-3">
+                    <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-emerald-100 text-emerald-600 dark:bg-emerald-950/50 dark:text-emerald-300">
+                      <CheckCircle2 className="h-5 w-5" />
+                    </div>
+                    <div>
+                      <h2 className="text-lg font-extrabold text-slate-900 dark:text-slate-50">Status Pelamar</h2>
+                      <p className="text-sm text-slate-500 dark:text-slate-400">Ringkasan proses lamaran.</p>
+                    </div>
+                  </div>
+                  <div className="space-y-3 text-sm">
+                    <div className="flex items-center justify-between gap-3 rounded-2xl bg-slate-50 p-3 dark:bg-slate-950/50">
+                      <span className="text-slate-500 dark:text-slate-400">Status</span>
+                      <span className={`badge badge-sm rounded-full border-none px-3 py-3 font-bold ${statusBadgeClass(selected.status || "submitted")}`}>
+                        {getStatusLabel(selected.status || "submitted")}
                       </span>
+                    </div>
+                    <div className="flex items-center justify-between gap-3 rounded-2xl bg-slate-50 p-3 dark:bg-slate-950/50">
+                      <span className="text-slate-500 dark:text-slate-400">Apply</span>
+                      <span className="font-bold text-slate-900 dark:text-slate-50">{selected.submitted_at ? new Date(selected.submitted_at).toLocaleDateString("id-ID") : "-"}</span>
+                    </div>
+                    {selected.reviewed_at && (
+                      <div className="flex items-center justify-between gap-3 rounded-2xl bg-slate-50 p-3 dark:bg-slate-950/50">
+                        <span className="text-slate-500 dark:text-slate-400">Review</span>
+                        <span className="font-bold text-slate-900 dark:text-slate-50">{new Date(selected.reviewed_at).toLocaleDateString("id-ID")}</span>
+                      </div>
+                    )}
+                    {selected.scheduled_date && (
+                      <div className="flex items-center justify-between gap-3 rounded-2xl bg-slate-50 p-3 dark:bg-slate-950/50">
+                        <span className="text-slate-500 dark:text-slate-400">Interview</span>
+                        <span className="font-bold text-slate-900 dark:text-slate-50">{new Date(selected.scheduled_date).toLocaleDateString("id-ID")}</span>
+                      </div>
                     )}
                   </div>
+                </div>                
+              </div>
+            </div>
+
+            <div className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-700 dark:bg-slate-900">
+              <div className="mb-5 flex items-center gap-3">
+                <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-orange-100 text-orange-600 dark:bg-orange-950/50 dark:text-orange-300">
+                  <FileText className="h-5 w-5" />
+                </div>
+                <div>
+                  <h2 className="text-lg font-extrabold text-slate-900 dark:text-slate-50">Dokumen Kandidat</h2>
+                  <p className="text-sm text-slate-500 dark:text-slate-400">Preview dokumen persyaratan berdasarkan posisi.</p>
                 </div>
               </div>
 
-              {/* ================= STATUS ================= */}
-              <div className="card bg-base-200 border">
-                <div className="card-body text-sm">
-                  <h3 className="card-title text-lg">Status Pelamar</h3>
-                  <p>📌 {getStatusLabel(selected.status || "submitted")}</p>
-                  <p>
-                    📅 Apply:{" "}
-                    {selected.submitted_at
-                      ? new Date(selected.submitted_at).toLocaleDateString(
-                          "id-ID",
-                        )
-                      : "-"}
-                  </p>
-                  {selected.reviewed_at && (
-                    <p>
-                      ✔ Review:{" "}
-                      {new Date(selected.reviewed_at).toLocaleDateString(
-                        "id-ID",
-                      )}
-                    </p>
-                  )}
-                  {selected.scheduled_date && (
-                    <p>
-                      📆 Interview:{" "}
-                      {new Date(selected.scheduled_date).toLocaleDateString(
-                        "id-ID",
-                      )}
-                    </p>
-                  )}
-                </div>
+              <div className="grid grid-cols-1 gap-4 xl:grid-cols-2">
+                {(() => {
+                  const pos = selected.position_name || selected.position || "";
+                  const basePos = selected.base_position || "";
+                  const req = getRequiredDocuments(pos, basePos);
+                  const meta = DOCUMENT_FIELD_METADATA;
+                  const requiredFields = (req.required || []).map((key) => ({ key, required: true }));
+                  const optionalFields = (req.optional || []).map((key) => ({ key, required: false }));
+                  const groupedFields = [
+                    { title: "Wajib", items: requiredFields },
+                    { title: "Tidak Wajib", items: optionalFields },
+                  ];
+
+                  return groupedFields.map((group) => (
+                    <div
+                      key={group.title}
+                      className={`space-y-3 rounded-3xl border px-4 py-4 shadow-sm dark:shadow-none ${
+                        group.title === "Wajib"
+                          ? "border-amber-200 bg-amber-50/60 dark:border-amber-900/50 dark:bg-amber-950/10"
+                          : "border-slate-200 bg-slate-50/60 dark:border-slate-700 dark:bg-slate-950/30"
+                      }`}
+                    >
+                      <div className="flex items-center justify-between gap-3">
+                        <div className="flex items-center gap-2">
+                          <h3 className="text-sm font-extrabold text-slate-900 dark:text-slate-50">
+                            {group.title}
+                          </h3>
+                          <span className={`badge badge-sm rounded-full border-none px-3 py-2 font-bold ${group.title === "Wajib" ? "!bg-amber-500 !text-white" : "!bg-slate-500 !text-white"}`}>
+                            {group.items.length}
+                          </span>
+                        </div>
+                        <p className="text-xs font-medium text-slate-500 dark:text-slate-400">
+                          {group.title === "Wajib" ? "Harus ada" : "Opsional"}
+                        </p>
+                      </div>
+
+                      <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
+                        {group.items.map(({ key, required }) => {
+                          const val = selected[key];
+                          const label = meta[key]?.label || key;
+                          const externalLink = isExternalLink(val);
+                          let url = "";
+                          if (val) {
+                            if (val.startsWith("http")) url = val;
+                            else if (val.startsWith("/uploads") || val.startsWith("uploads/")) {
+                              url = `http://localhost:5000/${val.replace(/^\//, "")}`;
+                            } else {
+                              url = `http://localhost:5000/uploads/candidate_documents/${val}`;
+                            }
+                          }
+
+                          return (
+                            <div
+                              key={key}
+                              className={`rounded-2xl border p-4 ${required ? "border-amber-200 bg-white dark:border-amber-900/50 dark:bg-slate-950/40" : "border-slate-200 bg-white dark:border-slate-700 dark:bg-slate-950/40"}`}
+                            >
+                              <div className="flex items-start justify-between gap-3">
+                                <div className="min-w-0">
+                                  <p className="truncate text-sm font-extrabold text-slate-900 dark:text-slate-50">
+                                    {label}
+                                  </p>
+                                  <div className="mt-2 flex items-center gap-2">
+                                    <span className={`badge badge-sm rounded-full border-none px-2 py-1 text-[11px] font-bold ${required ? "!bg-amber-500 !text-white" : "!bg-slate-500 !text-white"}`}>
+                                      {required ? "Wajib" : "Opsional"}
+                                    </span>
+                                    <span className={`text-xs font-semibold ${val ? "text-emerald-600 dark:text-emerald-300" : "text-red-500 dark:text-red-300"}`}>
+                                      {val ? "Ada" : "Tidak ada"}
+                                    </span>
+                                  </div>
+                                </div>
+
+                                {val ? externalLink ? (
+                                  <a
+                                    href={val}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-blue-600 bg-gradient-to-b from-blue-400 to-blue-600 text-white transition-all duration-200 hover:from-blue-500 hover:to-blue-700"
+                                    title={`Lihat ${label}`}
+                                    aria-label={`Lihat ${label}`}
+                                  >
+                                    <Eye className="h-4 w-4" />
+                                  </a>
+                                ) : (
+                                  <button
+                                    type="button"
+                                    onClick={() => openPreviewModal(url, label)}
+                                    className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-blue-600 bg-gradient-to-b from-blue-400 to-blue-600 text-white transition-all duration-200 hover:from-blue-500 hover:to-blue-700"
+                                    title={`Preview ${label}`}
+                                    aria-label={`Preview ${label}`}
+                                  >
+                                    <Eye className="h-4 w-4" />
+                                  </button>
+                                ) : (
+                                  <button
+                                    type="button"
+                                    className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-slate-300 bg-slate-100 text-slate-400 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-500"
+                                    disabled
+                                    title={`Tidak ada ${label}`}
+                                    aria-label={`Tidak ada ${label}`}
+                                  >
+                                    <X className="h-4 w-4" />
+                                  </button>
+                                )}
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  ));
+                })()}
               </div>
             </div>
-            {/*================= ACTIONS =================*/}
-            <div className="mt-6 border-t pt-6">
-              {selected?.isHistory ? (
+
+            <div className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-700 dark:bg-slate-900">
+              <div className="mb-4 flex items-center gap-3">
+                <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-orange-100 text-orange-600 dark:bg-orange-950/50 dark:text-orange-300">
+                  <GraduationCap className="h-5 w-5" />
+                </div>
                 <div>
+                  <h2 className="text-lg font-extrabold text-slate-900 dark:text-slate-50">Cover Letter</h2>
+                  <p className="text-sm text-slate-500 dark:text-slate-400">Dokumen atau file cover letter kandidat.</p>
                 </div>
-              ) : (
-                <div className="grid grid-cols-2 gap-3 w-full">
-                  <button
-                    className="btn btn-outline btn-error w-full py-3"
-                    onClick={() => {
-                      console.log("[DEBUG] Klik Tolak, selected:", selected);
-                      setShowRejectPopup(true);
-                    }}
-                    disabled={selected?.status === "ditolak"}
-                  >
-                    Tolak
-                  </button>
-                  <button
-                    className="btn btn-success w-full py-3"
-                    onClick={handleAccept}
-                    disabled={
-                      passedApplicants.some(
-                        (p) => p.application_id === selected?.application_id,
-                      ) || selected.status === "ditolak"
-                    }
-                  >
-                    Shortlist Kandidat
-                  </button>{" "}
-                </div>
-              )}
+              </div>
+
+              <div className="rounded-2xl border border-slate-200 bg-slate-50/70 p-4 dark:border-slate-700 dark:bg-slate-950/50">
+                {selected.cover_letter_file ? (
+                  (() => {
+                    const coverLetterUrl = getCoverLetterFileUrl(selected.cover_letter_file);
+                    const externalLink = isExternalLink(selected.cover_letter_file);
+                    return (
+                      <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+                        <div className="font-semibold text-slate-700 dark:text-slate-200 break-all">
+                          {getFileDisplayText(selected.cover_letter_file) || "Cover letter"}
+                        </div>
+                        {externalLink ? (
+                          <a
+                            href={selected.cover_letter_file}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className={gradientBlueButtonClass}
+                          >
+                            <Eye className="h-4 w-4" />
+                            Lihat
+                          </a>
+                        ) : (
+                          <button
+                            type="button"
+                            onClick={() => openPreviewModal(coverLetterUrl, "Cover Letter")}
+                            className={gradientBlueButtonClass}
+                          >
+                            <Eye className="h-4 w-4" />
+                            Preview
+                          </button>
+                        )}
+                      </div>
+                    );
+                  })()
+                ) : (
+                  <p className="text-sm font-medium text-slate-500 dark:text-slate-400">Tidak ada cover letter.</p>
+                )}
+              </div>
             </div>
-            {/* Modal Tolak */}
-            <Modal
-              open={showRejectPopup}
-              onClose={() => {
-                setShowRejectPopup(false);
-                setRejectNotes("");
-              }}
-              onSubmit={handleRejectSubmit}
-              title="Tolak Pelamar"
-            >
-              <label className="block mb-2 font-medium">
-                Catatan Penolakan
-              </label>
-              <textarea
-                className="textarea textarea-bordered w-full"
-                rows={3}
-                placeholder="Masukkan alasan penolakan..."
-                value={rejectNotes}
-                onChange={(e) => setRejectNotes(e.target.value)}
-              />
-            </Modal>
-          </TitleCard>
-        </>
+          </div>
+
+          <Modal
+            open={showRejectPopup}
+            onClose={() => {
+              setShowRejectPopup(false);
+              setRejectNotes("");
+            }}
+            onSubmit={handleRejectSubmit}
+            title="Tolak Pelamar"
+          >
+            <label className="mb-2 block font-medium">Catatan Penolakan</label>
+            <textarea
+              className="textarea textarea-bordered w-full rounded-xl"
+              rows={3}
+              placeholder="Masukkan alasan penolakan..."
+              value={rejectNotes}
+              onChange={(e) => setRejectNotes(e.target.value)}
+            />
+          </Modal>
+        </div>
       )}
 
       <Modal
         open={showMassUpdatePopup}
         onClose={() => setShowMassUpdatePopup(false)}
         onSubmit={handleMassUpdateSubmit}
-        title="Konfirmasi Update Massal"
-        submitLabel="Ya, Update"
-        submitButtonClassName="btn-primary text-primary-content"
+        title="Konfirmasi Publish Hasil"
+        submitLabel="Ya, Publish"
+        submitButtonClassName={gradientBlueButtonClass}
       >
         <div className="space-y-4">
-          {/* HEADER CARD */}
-          <div className="flex items-start gap-4 rounded-2xl border border-primary/20 bg-primary/10 p-5 text-base-content">
-            <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-primary text-primary-content shadow-sm">
+          <div className="flex items-start gap-4 rounded-2xl border border-orange-200 bg-orange-50 p-5 text-slate-700 dark:border-orange-900/60 dark:bg-orange-950/30 dark:text-slate-200">
+            <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-orange-500 text-white shadow-sm">
               <CheckBadgeIcon className="h-6 w-6" />
             </div>
-
             <div>
-              <h4 className="text-base font-semibold text-base-content">
+              <h4 className="text-base font-extrabold text-slate-900 dark:text-slate-50">
                 Publish hasil screening kandidat?
               </h4>
-
-              <p className="mt-2 text-sm leading-relaxed text-base-content/70">
-                Semua kandidat pada tab
-                <span className="mx-1 rounded-lg bg-base-200 px-2 py-1 font-semibold text-base-content">
-                  Shortlisted
-                </span>
-                akan dipublish hasilnya, termasuk kandidat yang
-                <span className="mx-1 rounded-lg bg-error/10 px-2 py-1 font-semibold text-error">
-                  ditolak
-                </span>
-                dan yang
-                <span className="ml-1 inline-flex rounded-lg bg-success/15 px-2 py-1 font-semibold text-success">
-                  Lolos Dokumen
-                </span>
+              <p className="mt-2 text-sm leading-relaxed text-slate-600 dark:text-slate-300">
+                Semua kandidat pada tab Shortlisted akan dipublish hasilnya,
+                termasuk kandidat yang ditolak dan kandidat yang lolos dokumen.
               </p>
             </div>
           </div>
-
-          {/* INFO */}
-          <div className="rounded-xl border border-base-300 bg-base-200/60 p-4 text-base-content">
-            <p className="text-sm text-base-content/70">
-              Pastikan seluruh hasil screening sudah final sebelum mempublish.
-            </p>
+          <div className="rounded-xl border border-slate-200 bg-slate-50 p-4 text-sm text-slate-600 dark:border-slate-700 dark:bg-slate-950/50 dark:text-slate-300">
+            Pastikan seluruh hasil screening sudah final sebelum mempublish.
           </div>
         </div>
       </Modal>
 
       {selectedPreview ? (
         <div className="modal modal-open">
-          <div className="modal-box max-w-4xl">
+          <div className="modal-box max-w-4xl rounded-3xl border border-slate-200 bg-white dark:border-slate-700 dark:bg-slate-900">
             <button
               type="button"
               className="btn btn-sm btn-circle absolute right-2 top-2"
               onClick={closePreviewModal}
             >
-              ✕
+              <X className="h-4 w-4" />
             </button>
-            <h3 className="font-semibold text-xl mb-1">
+            <h3 className="mb-1 text-xl font-extrabold text-slate-900 dark:text-slate-50">
               {selectedPreview.title || "Preview File"}
             </h3>
-            <p className="text-sm opacity-70 mb-4">
+            <p className="mb-4 text-sm text-slate-500 dark:text-slate-400">
               {getFileDisplayText(selectedPreview.path)}
             </p>
 
-            <div className="w-full min-h-[420px] bg-base-200 rounded-lg overflow-hidden flex items-center justify-center">
+            <div className="flex min-h-[420px] w-full items-center justify-center overflow-hidden rounded-2xl bg-slate-100 dark:bg-slate-950">
               {selectedPreview.type === "image" ? (
                 <img
                   src={getAssetUrl(selectedPreview.path)}
@@ -1355,24 +1370,24 @@ export default function HRRecruitmentProcessDetail() {
                 <iframe
                   title={selectedPreview.title || "Preview PDF"}
                   src={getAssetUrl(selectedPreview.path)}
-                  className="w-full h-[70vh] border-0"
+                  className="h-[70vh] w-full border-0"
                 />
               ) : selectedPreview.path ? (
-                <div className="text-center p-6">
-                  <p className="mb-2">
+                <div className="p-6 text-center">
+                  <p className="mb-2 text-slate-600 dark:text-slate-300">
                     Preview tidak tersedia untuk tipe file ini.
                   </p>
                   <a
                     href={getAssetUrl(selectedPreview.path)}
                     target="_blank"
                     rel="noreferrer"
-                    className="btn btn-primary btn-sm"
+                    className={gradientBlueButtonClass}
                   >
                     Buka File
                   </a>
                 </div>
               ) : (
-                <p className="opacity-70">Tidak ada file.</p>
+                <p className="text-slate-500 dark:text-slate-400">Tidak ada file.</p>
               )}
             </div>
           </div>

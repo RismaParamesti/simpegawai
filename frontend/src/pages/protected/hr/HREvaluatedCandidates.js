@@ -2,7 +2,6 @@ import React, { useEffect, useMemo, useState } from "react";
 import { useDispatch } from "react-redux";
 import axios from "axios";
 import { useNavigate } from "react-router-dom";
-import { NotificationManager } from "react-notifications";
 
 import TitleCard from "../../../components/Cards/TitleCard";
 import { setPageTitle } from "../../../features/common/headerSlice";
@@ -89,7 +88,11 @@ const HREvaluatedCandidates = () => {
           result: item.result || item.interview_result || "",
           interviewer_notes: item.interviewer_notes || "",
         }))
-        .filter((item) => item.status === "completed")
+        .filter(
+          (item) =>
+            item.status === "completed" &&
+            item.job_hiring_status !== "completed",
+        )
         .sort((a, b) => {
           const ratingDiff =
             getRatingNumber(b.rating) - getRatingNumber(a.rating);
@@ -236,136 +239,23 @@ const HREvaluatedCandidates = () => {
 
     setCompletingJobs((prev) => ({ ...prev, [jobOpeningId]: true }));
     try {
-      // Mark job_openings as complete (backend expected to publish results)
-      await axios.put(`/api/job-openings/${jobOpeningId}/complete`);
-
-      // Try calling explicit publish endpoint if backend exposes it.
-      // This is a no-op if the endpoint does not exist or fails.
-      let publishSucceeded = false;
-      try {
-        await axios.post(
-          `/api/job-openings/${jobOpeningId}/publish-interviews`,
-        );
-        publishSucceeded = true;
-      } catch (e) {
-        publishSucceeded = false;
-        if (NotificationManager)
-          NotificationManager.info(
-            "Publish endpoint not available; attempting per-application updates.",
-            "Info",
-            4000,
-          );
-        else
-          console.info(
-            "Publish endpoint not available; attempting per-application updates.",
-          );
-      }
+      await axios.post(`/api/hr/job-openings/${jobOpeningId}/publish-interviews`);
 
       alert("Lowongan berhasil diselesaikan dan hasil interview dipublish.");
 
-      // Optimistic UI update: mark job as completed locally in candidate list
       setCandidates((prev) =>
-        (prev || []).map((it) =>
-          (it.job_opening_id || it.position_id || it.id) === jobOpeningId
-            ? { ...it, status: "completed" }
-            : it,
+        (prev || []).filter(
+          (item) =>
+            String(item.job_opening_id || item.position_id || item.id) !==
+            String(jobOpeningId),
         ),
       );
 
-      // Notify other parts of the app to refresh (e.g., candidate view)
       if (typeof window !== "undefined" && window.dispatchEvent) {
         window.dispatchEvent(new Event("interviewsPublished"));
       }
 
-      // Refresh local data
-      try {
-        await fetchCandidates();
-      } catch (e) {
-        // ignore
-      }
-
-      // If publish endpoint wasn't available, fallback: update application statuses per-interview
-      if (!publishSucceeded) {
-        try {
-          const publishErrors = [];
-          let successCount = 0;
-          const interviewsForJob = (candidates || []).filter(
-            (it) =>
-              (it.job_opening_id || it.position_id || it.id) === jobOpeningId,
-          );
-          for (const it of interviewsForJob) {
-            const appId = it.application_id;
-            if (!appId) continue;
-            let appStatus = "";
-            if (it.recommendation === "hire" && it.result === "passed") {
-              appStatus = "diterima";
-            } else if (
-              it.recommendation === "reject" &&
-              it.result === "failed"
-            ) {
-              appStatus = "ditolak";
-            } else {
-              continue;
-            }
-            try {
-              const res = await axios.put(
-                `/api/hr/applications/${appId}/status`,
-                { status: appStatus },
-              );
-              successCount++;
-              if (NotificationManager)
-                NotificationManager.success(
-                  `Status aplikasi ${appId} diupdate ke ${appStatus}`,
-                  "Sukses",
-                  3000,
-                );
-              else
-                console.log(
-                  `Updated application ${appId} => ${appStatus}`,
-                  res.data,
-                );
-            } catch (err) {
-              publishErrors.push({ appId, err });
-              console.error(`Failed update application ${appId}`, err);
-              if (NotificationManager)
-                NotificationManager.error(
-                  `Gagal update status aplikasi ${appId}: ${err?.response?.data?.message || err?.message || JSON.stringify(err)}`,
-                  "Publish Error",
-                  6000,
-                );
-            }
-          }
-          if (successCount > 0) {
-            if (NotificationManager)
-              NotificationManager.info(
-                `${successCount} aplikasi berhasil dipublish.`,
-                "Info",
-                4000,
-              );
-            else console.info(`${successCount} aplikasi berhasil dipublish.`);
-          }
-          if (publishErrors.length > 0) {
-            console.warn(
-              "Some application status updates failed:",
-              publishErrors,
-            );
-            if (NotificationManager)
-              NotificationManager.error(
-                "Beberapa update status aplikasi gagal. Cek console/network untuk detail.",
-                "Error",
-                8000,
-              );
-          }
-        } catch (err) {
-          console.error("Fallback publish failed", err);
-          if (NotificationManager)
-            NotificationManager.error(
-              `Fallback publish failed: ${err?.message || JSON.stringify(err)}`,
-              "Error",
-              8000,
-            );
-        }
-      }
+      await fetchCandidates();
     } catch (err) {
       alert(
         "Gagal menyelesaikan lowongan: " +

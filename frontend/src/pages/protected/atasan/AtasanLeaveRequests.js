@@ -408,7 +408,7 @@ function AtasanLeaveRequests() {
                         </div>
                       ) : (
                         <button
-                          className="btn btn-ghost btn-xs"
+                          className="btn btn-xs action-view"
                           onClick={() => openDetailModal(item)}
                         >
                           Lihat Detail
