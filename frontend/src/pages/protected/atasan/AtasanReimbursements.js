@@ -247,7 +247,7 @@ function AtasanReimbursements() {
                                             </td>
                                             <td>
                                                 {item.attachment ? (
-                                                    <a href={attachmentUrl} target="_blank" rel="noreferrer" className=" px-3 py-1 text-xs bg-gradient-to-b from-blue-400 to-blue-600 text-white rounded-full shadow-md hover:shadow-lg border border-blue-600 hover:from-blue-500 hover:to-blue-700 transition-all duration-200 ">Lihat</a>
+                                                    <a href={attachmentUrl} target="_blank" rel="noreferrer" className=" px-3 py-1 text-xs bg-gradient-to-b from-blue-400 to-blue-600 text-white rounded-full border border-blue-600 hover:from-blue-500 hover:to-blue-700 transition-all duration-200 ">Lihat</a>
                                                 ) : (
                                                     <span className="text-xs opacity-60">-</span>
                                                 )}

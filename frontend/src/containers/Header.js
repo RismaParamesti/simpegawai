@@ -130,7 +130,7 @@ function Header() {
             htmlFor="left-sidebar-drawer"
             className="btn btn-primary btn-sm sm:btn-md drawer-button lg:hidden shadow-lg shadow-primary/20"
           >
-            <Bars3Icon className="h-5 inline-block w-5" />
+            <Bars3Icon className="h-5 inline-block w-5 text-white" />
           </label>
           <div className="ml-2 min-w-0">
             <h1 className="font-display truncate text-base font-semibold sm:text-xl lg:text-2xl">

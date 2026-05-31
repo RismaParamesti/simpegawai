@@ -6,6 +6,32 @@ import { NotificationManager } from "react-notifications";
 import axios from "axios";
 import { getStatusLabel } from "../utils/statusLabels";
 
+const ASSESSMENT_START = "[ASSESSMENT_CRITERIA]";
+const ASSESSMENT_END = "[/ASSESSMENT_CRITERIA]";
+
+const parseInterviewerNotes = (notes) => {
+  const rawNotes = String(notes || "");
+  const startIndex = rawNotes.indexOf(ASSESSMENT_START);
+  const endIndex = rawNotes.indexOf(ASSESSMENT_END);
+
+  if (startIndex === -1 || endIndex === -1 || endIndex < startIndex) {
+    return { notes: rawNotes.trim(), assessment: null };
+  }
+
+  const cleanNotes = `${rawNotes.slice(0, startIndex)}${rawNotes.slice(
+    endIndex + ASSESSMENT_END.length,
+  )}`.trim();
+  const assessmentJson = rawNotes
+    .slice(startIndex + ASSESSMENT_START.length, endIndex)
+    .trim();
+
+  try {
+    return { notes: cleanNotes, assessment: JSON.parse(assessmentJson) };
+  } catch (error) {
+    return { notes: cleanNotes, assessment: null };
+  }
+};
+
 export default function CandidateInterviewPage() {
   const dispatch = useDispatch();
   const [loading, setLoading] = useState(false);
@@ -273,6 +299,9 @@ export default function CandidateInterviewPage() {
                     // normalize interview fields: server returns interviews[] on each app
                     const interview = app.interviews && app.interviews.length > 0 ? app.interviews[0] : null;
                     app._interview = interview;
+                    app._parsedInterviewerNotes = parseInterviewerNotes(
+                      app.interviewer_notes || interview?.interviewer_notes,
+                    );
                   })()}
                   {/* Header */}
                   <div className="flex justify-between items-start gap-4 flex-wrap">
@@ -450,9 +479,9 @@ export default function CandidateInterviewPage() {
                   {((app.rating || app._interview?.rating) && (
                     <div className="mt-4 p-3 bg-base-100 rounded-lg">
                       <p className="text-xs text-gray-600 font-semibold mb-2">
-                        Rating Wawancara
+                        Nilai Wawancara
                       </p>
-                      <p className="text-sm">Rating: {(app.rating || app._interview?.rating)}/5</p>
+                      <p className="text-sm">Nilai: {(app.rating || app._interview?.rating)}/5</p>
                       <div className="rating rating-sm mt-1">
                         {[1, 2, 3, 4, 5].map((i) => (
                           <input
@@ -469,12 +498,57 @@ export default function CandidateInterviewPage() {
                   ))}
 
                   {/* Interview Notes */}
-                  {(app.interviewer_notes || app._interview?.interviewer_notes) && (
-                    <div className="mt-4 p-3 bg-base-100 rounded-lg">
-                      <p className="text-xs text-gray-600 font-semibold mb-2">
+                  {(app._parsedInterviewerNotes?.notes ||
+                    app._parsedInterviewerNotes?.assessment) && (
+                    <div className="mt-4 rounded-xl border border-base-300 bg-base-100 p-4">
+                      <p className="mb-2 text-xs font-semibold text-base-content/70">
                         Catatan Pewawancara
                       </p>
-                      <p className="text-sm">{app.interviewer_notes || app._interview?.interviewer_notes}</p>
+
+                      {app._parsedInterviewerNotes.notes && (
+                        <p className="whitespace-pre-line text-sm leading-relaxed text-base-content">
+                          {app._parsedInterviewerNotes.notes}
+                        </p>
+                      )}
+
+                      {Array.isArray(
+                        app._parsedInterviewerNotes.assessment?.criteria,
+                      ) && (
+                        <div className="mt-4 rounded-xl border border-primary/20 bg-primary/5 p-3">
+                          <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+                            <p className="text-sm font-bold text-base-content">
+                              Rincian Penilaian
+                            </p>
+                            <span className="badge badge-primary">
+                              Total{" "}
+                              {app._parsedInterviewerNotes.assessment
+                                .total_score ?? 0}
+                              /
+                              {app._parsedInterviewerNotes.assessment
+                                .maximum_score ?? 0}
+                            </span>
+                          </div>
+
+                          <div className="space-y-2">
+                            {app._parsedInterviewerNotes.assessment.criteria.map(
+                              (criterion, criterionIndex) => (
+                                <div
+                                  key={`${criterion.criterion}-${criterionIndex}`}
+                                  className="flex items-start justify-between gap-3 rounded-lg bg-base-100 px-3 py-2 text-sm"
+                                >
+                                  <span className="text-base-content">
+                                    {criterion.criterion}
+                                  </span>
+                                  <span className="shrink-0 font-bold text-primary">
+                                    {criterion.achieved_score ?? 0}/
+                                    {criterion.maximum_score ?? 0}
+                                  </span>
+                                </div>
+                              ),
+                            )}
+                          </div>
+                        </div>
+                      )}
                     </div>
                   )}
 

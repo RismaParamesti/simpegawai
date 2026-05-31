@@ -57,6 +57,8 @@ router.get(
                c.name AS candidate_name, c.email AS candidate_email,
                a.status AS application_status, a.job_opening_id,
                jo.title AS job_title, jo.location AS job_location,
+               jo.hiring_status AS job_hiring_status,
+               jo.assessment_criteria,
                p.name AS position_name,
                e.full_name AS interviewer_name
         FROM interviews i
@@ -95,6 +97,8 @@ router.get(
                c.name AS candidate_name, c.email AS candidate_email,
                a.status AS application_status, a.job_opening_id,
                jo.title AS job_title, jo.location AS job_location,
+               jo.hiring_status AS job_hiring_status,
+               jo.assessment_criteria,
                p.name AS position_name,
                e.full_name AS interviewer_name
         FROM interviews i
@@ -367,6 +371,88 @@ router.post(
     } catch (error) {
       console.error(error);
       res.status(500).json({ message: "Server error" });
+    }
+  },
+);
+
+// ============================
+// PUBLISH INTERVIEW RESULTS FOR A JOB OPENING (HR/Admin)
+// ============================
+router.post(
+  "/job-openings/:id/publish-interviews",
+  verifyToken,
+  verifyRole(["hr", "admin"]),
+  async (req, res) => {
+    const connection = await db.promise().getConnection();
+
+    try {
+      const jobOpeningId = parseInt(req.params.id, 10);
+      if (isNaN(jobOpeningId)) {
+        return res.status(400).json({ message: "Invalid job opening id" });
+      }
+
+      await connection.beginTransaction();
+
+      const [jobs] = await connection.query(
+        "SELECT id FROM job_openings WHERE id = ? FOR UPDATE",
+        [jobOpeningId],
+      );
+      if (jobs.length === 0) {
+        await connection.rollback();
+        return res.status(404).json({ message: "Job opening not found" });
+      }
+
+      const [interviews] = await connection.query(
+        `SELECT i.id, i.application_id, i.result, i.recommendation
+         FROM interviews i
+         JOIN applications a ON a.id = i.application_id
+         WHERE a.job_opening_id = ? AND i.status = 'completed'`,
+        [jobOpeningId],
+      );
+
+      if (interviews.length === 0) {
+        await connection.rollback();
+        return res.status(400).json({
+          message: "Belum ada hasil interview yang dapat dipublish",
+        });
+      }
+
+      for (const interview of interviews) {
+        const applicationStatus =
+          interview.result === "passed"
+            ? "diterima"
+            : ["failed", "no_show"].includes(interview.result)
+              ? "ditolak"
+              : null;
+
+        if (!applicationStatus) continue;
+
+        await connection.query(
+          `UPDATE applications
+           SET status = ?, reviewed_at = NOW()
+           WHERE id = ?`,
+          [applicationStatus, interview.application_id],
+        );
+      }
+
+      await connection.query(
+        `UPDATE job_openings
+         SET status = 'closed', hiring_status = 'completed'
+         WHERE id = ?`,
+        [jobOpeningId],
+      );
+
+      await connection.commit();
+      res.json({
+        success: true,
+        message: "Hasil interview berhasil dipublish",
+      });
+    } catch (error) {
+      await connection.rollback();
+      console.error(error);
+      res.status(500).json({ message: "Server error" });
+    } finally {
+      connection.release();
     }
   },
 );

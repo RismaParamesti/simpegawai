@@ -158,6 +158,7 @@ router.get("/:id", async (req, res) => {
         jo.title,
         jo.description,
         jo.requirements,
+        jo.assessment_criteria,
         jo.responsibilities,
         jo.quota,
         jo.employment_type,
@@ -334,6 +335,7 @@ router.post("/", verifyToken, verifyRole(["hr"]), async (req, res) => {
       title,
       description,
       requirements,
+      assessment_criteria,
       responsibilities,
       quota,
       employment_type,
@@ -366,19 +368,26 @@ router.post("/", verifyToken, verifyRole(["hr"]), async (req, res) => {
       .query("SELECT id FROM employees WHERE user_id = ?", [req.user.id]);
 
     const createdBy = employee.length > 0 ? employee[0].id : null;
+    const normalizedAssessmentCriteria =
+      assessment_criteria === undefined
+        ? null
+        : typeof assessment_criteria === "string"
+          ? assessment_criteria
+          : JSON.stringify(assessment_criteria);
 
     const [result] = await db.promise().query(
       `INSERT INTO job_openings (
-                position_id, base_position, title, description, requirements, responsibilities, 
+                position_id, base_position, title, description, requirements, assessment_criteria, responsibilities,
                 quota, employment_type, salary_range_min, salary_range_max, 
                 location, deadline, status, hiring_status, created_by, created_at
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW())`,
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW())`,
       [
         position_id,
         base_position,
         title,
         description,
         requirements,
+        normalizedAssessmentCriteria,
         responsibilities,
         quota || 1,
         employment_type || "permanent",
@@ -407,6 +416,7 @@ router.post("/", verifyToken, verifyRole(["hr"]), async (req, res) => {
         quota: quota || 1,
         status: status || "open",
         deadline,
+        assessment_criteria: normalizedAssessmentCriteria,
       },
       ipAddress: getIpAddress(req),
       userAgent: getUserAgent(req),
@@ -438,6 +448,7 @@ router.put(
         title,
         description,
         requirements,
+        assessment_criteria,
         responsibilities,
         quota,
         employment_type,
@@ -457,6 +468,13 @@ router.put(
         return res.status(404).json({ message: "Job opening not found" });
       }
 
+      const normalizedAssessmentCriteria =
+        assessment_criteria === undefined
+          ? undefined
+          : typeof assessment_criteria === "string"
+            ? assessment_criteria
+            : JSON.stringify(assessment_criteria);
+
       await db.promise().query(
         `UPDATE job_openings SET
                 position_id = COALESCE(?, position_id),
@@ -464,6 +482,7 @@ router.put(
                 title = COALESCE(?, title),
                 description = COALESCE(?, description),
                 requirements = COALESCE(?, requirements),
+                assessment_criteria = COALESCE(?, assessment_criteria),
                 responsibilities = COALESCE(?, responsibilities),
                 quota = COALESCE(?, quota),
                 employment_type = COALESCE(?, employment_type),
@@ -480,6 +499,7 @@ router.put(
           title,
           description,
           requirements,
+          normalizedAssessmentCriteria,
           responsibilities,
           quota,
           employment_type,

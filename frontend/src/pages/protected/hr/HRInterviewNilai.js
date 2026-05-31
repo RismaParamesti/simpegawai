@@ -7,6 +7,53 @@ import {
   DOCUMENT_FIELD_METADATA,
 } from "../../../utils/documentRequirements";
 
+const ASSESSMENT_START = "[ASSESSMENT_CRITERIA]";
+const ASSESSMENT_END = "[/ASSESSMENT_CRITERIA]";
+
+const parseAssessmentCriteria = (value) => {
+  if (!value) return [];
+  if (Array.isArray(value)) return value;
+  if (typeof value !== "string") return [];
+
+  try {
+    const parsed = JSON.parse(value);
+    return Array.isArray(parsed) ? parsed : [];
+  } catch (error) {
+    return [];
+  }
+};
+
+const normalizeAssessmentCriteria = (value) =>
+  parseAssessmentCriteria(value)
+    .map((item) => ({
+      criterion: String(item?.criterion || "").trim(),
+      score: Math.max(0, Number(item?.score) || 0),
+    }))
+    .filter((item) => item.criterion && item.score > 0);
+
+const parseStoredAssessment = (notes) => {
+  const rawNotes = String(notes || "");
+  const startIndex = rawNotes.indexOf(ASSESSMENT_START);
+  const endIndex = rawNotes.indexOf(ASSESSMENT_END);
+
+  if (startIndex === -1 || endIndex === -1 || endIndex < startIndex) {
+    return { notes: rawNotes, assessment: null };
+  }
+
+  const json = rawNotes
+    .slice(startIndex + ASSESSMENT_START.length, endIndex)
+    .trim();
+  const cleanNotes = `${rawNotes.slice(0, startIndex)}${rawNotes.slice(
+    endIndex + ASSESSMENT_END.length
+  )}`.trim();
+
+  try {
+    return { notes: cleanNotes, assessment: JSON.parse(json) };
+  } catch (error) {
+    return { notes: cleanNotes, assessment: null };
+  }
+};
+
 export default function InterviewModal({
   isFormOpen,
   isCancelOpen,
@@ -31,6 +78,7 @@ export default function InterviewModal({
     recommendation: "",
     interviewer_notes: "",
     result: "",
+    criteria_scores: {},
   });
   const [isEdit, setIsEdit] = useState(false);
   const [previewUrl, setPreviewUrl] = useState(null);
@@ -38,7 +86,11 @@ export default function InterviewModal({
   const [previewIsImage, setPreviewIsImage] = useState(false);
   const [previewScale, setPreviewScale] = useState(1);
   // Tambahan: state untuk job_opening
-  const [jobOpeningStatus, setJobOpeningStatus] = useState({ status: null, hiring_status: null });
+  const [jobOpeningStatus, setJobOpeningStatus] = useState({
+    status: null,
+    hiring_status: null,
+    assessment_criteria: [],
+  });
 
   const isExternalUrl = (value) => /^https?:\/\//i.test(String(value || ""));
   const getDocumentUrl = (value) => {
@@ -128,6 +180,126 @@ export default function InterviewModal({
 
     return parts.length ? parts.join(" - ") : "Lowongan belum tersedia";
   };
+  const assessmentCriteria = jobOpeningStatus.assessment_criteria?.length
+    ? jobOpeningStatus.assessment_criteria
+    : normalizeAssessmentCriteria(
+        detailCandidate?.assessment_criteria ||
+          selectedCandidate?.assessment_criteria
+      );
+  const getAssessmentSummary = (criteriaScores = evaluation.criteria_scores) => {
+    const maximum = assessmentCriteria.reduce(
+      (total, item) => total + item.score,
+      0
+    );
+    const achieved = assessmentCriteria.reduce((total, item, index) => {
+      const value = Number(criteriaScores?.[index]);
+      return total + (Number.isFinite(value) ? Math.min(item.score, value) : 0);
+    }, 0);
+    const percentage = maximum > 0 ? (achieved / maximum) * 100 : 0;
+    const rating =
+      maximum > 0 ? Math.max(1, Math.min(5, Math.round(percentage / 20))) : "";
+
+    return { achieved, maximum, percentage, rating };
+  };
+  const getEvaluationFromData = (data = {}) => {
+    const parsedNotes = parseStoredAssessment(data.interviewer_notes);
+    const storedCriteria = Array.isArray(parsedNotes.assessment?.criteria)
+      ? parsedNotes.assessment.criteria
+      : [];
+    const criteriaScores = storedCriteria.reduce((scores, item, index) => {
+      scores[index] = item?.achieved_score ?? "";
+      return scores;
+    }, {});
+
+    return {
+      rating: data.rating || "",
+      recommendation: data.recommendation || "",
+      interviewer_notes: parsedNotes.notes,
+      result: data.result || "",
+      criteria_scores: criteriaScores,
+    };
+  };
+  const updateCriteriaScore = (index, maximum, value) => {
+    const numericValue =
+      value === "" ? "" : Math.max(0, Math.min(maximum, Number(value) || 0));
+    setEvaluation((current) => ({
+      ...current,
+      criteria_scores: {
+        ...current.criteria_scores,
+        [index]: numericValue,
+      },
+    }));
+  };
+  const buildInterviewerNotes = () => {
+    if (!assessmentCriteria.length) return evaluation.interviewer_notes;
+
+    const summary = getAssessmentSummary();
+    const assessment = {
+      criteria: assessmentCriteria.map((item, index) => ({
+        criterion: item.criterion,
+        maximum_score: item.score,
+        achieved_score: Number(evaluation.criteria_scores?.[index]) || 0,
+      })),
+      total_score: summary.achieved,
+      maximum_score: summary.maximum,
+      percentage: Number(summary.percentage.toFixed(2)),
+      rating: summary.rating,
+    };
+
+    return `${String(evaluation.interviewer_notes || "").trim()}
+
+${ASSESSMENT_START}
+${JSON.stringify(assessment)}
+${ASSESSMENT_END}`.trim();
+  };
+  const saveEvaluation = async ({ closeAfterSave = false } = {}) => {
+    if (
+      assessmentCriteria.length &&
+      assessmentCriteria.some(
+        (_, index) =>
+          evaluation.criteria_scores?.[index] === "" ||
+          evaluation.criteria_scores?.[index] === undefined
+      )
+    ) {
+      NotificationManager.error(
+        "Lengkapi nilai seluruh kriteria penilaian",
+        "Penilaian belum lengkap",
+        4000
+      );
+      return;
+    }
+
+    const summary = getAssessmentSummary();
+
+    try {
+      await axios.put(`/api/hr/interviews/${selectedCandidate.id}/result`, {
+        rating: assessmentCriteria.length ? summary.rating : evaluation.rating,
+        recommendation: evaluation.recommendation,
+        interviewer_notes: buildInterviewerNotes(),
+        result: evaluation.result,
+        status: "completed",
+        publish: false,
+      });
+
+      NotificationManager.success(
+        "Berhasil menyimpan hasil wawancara",
+        "Berhasil",
+        3000
+      );
+
+      if (typeof window !== "undefined" && window.dispatchEvent) {
+        window.dispatchEvent(new Event("refreshInterviewData"));
+      }
+
+      setIsEdit(false);
+      if (closeAfterSave && typeof onCloseForm === "function") {
+        onCloseForm();
+      }
+    } catch (err) {
+      console.error(err);
+      NotificationManager.error("Gagal menyimpan", "Gagal", 4000);
+    }
+  };
   // Ambil status & hiring_status dari job_openings
   useEffect(() => {
     // Cari job_opening_id dari detailCandidate atau selectedCandidate
@@ -149,12 +321,20 @@ export default function InterviewModal({
           setJobOpeningStatus({
             status: res.data.job.status,
             hiring_status: res.data.job.hiring_status,
+            assessment_criteria: normalizeAssessmentCriteria(
+              res.data.job.assessment_criteria
+            ),
             _id: jobOpeningId,
           });
         }
       })
       .catch(() => {
-        setJobOpeningStatus({ status: null, hiring_status: null, _id: jobOpeningId });
+        setJobOpeningStatus({
+          status: null,
+          hiring_status: null,
+          assessment_criteria: [],
+          _id: jobOpeningId,
+        });
       });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [detailCandidate, selectedCandidate]);
@@ -162,13 +342,9 @@ export default function InterviewModal({
   // Saat masuk mode edit, isi field dengan data terakhir
   useEffect(() => {
     if (isEdit) {
-      // Ambil data dari detailCandidate, jika tidak ada fallback ke selectedCandidate, lalu ke evaluation
-      setEvaluation({
-        rating: (detailCandidate?.rating ?? selectedCandidate?.rating ?? evaluation.rating) || "",
-        recommendation: (detailCandidate?.recommendation ?? selectedCandidate?.recommendation ?? evaluation.recommendation) || "",
-        interviewer_notes: (detailCandidate?.interviewer_notes ?? selectedCandidate?.interviewer_notes ?? evaluation.interviewer_notes) || "",
-        result: (detailCandidate?.result ?? selectedCandidate?.result ?? evaluation.result) || "",
-      });
+      setEvaluation(
+        getEvaluationFromData(detailCandidate || selectedCandidate || evaluation)
+      );
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isEdit]);
@@ -178,12 +354,7 @@ export default function InterviewModal({
     if (isDetailOpen && selectedCandidate?.id) {
       setDetailCandidate(selectedCandidate);
       setDetailError("");
-      setEvaluation({
-        rating: selectedCandidate.rating || "",
-        recommendation: selectedCandidate.recommendation || "",
-        interviewer_notes: selectedCandidate.interviewer_notes || "",
-        result: selectedCandidate.result || "",
-      });
+      setEvaluation(getEvaluationFromData(selectedCandidate));
       let url = "";
       if (selectedCandidate.application_id) {
         url = `/api/candidates/admin/applications/${selectedCandidate.application_id}`;
@@ -197,12 +368,7 @@ export default function InterviewModal({
           const data = res.data.application || res.data.interview || selectedCandidate;
           setDetailCandidate(data);
           // Set evaluation jika ada data interview
-          setEvaluation({
-            rating: data.rating || "",
-            recommendation: data.recommendation || "",
-            interviewer_notes: data.interviewer_notes || "",
-            result: data.result || "",
-          });
+          setEvaluation(getEvaluationFromData(data));
         })
         .catch((err) => {
           let msg = "Gagal mengambil detail pelamar/interview";
@@ -219,6 +385,117 @@ export default function InterviewModal({
       setDetailError("");
     }
   }, [isDetailOpen, selectedCandidate]);
+
+  const renderAssessmentFields = () => {
+    if (!assessmentCriteria.length) return null;
+
+    const summary = getAssessmentSummary();
+
+    return (
+      <div className="mb-4 rounded-2xl border border-primary/20 bg-primary/5 p-4">
+        <div className="mb-3 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+          <div>
+            <h4 className="text-sm font-bold text-base-content">
+              Penilaian Berdasarkan Kriteria Lowongan
+            </h4>
+            <p className="text-xs text-base-content/70">
+              Isi nilai kandidat untuk setiap kriteria sesuai nilai maksimum.
+            </p>
+          </div>
+          <div className="badge badge-primary gap-1 px-3 py-3">
+            Total {summary.achieved}/{summary.maximum}
+          </div>
+        </div>
+
+        <div className="space-y-3">
+          {assessmentCriteria.map((item, index) => (
+            <div
+              key={`${item.criterion}-${index}`}
+              className="grid gap-3 rounded-xl border border-base-300 bg-base-100 p-3 sm:grid-cols-[1fr_120px]"
+            >
+              <div>
+                <p className="text-sm font-semibold text-base-content">
+                  {item.criterion}
+                </p>
+                <p className="mt-1 text-xs text-base-content/70">
+                  Nilai maksimum: {item.score}
+                </p>
+              </div>
+              <label className="form-control">
+                <span className="label-text mb-1 text-xs font-semibold">
+                  Nilai Kandidat
+                </span>
+                <input
+                  type="number"
+                  min="0"
+                  max={item.score}
+                  className="input input-bordered input-sm w-full"
+                  placeholder={`0 - ${item.score}`}
+                  value={evaluation.criteria_scores?.[index] ?? ""}
+                  onChange={(event) =>
+                    updateCriteriaScore(index, item.score, event.target.value)
+                  }
+                />
+              </label>
+            </div>
+          ))}
+        </div>
+
+        <div className="mt-3 grid gap-2 text-sm sm:grid-cols-3">
+          <div className="rounded-xl bg-base-100 px-3 py-2">
+            <p className="text-xs text-base-content/70">Persentase</p>
+            <p className="font-bold">{summary.percentage.toFixed(2)}%</p>
+          </div>
+          <div className="rounded-xl bg-base-100 px-3 py-2">
+            <p className="text-xs text-base-content/70">Rating Sistem</p>
+            <p className="font-bold">{summary.rating || "-"}/5</p>
+          </div>
+          <div className="rounded-xl bg-base-100 px-3 py-2">
+            <p className="text-xs text-base-content/70">Jumlah Kriteria</p>
+            <p className="font-bold">{assessmentCriteria.length}</p>
+          </div>
+        </div>
+      </div>
+    );
+  };
+
+  const renderAssessmentSummary = () => {
+    if (!assessmentCriteria.length) return null;
+
+    const summary = getAssessmentSummary();
+
+    return (
+      <div className="rounded-xl border border-primary/20 bg-primary/5 px-4 py-3">
+        <div className="mb-3 flex items-center justify-between gap-3">
+          <div>
+            <p className="text-xs font-semibold text-base-content/70">
+              Rincian Kriteria Penilaian
+            </p>
+            <p className="text-sm font-bold">
+              Total {summary.achieved}/{summary.maximum} (
+              {summary.percentage.toFixed(2)}%)
+            </p>
+          </div>
+          <span className="badge badge-primary">
+            Rating {summary.rating || evaluation.rating || "-"}/5
+          </span>
+        </div>
+        <div className="space-y-2">
+          {assessmentCriteria.map((item, index) => (
+            <div
+              key={`${item.criterion}-${index}`}
+              className="flex items-start justify-between gap-3 rounded-lg bg-base-100 px-3 py-2 text-sm"
+            >
+              <span>{item.criterion}</span>
+              <span className="shrink-0 font-bold">
+                {evaluation.criteria_scores?.[index] ?? 0}/{item.score}
+              </span>
+            </div>
+          ))}
+        </div>
+      </div>
+    );
+  };
 
   return (
   <>
@@ -619,27 +896,34 @@ export default function InterviewModal({
 
                   {!readOnly ? (
                     <>
+                      {renderAssessmentFields()}
                       <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
                         <div>
                           <label className="label">
                             <span className="label-text text-xs font-semibold">
-                              Penilaian
+                              Rating
                             </span>
                           </label>
-                          <input
-                            type="number"
-                            min="1"
-                            max="5"
-                            className="input input-bordered w-full"
-                            placeholder="1 - 5"
-                            value={evaluation.rating}
-                            onChange={(e) =>
-                              setEvaluation({
-                                ...evaluation,
-                                rating: e.target.value,
-                              })
-                            }
-                          />
+                          {assessmentCriteria.length ? (
+                            <div className="input input-bordered flex w-full items-center font-bold">
+                              {getAssessmentSummary().rating || "-"}/5
+                            </div>
+                          ) : (
+                            <input
+                              type="number"
+                              min="1"
+                              max="5"
+                              className="input input-bordered w-full"
+                              placeholder="1 - 5"
+                              value={evaluation.rating}
+                              onChange={(e) =>
+                                setEvaluation({
+                                  ...evaluation,
+                                  rating: e.target.value,
+                                })
+                              }
+                            />
+                          )}
                         </div>
 
                         <div>
@@ -722,48 +1006,9 @@ export default function InterviewModal({
                         <button
                           className="btn btn-primary"
                           type="button"
-                          onClick={async () => {
-                            try {
-                              await axios.put(
-                                `/api/hr/interviews/${selectedCandidate.id}/result`,
-                                {
-                                  rating: evaluation.rating,
-                                  recommendation: evaluation.recommendation,
-                                  interviewer_notes:
-                                    evaluation.interviewer_notes,
-                                  result: evaluation.result,
-                                  status: "completed",
-                                  publish: false,
-                                }
-                              );
-
-                              NotificationManager.success(
-                                "Berhasil menyimpan hasil wawancara",
-                                "Berhasil",
-                                3000
-                              );
-
-                              if (
-                                typeof window !== "undefined" &&
-                                window.dispatchEvent
-                              ) {
-                                window.dispatchEvent(
-                                  new Event("refreshInterviewData")
-                                );
-                              }
-
-                              if (typeof onCloseForm === "function") {
-                                onCloseForm();
-                              }
-                            } catch (err) {
-                              console.error(err);
-                              NotificationManager.error(
-                                "Gagal menyimpan",
-                                "Gagal",
-                                4000
-                              );
-                            }
-                          }}
+                          onClick={() =>
+                            saveEvaluation({ closeAfterSave: true })
+                          }
                         >
                           Simpan Hasil
                         </button>
@@ -771,27 +1016,34 @@ export default function InterviewModal({
                     </>
                   ) : isEdit ? (
                     <>
+                      {renderAssessmentFields()}
                       <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
                         <div>
                           <label className="label">
                             <span className="label-text text-xs font-semibold">
-                              Penilaian
+                              Rating
                             </span>
                           </label>
-                          <input
-                            type="number"
-                            min="1"
-                            max="5"
-                            className="input input-bordered w-full"
-                            placeholder="1 - 5"
-                            value={evaluation.rating}
-                            onChange={(e) =>
-                              setEvaluation({
-                                ...evaluation,
-                                rating: e.target.value,
-                              })
-                            }
-                          />
+                          {assessmentCriteria.length ? (
+                            <div className="input input-bordered flex w-full items-center font-bold">
+                              {getAssessmentSummary().rating || "-"}/5
+                            </div>
+                          ) : (
+                            <input
+                              type="number"
+                              min="1"
+                              max="5"
+                              className="input input-bordered w-full"
+                              placeholder="1 - 5"
+                              value={evaluation.rating}
+                              onChange={(e) =>
+                                setEvaluation({
+                                  ...evaluation,
+                                  rating: e.target.value,
+                                })
+                              }
+                            />
+                          )}
                         </div>
 
                         <div>
@@ -873,46 +1125,7 @@ export default function InterviewModal({
                         <button
                           className="btn btn-primary"
                           type="button"
-                          onClick={async () => {
-                            try {
-                              await axios.put(
-                                `/api/hr/interviews/${selectedCandidate.id}/result`,
-                                {
-                                  rating: evaluation.rating,
-                                  recommendation: evaluation.recommendation,
-                                  interviewer_notes:
-                                    evaluation.interviewer_notes,
-                                  result: evaluation.result,
-                                  status: "completed",
-                                  publish: false,
-                                }
-                              );
-
-                              NotificationManager.success(
-                                "Berhasil menyimpan hasil wawancara",
-                                "Berhasil",
-                                3000
-                              );
-
-                              if (
-                                typeof window !== "undefined" &&
-                                window.dispatchEvent
-                              ) {
-                                window.dispatchEvent(
-                                  new Event("refreshInterviewData")
-                                );
-                              }
-
-                              setIsEdit(false);
-                            } catch (err) {
-                              console.error(err);
-                              NotificationManager.error(
-                                "Gagal menyimpan",
-                                "Gagal",
-                                4000
-                              );
-                            }
-                          }}
+                          onClick={() => saveEvaluation()}
                         >
                           Simpan Hasil
                         </button>
@@ -950,6 +1163,7 @@ export default function InterviewModal({
 
                       return (
                         <div className="space-y-4">
+                          {renderAssessmentSummary()}
                           <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
                             <div className="rounded-xl border border-base-300 bg-base-200/40 px-4 py-3">
                               <p className="text-xs text-base-content/60">
@@ -1133,4 +1347,3 @@ export default function InterviewModal({
   </>
 );
 }
-

@@ -357,7 +357,7 @@ export default function CandidateRequestsPage() {
               >
                 {s.label}
                 {selectedStatus === s.value && (
-                  <span className="absolute inset-0 -z-10 rounded-lg bg-primary shadow-sm"></span>
+                  <span className="absolute inset-0 -z-10 rounded-lg bg-primary"></span>
                 )}
               </button>
             ))}
@@ -435,7 +435,7 @@ export default function CandidateRequestsPage() {
                   {/* ACTION */}
                   <div className="mt-4 flex justify-between items-center flex-wrap gap-2">
                     <button
-                      className="btn btn-sm btn-outline"
+                      className="btn btn-sm action-view"
                       onClick={() => {
                         setSelectedApp(app);
                         setIsModalOpen(true);

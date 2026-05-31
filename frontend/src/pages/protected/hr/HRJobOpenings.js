@@ -1,9 +1,19 @@
 import React, { useEffect, useState } from "react";
 import { useDispatch } from "react-redux";
 import { useNavigate } from "react-router-dom";
+import {
+  BriefcaseBusiness,
+  CalendarDays,
+  Check,
+  List,
+  PlusCircle,
+  RotateCcw,
+  Search,
+  TriangleAlert,
+  X,
+} from "lucide-react";
 import { setPageTitle } from "../../../features/common/headerSlice";
 import jobService, { hrApi } from "../../../features/hr/api";
-import TitleCard from "../../../components/Cards/TitleCard";
 import Pagination from "../../../components/Pagination/Pagination";
 
 const defaultJobOpening = {
@@ -11,6 +21,12 @@ const defaultJobOpening = {
   title: "",
   description: "",
   requirements: "",
+  assessment_criteria: [
+    {
+      criterion: "",
+      score: "",
+    },
+  ],
   responsibilities: "",
   quota: 1,
   employment_type: "permanent",
@@ -48,6 +64,7 @@ export default function HRJobOpenings() {
   const [positions, setPositions] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  const [successMessage, setSuccessMessage] = useState("");
   const [showDetail, setShowDetail] = useState(false);
   const [detailData, setDetailData] = useState(null);
   const [editMode, setEditMode] = useState(false);
@@ -56,7 +73,21 @@ export default function HRJobOpenings() {
   const [pendingCancelJob, setPendingCancelJob] = useState(null);
   const dispatch = useDispatch();
   const navigate = useNavigate();
-  const [activeTab, setActiveTab] = useState("add");
+  const [activeTab, setActiveTab] = useState("all");
+
+  function parseAssessmentCriteria(value) {
+    if (!value) return [];
+    if (Array.isArray(value)) return value;
+    if (typeof value === "string") {
+      try {
+        const parsed = JSON.parse(value);
+        return Array.isArray(parsed) ? parsed : [];
+      } catch (e) {
+        return [];
+      }
+    }
+    return [];
+  }
 
   useEffect(() => {
     fetchJobOpenings();
@@ -159,11 +190,19 @@ export default function HRJobOpenings() {
     setError("");
     try {
       let payload = { ...form };
+      const normalizedAssessmentCriteria = (payload.assessment_criteria || [])
+        .filter((item) => item.criterion || item.score)
+        .map((item) => ({
+          criterion: String(item.criterion || "").trim(),
+          score: String(item.score || "").trim(),
+        }))
+        .filter((item) => item.criterion || item.score);
       // Pastikan base_position, developer_specialization
       if (!payload.base_position) payload.base_position = "";
       if (!payload.developer_specialization)
         payload.developer_specialization = "";
       if (!payload.hiring_status) payload.hiring_status = "ongoing";
+      payload.assessment_criteria = normalizedAssessmentCriteria;
       // Convert salary fields to numbers if present (they are stored as digit-only strings)
       if (payload.salary_range_min)
         payload.salary_range_min = parseInt(payload.salary_range_min, 10);
@@ -171,8 +210,20 @@ export default function HRJobOpenings() {
         payload.salary_range_max = parseInt(payload.salary_range_max, 10);
       if (editMode && editId) {
         await jobService.updateJobOpening(editId, payload);
+
+        const msg =
+          "Lowongan pekerjaan berhasil diperbarui. Perubahan data telah disimpan dan akan langsung digunakan pada proses rekrutmen.";
+
+        setSuccessMessage(msg);
+        setTimeout(() => setSuccessMessage(""), 5000);
       } else {
         await jobService.createJobOpening(payload);
+
+        const msg =
+          "Lowongan pekerjaan berhasil dibuat dan dipublikasikan. Kandidat sekarang dapat melihat serta mengajukan lamaran pada lowongan ini.";
+
+        setSuccessMessage(msg);
+        setTimeout(() => setSuccessMessage(""), 5000);
       }
       setForm(defaultJobOpening);
       setEditMode(false);
@@ -183,6 +234,8 @@ export default function HRJobOpenings() {
       setError(e.message);
     }
     setLoading(false);
+    // clear success message after a short delay (use captured message)
+    // setTimeout is scheduled only if a message was set
   }
 
   function handleEdit(id) {
@@ -200,6 +253,18 @@ export default function HRJobOpenings() {
           data.base_position !== undefined ? data.base_position : "",
         hiring_status:
           data.hiring_status !== undefined ? data.hiring_status : "",
+        assessment_criteria: parseAssessmentCriteria(data.assessment_criteria)
+          .length
+          ? parseAssessmentCriteria(data.assessment_criteria).map((item) => ({
+              criterion: item.criterion || "",
+              score: item.score || "",
+            }))
+          : [
+              {
+                criterion: "",
+                score: "",
+              },
+            ],
       }));
       setEditMode(true);
       setEditId(id);
@@ -225,9 +290,12 @@ export default function HRJobOpenings() {
         status: "closed",
         hiring_status: "shortlisting",
       });
+      const msg = "Lowongan berhasil ditutup";
       setShowCancelPopup(false);
       setPendingCancelJob(null);
       await fetchJobOpenings();
+      setSuccessMessage(msg);
+      setTimeout(() => setSuccessMessage(""), 4000);
     } catch (e) {
       setError(e.message);
     }
@@ -251,6 +319,48 @@ export default function HRJobOpenings() {
     setForm(defaultJobOpening);
   }
 
+  function updateAssessmentCriterion(index, field, value) {
+    setForm((f) => ({
+      ...f,
+      assessment_criteria: (f.assessment_criteria || []).map(
+        (item, itemIndex) =>
+          itemIndex === index ? { ...item, [field]: value } : item,
+      ),
+    }));
+  }
+
+  function addAssessmentCriterion() {
+    setForm((f) => ({
+      ...f,
+      assessment_criteria: [
+        ...(f.assessment_criteria || []),
+        {
+          criterion: "",
+          score: "",
+        },
+      ],
+    }));
+  }
+
+  function removeAssessmentCriterion(index) {
+    setForm((f) => {
+      const remaining = (f.assessment_criteria || []).filter(
+        (_, itemIndex) => itemIndex !== index,
+      );
+      return {
+        ...f,
+        assessment_criteria: remaining.length
+          ? remaining
+          : [
+              {
+                criterion: "",
+                score: "",
+              },
+            ],
+      };
+    });
+  }
+
   // Helper to format numbers with dot as thousand separator (Indonesian style)
   function formatWithDots(numStr) {
     if (numStr === null || numStr === undefined || numStr === "") return "";
@@ -259,8 +369,18 @@ export default function HRJobOpenings() {
   }
 
   // Filters for active and history lists
-  const [filtersActive, setFiltersActive] = useState({ title: "", position_id: "", quota: "", deadline: "" });
-  const [filtersHistory, setFiltersHistory] = useState({ title: "", position_id: "", quota: "", deadline: "" });
+  const [filtersActive, setFiltersActive] = useState({
+    title: "",
+    position_id: "",
+    quota: "",
+    deadline: "",
+  });
+  const [filtersHistory, setFiltersHistory] = useState({
+    title: "",
+    position_id: "",
+    quota: "",
+    deadline: "",
+  });
 
   function handleFilterChange(section, name, value) {
     if (section === "active") {
@@ -271,17 +391,35 @@ export default function HRJobOpenings() {
   }
 
   function resetFilters(section) {
-    if (section === "active") setFiltersActive({ title: "", position_id: "", quota: "", deadline: "" });
-    else setFiltersHistory({ title: "", position_id: "", quota: "", deadline: "" });
+    if (section === "active")
+      setFiltersActive({ title: "", position_id: "", quota: "", deadline: "" });
+    else
+      setFiltersHistory({
+        title: "",
+        position_id: "",
+        quota: "",
+        deadline: "",
+      });
   }
 
   function applyFilters(list, filters) {
     return list.filter((j) => {
-      if (filters.title && !(String(j.title || "").toLowerCase().includes(String(filters.title).toLowerCase()))) return false;
-      if (filters.position_id && String(j.position_id) !== String(filters.position_id)) return false;
+      if (
+        filters.title &&
+        !String(j.title || "")
+          .toLowerCase()
+          .includes(String(filters.title).toLowerCase())
+      )
+        return false;
+      if (
+        filters.position_id &&
+        String(j.position_id) !== String(filters.position_id)
+      )
+        return false;
       if (filters.quota) {
         const q = parseInt(filters.quota, 10);
-        if (!isNaN(q) && (isNaN(j.quota) || parseInt(j.quota, 10) < q)) return false;
+        if (!isNaN(q) && (isNaN(j.quota) || parseInt(j.quota, 10) < q))
+          return false;
       }
       if (filters.deadline) {
         if (!j.deadline) return false;
@@ -295,12 +433,8 @@ export default function HRJobOpenings() {
 
   const filteredActive = applyFilters(jobOpenings, filtersActive);
   const filteredHistory = applyFilters(historyOpenings, filtersHistory);
-
-  const menu = [
-    { key: "add", label: "Tambah Lowongan" },
-    { key: "active", label: "Daftar Lowongan Aktif" },
-    { key: "history", label: "Riwayat Lowongan" },
-  ];
+  const combinedOpenings = [...jobOpenings, ...historyOpenings];
+  const filteredAll = applyFilters(combinedOpenings, filtersActive);
 
   // Pagination state
   const ITEMS_PER_PAGE = 10;
@@ -308,491 +442,1290 @@ export default function HRJobOpenings() {
   const [historyPage, setHistoryPage] = useState(1);
 
   // Reset to page 1 when filters change
-  useEffect(() => setActivePage(1), [filtersActive.title, filtersActive.position_id, filtersActive.quota, filtersActive.deadline]);
-  useEffect(() => setHistoryPage(1), [filtersHistory.title, filtersHistory.position_id, filtersHistory.quota, filtersHistory.deadline]);
+  useEffect(
+    () => setActivePage(1),
+    [
+      filtersActive.title,
+      filtersActive.position_id,
+      filtersActive.quota,
+      filtersActive.deadline,
+    ],
+  );
+  useEffect(
+    () => setHistoryPage(1),
+    [
+      filtersHistory.title,
+      filtersHistory.position_id,
+      filtersHistory.quota,
+      filtersHistory.deadline,
+    ],
+  );
 
   // Ensure current page is within bounds when filtered length changes
   useEffect(() => {
-    const total = Math.max(1, Math.ceil(filteredActive.length / ITEMS_PER_PAGE));
+    const total = Math.max(
+      1,
+      Math.ceil(filteredActive.length / ITEMS_PER_PAGE),
+    );
     if (activePage > total) setActivePage(total);
   }, [filteredActive.length, activePage]);
 
   useEffect(() => {
-    const total = Math.max(1, Math.ceil(filteredHistory.length / ITEMS_PER_PAGE));
+    const total = Math.max(
+      1,
+      Math.ceil(filteredHistory.length / ITEMS_PER_PAGE),
+    );
     if (historyPage > total) setHistoryPage(total);
   }, [filteredHistory.length, historyPage]);
 
-  const paginatedActive = filteredActive.slice((activePage - 1) * ITEMS_PER_PAGE, activePage * ITEMS_PER_PAGE);
-  const paginatedHistory = filteredHistory.slice((historyPage - 1) * ITEMS_PER_PAGE, historyPage * ITEMS_PER_PAGE);
+  const paginatedActive = filteredActive.slice(
+    (activePage - 1) * ITEMS_PER_PAGE,
+    activePage * ITEMS_PER_PAGE,
+  );
+  const paginatedAll = filteredAll.slice(
+    (activePage - 1) * ITEMS_PER_PAGE,
+    activePage * ITEMS_PER_PAGE,
+  );
+  const paginatedHistory = filteredHistory.slice(
+    (historyPage - 1) * ITEMS_PER_PAGE,
+    historyPage * ITEMS_PER_PAGE,
+  );
+
+  const getJobStatusBadgeClass = (status) => {
+    const normalized = String(status || "").toLowerCase();
+    if (normalized === "closed") return "badge-error";
+    if (normalized === "draft") return "badge-warning";
+    return "badge-success";
+  };
+
+  const HeroIllustration = () => (
+    <div className="pointer-events-none absolute right-16 top-3 hidden h-28 w-80 lg:block">
+      <div className="absolute bottom-0 right-0 h-20 w-72 rounded-full bg-orange-100/70" />
+      <div className="absolute bottom-2 right-16 h-10 w-16 rounded-t-full bg-orange-50" />
+
+      <div className="absolute right-36 top-0 h-24 w-20 rotate-[-2deg] rounded-xl border border-base-300 bg-base-100 shadow-md">
+        <div className="flex items-center gap-1 border-b border-orange-100 px-2 py-2">
+          <div className="h-5 w-5 rounded-full bg-teal-100" />
+          <div className="space-y-1">
+            <div className="h-1.5 w-8 rounded-full bg-orange-400" />
+            <div className="h-1.5 w-6 rounded-full bg-slate-300" />
+          </div>
+        </div>
+
+        <div className="space-y-1.5 px-3 py-2">
+          <div className="h-1.5 w-12 rounded-full bg-orange-400" />
+          <div className="h-1.5 w-10 rounded-full bg-orange-300" />
+          <div className="h-1.5 w-12 rounded-full bg-orange-200" />
+          <div className="h-1.5 w-8 rounded-full bg-slate-200" />
+        </div>
+      </div>
+
+      <div className="absolute right-7 top-9 h-12 w-12 rounded-xl bg-primary/20" />
+      <div className="absolute right-5 top-20 h-2 w-16 rounded-full bg-base-300" />
+      <div className="absolute right-8 top-[88px] h-9 w-2 rounded-full bg-base-400" />
+      <div className="absolute right-[72px] top-[88px] h-9 w-2 rounded-full bg-base-400" />
+    </div>
+  );
 
   return (
-    <>
-      {/* Modal Detail */}
-      {showDetail && detailData && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
-          <div className="bg-base-100 rounded-xl shadow-xl w-full max-w-3xl max-h-[90vh] overflow-y-auto relative border border-base-300">
-            {/* HEADER */}
-            <div className="border-b border-base-300 px-6 py-4 flex justify-between items-center">
-              <h2 className="text-xl font-bold text-base-content">
+  <>
+    {/* Modal Detail */}
+    {showDetail && detailData && (
+      <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
+        <div className="bg-base-100 rounded-3xl shadow-2xl w-full max-w-4xl max-h-[90vh] overflow-y-auto relative border border-base-300">
+          <div className="border-b border-base-300 px-6 py-5 flex justify-between items-center bg-gradient-to-r from-orange-50 to-base-100">
+            <div>
+              <h2 className="text-2xl font-bold text-base-content">
                 Detail Lowongan
               </h2>
-
-              <button
-                className="text-base-content hover:text-primary text-xl"
-                onClick={handleCloseDetail}
-              >
-                &times;
-              </button>
+              <p className="text-sm text-base-content/60 mt-1">
+                Informasi lengkap lowongan pekerjaan.
+              </p>
             </div>
 
-            <div className="p-6 space-y-6">
-              {/* INFORMASI UTAMA */}
-              <div>
-                <h3 className="font-semibold text-base-content mb-3">
-                  Informasi Pekerjaan
-                </h3>
+            <button
+              className="btn btn-ghost btn-circle text-xl"
+              onClick={handleCloseDetail}
+              aria-label="Tutup detail lowongan"
+            >
+              <X className="h-5 w-5" />
+            </button>
+          </div>
 
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
-                  <div>
-                    <p className="text-base-content/70">Judul</p>
-                    <p className="font-semibold text-base-content">
-                      {detailData.title}
-                    </p>
-                  </div>
+          <div className="p-6 space-y-6">
+            <div className="rounded-2xl border border-base-200 bg-base-50 p-5">
+              <h3 className="font-bold text-base-content mb-4">
+                Informasi Pekerjaan
+              </h3>
 
-                  <div>
-                    <p className="text-base-content/70">Posisi</p>
-                    <p className="font-semibold text-base-content">
-                      {positions.find((p) => p.id === detailData.position_id)
-                        ?.name || "-"}
-                    </p>
-                  </div>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
+                <div>
+                  <p className="text-base-content/60">Judul</p>
+                  <p className="font-semibold">{detailData.title || "-"}</p>
+                </div>
 
-                  <div>
-                    <p className="text-base-content/70">Kuota</p>
-                    <p className="font-semibold text-base-content">
-                      {detailData.quota}
-                    </p>
-                  </div>
+                <div>
+                  <p className="text-base-content/60">Posisi</p>
+                  <p className="font-semibold">
+                    {positions.find((p) => p.id === detailData.position_id)
+                      ?.name || "-"}
+                  </p>
+                </div>
 
-                  <div>
-                    <p className="text-base-content/70">Jenis</p>
-                    <p className="font-semibold capitalize text-base-content">
-                      {detailData.employment_type}
-                    </p>
-                  </div>
+                <div>
+                  <p className="text-base-content/60">Kuota</p>
+                  <p className="font-semibold">{detailData.quota || "-"}</p>
+                </div>
 
-                  <div>
-                    <p className="text-base-content/70">Lokasi</p>
-                    <p className="font-semibold text-base-content">
-                      {detailData.location}
-                    </p>
-                  </div>
+                <div>
+                  <p className="text-base-content/60">Jenis</p>
+                  <p className="font-semibold capitalize">
+                    {detailData.employment_type || "-"}
+                  </p>
+                </div>
 
-                  <div>
-                    <p className="text-base-content/70">Deadline</p>
-                    <p className="font-semibold text-base-content">
-                      {detailData.deadline
-                        ? new Date(detailData.deadline).toLocaleDateString(
-                            "id-ID",
-                          )
-                        : "-"}
-                    </p>
-                  </div>
+                <div>
+                  <p className="text-base-content/60">Lokasi</p>
+                  <p className="font-semibold">{detailData.location || "-"}</p>
+                </div>
 
-                  <div>
-                    <p className="text-base-content/70">Gaji</p>
-                    <p className="font-semibold text-base-content">
-                      {detailData.salary_range_min &&
-                      detailData.salary_range_max
-                        ? `Rp ${parseInt(
-                            detailData.salary_range_min,
-                          ).toLocaleString("id-ID")} - Rp ${parseInt(
-                            detailData.salary_range_max,
-                          ).toLocaleString("id-ID")}`
-                        : "Dirahasiakan"}
-                    </p>
-                  </div>
+                <div>
+                  <p className="text-base-content/60">Deadline</p>
+                  <p className="font-semibold">
+                    {detailData.deadline
+                      ? new Date(detailData.deadline).toLocaleDateString(
+                          "id-ID",
+                        )
+                      : "-"}
+                  </p>
+                </div>
 
-                  <div>
-                    <p className="text-base-content/70">Status</p>
-                    <span
-                      className={`badge ${
-                        detailData.status === "open"
-                          ? "badge-success"
-                          : detailData.status === "closed"
-                            ? "badge-error"
-                            : "badge-warning"
-                      }`}
-                    >
-                      {detailData.status}
-                    </span>
-                  </div>
+                <div>
+                  <p className="text-base-content/60">Gaji</p>
+                  <p className="font-semibold">
+                    {detailData.salary_range_min && detailData.salary_range_max
+                      ? `Rp ${parseInt(
+                          detailData.salary_range_min,
+                        ).toLocaleString("id-ID")} - Rp ${parseInt(
+                          detailData.salary_range_max,
+                        ).toLocaleString("id-ID")}`
+                      : "Dirahasiakan"}
+                  </p>
+                </div>
+
+                <div>
+                  <p className="text-base-content/60">Status</p>
+                  <span
+                    className={`badge rounded-full ${
+                      detailData.status === "open"
+                        ? "badge-success"
+                        : detailData.status === "closed"
+                          ? "badge-error"
+                          : "badge-warning"
+                    }`}
+                  >
+                    {detailData.status || "-"}
+                  </span>
                 </div>
               </div>
+            </div>
 
-              {/* DESKRIPSI */}
-              <div>
-                <h3 className="font-semibold text-base-content mb-2">
-                  Deskripsi Pekerjaan
-                </h3>
-
-                <p className="text-sm text-base-content leading-relaxed whitespace-pre-line">
+            <div className="grid grid-cols-1 gap-4">
+              <div className="rounded-2xl border border-base-200 bg-base-100 p-5">
+                <h3 className="font-bold mb-2">Deskripsi Pekerjaan</h3>
+                <p className="text-sm leading-relaxed whitespace-pre-line text-base-content/80">
                   {detailData.description || "-"}
                 </p>
               </div>
 
-              {/* PERSYARATAN */}
-              <div>
-                <h3 className="font-semibold text-base-content mb-2">
-                  Persyaratan
-                </h3>
-
-                <p className="text-sm text-base-content leading-relaxed whitespace-pre-line">
+              <div className="rounded-2xl border border-base-200 bg-base-100 p-5">
+                <h3 className="font-bold mb-2">Persyaratan</h3>
+                <p className="text-sm leading-relaxed whitespace-pre-line text-base-content/80">
                   {detailData.requirements || "-"}
                 </p>
               </div>
 
-              {/* TANGGUNG JAWAB */}
-              <div>
-                <h3 className="font-semibold text-base-content mb-2">
-                  Tanggung Jawab
-                </h3>
-
-                <p className="text-sm text-base-content leading-relaxed whitespace-pre-line">
+              <div className="rounded-2xl border border-base-200 bg-base-100 p-5">
+                <h3 className="font-bold mb-2">Tanggung Jawab</h3>
+                <p className="text-sm leading-relaxed whitespace-pre-line text-base-content/80">
                   {detailData.responsibilities || "-"}
+                </p>
+              </div>
+
+              <div className="rounded-2xl border border-base-200 bg-base-100 p-5">
+                <h3 className="font-bold mb-3">Kriteria Penilaian</h3>
+
+                {parseAssessmentCriteria(detailData.assessment_criteria)
+                  .length > 0 ? (
+                  <div className="overflow-x-auto rounded-xl border border-base-200">
+                    <table className="table table-sm w-full">
+                      <thead className="bg-base-200">
+                        <tr>
+                          <th>No</th>
+                          <th>Kriteria</th>
+                          <th>Nilai/Bobot</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {parseAssessmentCriteria(
+                          detailData.assessment_criteria,
+                        ).map((item, index) => (
+                          <tr key={`${item.criterion || "criteria"}-${index}`}>
+                            <td>{index + 1}</td>
+                            <td className="font-medium">
+                              {item.criterion || "-"}
+                            </td>
+                            <td>{item.score || "-"}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                ) : (
+                  <p className="text-sm text-base-content/60">
+                    Belum ada kriteria penilaian.
+                  </p>
+                )}
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    )}
+
+    {/* Modal Konfirmasi Tutup */}
+    {showCancelPopup && pendingCancelJob && (
+      <div className="modal modal-open">
+        <div className="modal-box max-w-md p-0 overflow-hidden rounded-3xl shadow-2xl">
+          <div className="bg-gradient-to-r from-red-500 to-red-600 text-white px-6 py-5">
+            <div className="flex items-center gap-4">
+              <div className="w-14 h-14 rounded-full bg-white/20 flex items-center justify-center text-3xl">
+                <TriangleAlert className="h-7 w-7" />
+              </div>
+
+              <div>
+                <h3 className="font-bold text-xl">Tutup Lowongan</h3>
+                <p className="text-sm opacity-90 mt-1">
+                  Lowongan akan dipindahkan ke riwayat rekrutmen.
                 </p>
               </div>
             </div>
           </div>
+
+          <div className="p-6">
+            <div className="bg-base-200 rounded-2xl p-4">
+              <p className="text-sm text-base-content/60">
+                Lowongan yang akan ditutup:
+              </p>
+
+              <h2 className="text-xl font-bold mt-2">
+                {pendingCancelJob?.title}
+              </h2>
+
+              <p className="text-sm text-base-content/50 mt-1">
+                Posisi:{" "}
+                {positions.find((p) => p.id === pendingCancelJob.position_id)
+                  ?.name || "-"}
+              </p>
+            </div>
+
+            <div className="alert alert-warning mt-5 text-sm rounded-2xl">
+              <span>
+                Anda masih dapat melihat data lowongan ini pada riwayat.
+              </span>
+            </div>
+
+            <div className="modal-action mt-6">
+                <button
+                  className="btn btn-ghost btn-sm rounded-xl"
+                  onClick={closeCancelPopup}
+                  disabled={loading}
+                >
+                Batal
+              </button>
+
+              <button
+                className="btn btn-error text-white rounded-xl"
+                onClick={confirmCancelJob}
+                disabled={loading}
+              >
+                {loading ? "Memproses..." : "Ya, Tutup"}
+              </button>
+            </div>
+          </div>
         </div>
-      )}
 
-      {/* Modal Konfirmasi Hapus (match AdminDepartement style) */}
-      {showCancelPopup && pendingCancelJob && (
-        <div className="modal modal-open">
-          <div className="modal-box max-w-md p-0 overflow-hidden rounded-2xl">
-            <div className="bg-error text-error-content px-6 py-5">
-              <div className="flex items-center gap-4">
-                <div className="w-14 h-14 rounded-full bg-white/20 flex items-center justify-center text-3xl">
-                  ⚠️
-                </div>
+        <div
+          className="modal-backdrop bg-black/40"
+          onClick={closeCancelPopup}
+        ></div>
+      </div>
+    )}
 
+    {/* Toast Error */}
+    {error && (
+      <div className="fixed top-6 right-6 z-[9999] w-full max-w-md">
+        <div className="alert alert-error rounded-2xl shadow-2xl">
+          <span>{error}</span>
+          <button
+            type="button"
+            onClick={() => setError("")}
+            className="btn btn-ghost btn-sm btn-circle"
+          >
+            <X className="h-4 w-4" />
+          </button>
+        </div>
+      </div>
+    )}
+
+    <div className="mt-4 overflow-hidden rounded-[1.5rem] border border-base-200/80 bg-base-100 p-4 shadow-[0_20px_70px_rgba(15,23,42,0.07)] sm:p-7">
+      <div className="space-y-5">
+        {/* Header sesuai referensi */}
+        <div className="relative min-h-[112px] overflow-hidden rounded-[1.4rem] bg-gradient-to-r from-base-100 via-base-100 to-orange-50/70 px-1 py-2 sm:px-2">
+          <HeroIllustration />
+          <div className="relative z-10 max-w-3xl">
+            <h1 className="text-[28px] font-extrabold leading-tight text-base-content">
+              Lowongan Pekerjaan
+            </h1>
+            <p className="mt-2 text-sm font-medium text-base-content/60">
+              Kelola dan pantau semua lowongan pekerjaan yang tersedia di perusahaan.
+            </p>
+          </div>
+        </div>
+
+        {/* Success Message sesuai referensi */}
+        {successMessage && (
+          <div className="rounded-2xl border border-success bg-success/10 shadow-sm">
+            <div className="flex items-center gap-4 p-5">
+              <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-success text-white shadow-md">
+                <Check className="h-7 w-7" />
+              </div>
+              <div className="flex-1">
+                <h3 className="text-base font-extrabold text-success">
+                  {editMode
+                    ? "Lowongan pekerjaan berhasil diperbarui."
+                    : "Lowongan pekerjaan berhasil dibuat dan dipublikasikan."}
+                </h3>
+                <p className="mt-1 text-sm font-medium text-success/90">
+                  {successMessage}
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setSuccessMessage("")}
+                className="btn btn-ghost btn-sm btn-circle text-success"
+              >
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* Tab Menu */}
+        <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
+          <div className="flex flex-1 flex-wrap gap-2">
+            <button
+              type="button"
+              onClick={() => setActiveTab("all")}
+              className={`rounded-xl border px-5 py-3 text-left transition-all ${
+                activeTab === "all"
+                  ? "border-primary bg-base-100 text-primary shadow-sm"
+                  : "border-base-200 bg-base-100 hover:border-primary hover:shadow-sm text-base-content"
+              }`}
+            >
+              <div className="flex items-center gap-3">
+                <List className="h-5 w-5" />
                 <div>
-                  <h3 className="font-bold text-xl">Tutup Lowongan</h3>
-
-                  <p className="text-sm opacity-90 mt-1">
-                    Tindakan ini akan menutup lowongan dan mengubah hiring status menjadi Shortlisting.
+                  <p className="font-bold">
+                    Semua Lowongan
+                  </p>
+                  <p className="text-xs text-base-content/50 mt-1">
+                    Aktif & riwayat
                   </p>
                 </div>
               </div>
-            </div>
+            </button>
 
-            <div className="p-6">
-              <div className="bg-base-200 rounded-xl p-4">
-                <p className="text-sm text-base-content/60">Lowongan yang akan ditutup:</p>
-
-                <h2 className="text-xl font-bold mt-2">{pendingCancelJob?.title}</h2>
-
-                <p className="text-sm text-base-content/50 mt-1">Posisi: {positions.find((p) => p.id === pendingCancelJob.position_id)?.name || '-'}</p>
+            <button
+              type="button"
+              onClick={() => setActiveTab("active")}
+              className={`rounded-xl border px-5 py-3 text-left transition-all ${
+                activeTab === "active"
+                  ? "border-success bg-base-100 text-success shadow-sm"
+                  : "border-base-200 bg-base-100 hover:border-success hover:shadow-sm text-base-content"
+              }`}
+            >
+              <div className="flex items-center gap-3">
+                <span className="w-3 h-3 rounded-full bg-green-500"></span>
+                <div>
+                  <p className="font-bold flex items-center gap-2">
+                    Lowongan Aktif
+                    <span className="badge badge-sm">
+                      {jobOpenings.length}
+                    </span>
+                  </p>
+                  <p className="text-xs text-base-content/50 mt-1">
+                    Sedang menerima lamaran
+                  </p>
+                </div>
               </div>
+            </button>
 
-              <div className="alert alert-warning mt-5 text-sm">
-                <span>Lowongan akan ditutup. Anda masih dapat membuka kembali lowongan ini nanti jika diperlukan.</span>
+            <button
+              type="button"
+              onClick={() => setActiveTab("history")}
+              className={`rounded-xl border px-5 py-3 text-left transition-all ${
+                activeTab === "history"
+                  ? "border-base-300 bg-base-100 text-base-content shadow-sm"
+                  : "border-base-200 bg-base-100 hover:border-base-300 hover:shadow-sm text-base-content"
+              }`}
+            >
+              <div className="flex items-center gap-3">
+                <span className="w-3 h-3 rounded-full bg-slate-400"></span>
+                <div>
+                  <p className="font-bold flex items-center gap-2">
+                    Lowongan Nonaktif
+                    <span className="badge badge-sm">
+                      {historyOpenings.length}
+                    </span>
+                  </p>
+                  <p className="text-xs text-base-content/50 mt-1">
+                    Lowongan yang ditutup
+                  </p>
+                </div>
               </div>
-
-              <div className="modal-action mt-6">
-                <button className="btn btn-ghost" onClick={closeCancelPopup} disabled={loading}>
-                  Batal
-                </button>
-
-                <button className="btn btn-error text-white" onClick={confirmCancelJob} disabled={loading}>
-                  {loading ? "Memproses..." : "Ya, Tutup"}
-                </button>
-              </div>
-            </div>
+            </button>
           </div>
 
-          <div className="modal-backdrop bg-black/40" onClick={closeCancelPopup}></div>
+          <button
+            type="button"
+            onClick={() => {
+              setActiveTab("add");
+              setEditMode(false);
+              setEditId(null);
+              setForm(defaultJobOpening);
+            }}
+            className="btn btn-primary px-5 shadow-md"
+          >
+            <PlusCircle className="h-5 w-5" />
+            Tambah Lowongan
+          </button>
         </div>
-      )}
 
-      <TitleCard
-        title="Manajemen Lowongan"
-        topMargin="mt-4"
-      >
-        <div className="space-y-6">
-          <div className="flex w-full bg-base-200 p-2 rounded-2xl gap-2">
-            {menu.map((m) => (
-              <button
-                key={m.key}
-                onClick={() => setActiveTab(m.key)}
-                className={`flex-1 text-center py-3 rounded-xl text-sm font-medium transition-all ${
-                  activeTab === m.key
-                    ? "bg-primary text-white shadow-md"
-                    : "text-base-content hover:bg-base-300"
-                }`}
-              >
-                {m.key === "add" && editMode ? "Edit Lowongan" : m.label}
-              </button>
-            ))}
+        {/* Form Tambah/Edit */}
+        {activeTab === "add" && (
+          <div className="rounded-3xl border border-base-200 bg-base-100 p-6 shadow-sm">
+            <div className="mb-6">
+              <h2 className="text-xl font-bold">
+                {editMode ? "Edit Lowongan Pekerjaan" : "Tambah Lowongan Baru"}
+              </h2>
+              <p className="text-sm text-base-content/60 mt-1">
+                Lengkapi informasi lowongan dan kriteria penilaian yang akan
+                digunakan saat interview.
+              </p>
+            </div>
+
+            <form
+              onSubmit={handleSubmit}
+              className="grid grid-cols-1 md:grid-cols-2 gap-5"
+            >
+              <div>
+                <label className="label label-text text-base-content">
+                  Posisi
+                </label>
+                <select
+                  name="position_id"
+                  value={form.position_id}
+                  onChange={handleChange}
+                  required
+                  className="select select-bordered w-full rounded-xl"
+                >
+                  <option value="">Pilih Posisi</option>
+                  {positions
+                    .filter((pos) => {
+                      const name = String(pos.name || "").toLowerCase().trim();
+                      const level = String(pos.level || "")
+                        .toLowerCase()
+                        .trim();
+                      return (
+                        !name.includes("commissioner") &&
+                        level !== "commissioner"
+                      );
+                    })
+                    .map((pos) => (
+                      <option key={pos.id} value={pos.id}>
+                        {pos.name}
+                      </option>
+                    ))}
+                </select>
+
+                {(() => {
+                  const selected =
+                    positions
+                      .find((p) => String(p.id) === String(form.position_id))
+                      ?.name?.toLowerCase() || "";
+
+                  if (
+                    selected.includes("mentor") ||
+                    selected.includes("project manager")
+                  ) {
+                    return (
+                      <div className="mt-2">
+                        <label className="label label-text text-base-content">
+                          Bidang/Spesialisasi
+                        </label>
+                        <select
+                          name="base_position"
+                          value={form.base_position || ""}
+                          onChange={handleChange}
+                          className="select select-bordered w-full rounded-xl"
+                          required
+                        >
+                          <option value="">Pilih Bidang</option>
+                          {BASE_POSITIONS.map((b) => (
+                            <option key={b} value={b}>
+                              {b}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+                    );
+                  }
+
+                  if (selected === "developer") {
+                    return (
+                      <div className="mt-2">
+                        <label className="label label-text text-base-content">
+                          Bidang Developer
+                        </label>
+                        <select
+                          name="developer_specialization"
+                          value={form.developer_specialization || ""}
+                          onChange={handleChange}
+                          className="select select-bordered w-full rounded-xl"
+                          required
+                        >
+                          <option value="">Pilih Bidang Developer</option>
+                          {DEVELOPER_SPECIALIZATIONS.map((b) => (
+                            <option key={b.value} value={b.value}>
+                              {b.label}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+                    );
+                  }
+
+                  return null;
+                })()}
+              </div>
+
+              <div>
+                <label className="label label-text text-base-content">
+                  Judul
+                </label>
+                <input
+                  name="title"
+                  value={form.title}
+                  onChange={handleChange}
+                  required
+                  className="input input-bordered w-full rounded-xl"
+                  placeholder="Contoh: Frontend Developer"
+                />
+              </div>
+
+              <div className="md:col-span-2">
+                <label className="label label-text text-base-content">
+                  Deskripsi
+                </label>
+                <textarea
+                  name="description"
+                  value={form.description}
+                  onChange={handleChange}
+                  className="textarea textarea-bordered w-full rounded-xl min-h-28"
+                  placeholder="Tuliskan deskripsi pekerjaan"
+                />
+              </div>
+
+              <div className="md:col-span-2">
+                <label className="label label-text text-base-content">
+                  Persyaratan
+                </label>
+                <textarea
+                  name="requirements"
+                  value={form.requirements}
+                  onChange={handleChange}
+                  className="textarea textarea-bordered w-full rounded-xl min-h-28"
+                  placeholder="Tuliskan persyaratan kandidat"
+                />
+              </div>
+
+              <div className="md:col-span-2">
+                <label className="label label-text text-base-content">
+                  Tanggung Jawab
+                </label>
+                <textarea
+                  name="responsibilities"
+                  value={form.responsibilities}
+                  onChange={handleChange}
+                  className="textarea textarea-bordered w-full rounded-xl min-h-28"
+                  placeholder="Tuliskan tanggung jawab pekerjaan"
+                />
+              </div>
+
+              <div>
+                <label className="label label-text text-base-content">
+                  Kuota
+                </label>
+                <input
+                  type="number"
+                  name="quota"
+                  value={form.quota}
+                  onChange={handleChange}
+                  className="input input-bordered w-full rounded-xl"
+                />
+              </div>
+
+              <div>
+                <label className="label label-text text-base-content">
+                  Jenis
+                </label>
+                <select
+                  name="employment_type"
+                  value={form.employment_type}
+                  onChange={handleChange}
+                  className="select select-bordered w-full rounded-xl"
+                >
+                  <option value="permanent">Tetap</option>
+                  <option value="contract">Kontrak</option>
+                  <option value="intern">Magang</option>
+                </select>
+              </div>
+
+              <div>
+                <label className="label label-text text-base-content">
+                  Gaji Minimum
+                </label>
+                <input
+                  type="text"
+                  name="salary_range_min"
+                  value={formatWithDots(form.salary_range_min)}
+                  onChange={handleChange}
+                  className="input input-bordered w-full rounded-xl"
+                  inputMode="numeric"
+                  pattern="[0-9.]*"
+                  placeholder="Contoh: 2000000"
+                />
+              </div>
+
+              <div>
+                <label className="label label-text text-base-content">
+                  Gaji Maksimum
+                </label>
+                <input
+                  type="text"
+                  name="salary_range_max"
+                  value={formatWithDots(form.salary_range_max)}
+                  onChange={handleChange}
+                  className="input input-bordered w-full rounded-xl"
+                  inputMode="numeric"
+                  pattern="[0-9.]*"
+                  placeholder="Contoh: 4000000"
+                />
+              </div>
+
+              <div>
+                <label className="label label-text text-base-content">
+                  Lokasi
+                </label>
+                <input
+                  name="location"
+                  value={form.location}
+                  onChange={handleChange}
+                  className="input input-bordered w-full rounded-xl"
+                  placeholder="Contoh: Surabaya / Remote"
+                />
+              </div>
+
+              <div>
+                <label className="label label-text text-base-content">
+                  Deadline
+                </label>
+                <input
+                  type="date"
+                  name="deadline"
+                  value={form.deadline ? form.deadline.substring(0, 10) : ""}
+                  onChange={handleChange}
+                  className="input input-bordered w-full rounded-xl"
+                />
+              </div>
+
+              <div>
+                <label className="label label-text text-base-content">
+                  Status
+                </label>
+                <select
+                  name="status"
+                  value={form.status}
+                  onChange={handleChange}
+                  className="select select-bordered w-full rounded-xl"
+                >
+                  <option value="open">Buka</option>
+                  {editMode && <option value="closed">Tutup</option>}
+                  <option value="draft">Draft</option>
+                </select>
+              </div>
+
+              <div>
+                <label className="label label-text text-base-content">
+                  Hiring Status
+                </label>
+                <select
+                  name="hiring_status"
+                  value={form.hiring_status || ""}
+                  onChange={handleChange}
+                  className={`select select-bordered w-full rounded-xl ${
+                    !editMode ? "opacity-60" : ""
+                  }`}
+                  required
+                  disabled={!editMode}
+                >
+                  <option value="">Pilih Status</option>
+                  <option value="ongoing">Ongoing</option>
+                  <option value="shortlisting">Shortlisting</option>
+                  <option value="interview">Interview</option>
+                  <option value="offering">Offering</option>
+                  <option value="completed">Completed</option>
+                  <option value="canceled">Canceled</option>
+                </select>
+
+                {!editMode && (
+                  <p className="text-xs text-base-content/60 mt-1">
+                    Status awal: <span className="font-medium">Ongoing</span>{" "}
+                    dan dapat diubah setelah lowongan dibuat.
+                  </p>
+                )}
+              </div>
+
+              <div className="md:col-span-2 rounded-3xl border border-base-200 bg-base-200/30 p-5 space-y-4">
+                <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3">
+                  <div>
+                    <h3 className="font-bold text-base-content">
+                      Kriteria Penilaian
+                    </h3>
+                    <p className="text-xs text-base-content/60 mt-1">
+                      Kriteria ini akan tampil otomatis pada halaman interview.
+                    </p>
+                  </div>
+
+                  <button
+                    type="button"
+                    className="btn btn-outline btn-sm rounded-xl"
+                    onClick={addAssessmentCriterion}
+                  >
+                    + Tambah Kriteria
+                  </button>
+                </div>
+
+                {(form.assessment_criteria || []).map((item, index) => (
+                  <div
+                    key={`assessment-criterion-${index}`}
+                    className="grid grid-cols-1 md:grid-cols-12 gap-3 rounded-2xl border border-base-200 bg-base-100 p-4 shadow-sm"
+                  >
+                    <div className="md:col-span-6">
+                      <label className="label label-text text-base-content">
+                        Kriteria
+                      </label>
+                      <input
+                        type="text"
+                        className="input input-bordered w-full rounded-xl"
+                        placeholder="Contoh: Kemampuan komunikasi"
+                        value={item.criterion}
+                        onChange={(e) =>
+                          updateAssessmentCriterion(
+                            index,
+                            "criterion",
+                            e.target.value,
+                          )
+                        }
+                      />
+                    </div>
+
+                    <div className="md:col-span-4">
+                      <label className="label label-text text-base-content">
+                        Nilai / Bobot
+                      </label>
+                      <input
+                        type="text"
+                        className="input input-bordered w-full rounded-xl"
+                        placeholder="Contoh: 30%"
+                        value={item.score}
+                        onChange={(e) =>
+                          updateAssessmentCriterion(
+                            index,
+                            "score",
+                            e.target.value,
+                          )
+                        }
+                      />
+                    </div>
+
+                    <div className="md:col-span-2 flex items-end justify-end">
+                      <button
+                        type="button"
+                        className="btn btn-ghost btn-sm rounded-xl text-error"
+                        onClick={() => removeAssessmentCriterion(index)}
+                        disabled={(form.assessment_criteria || []).length === 1}
+                      >
+                        Hapus
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+
+              <div className="md:col-span-2 flex justify-end gap-3 pt-5 border-t border-base-200">
+                {editMode && (
+                  <button
+                    type="button"
+                    className="btn btn-ghost btn-sm rounded-xl"
+                    onClick={handleCancelEdit}
+                    disabled={loading}
+                  >
+                    Batal
+                  </button>
+                )}
+
+                <button
+                  type="submit"
+                  className="btn btn-primary rounded-xl px-8"
+                  disabled={loading}
+                >
+                  {loading
+                    ? "Menyimpan..."
+                    : editMode
+                      ? "Simpan Perubahan"
+                      : "Publikasikan Lowongan"}
+                </button>
+              </div>
+            </form>
           </div>
+        )}
 
-          {activeTab === "add" && (
-            <div className="rounded-2xl border border-base-200 bg-base-100 p-6">
-              <form
-                onSubmit={handleSubmit}
-                className="grid grid-cols-1 md:grid-cols-2 gap-4"
-              >
-            <div>
-              <label className="label label-text text-base-content">Posisi</label>
-              <select
-                name="position_id"
-                value={form.position_id}
-                onChange={handleChange}
-                required
-                className="select select-bordered w-full"
-              >
-                <option value="">Pilih Posisi</option>
-                {positions
-                  .filter((pos) => {
-                    const name = String(pos.name || "").toLowerCase().trim();
-                    const level = String(pos.level || "").toLowerCase().trim();
-                    return !name.includes("commissioner") && level !== "commissioner";
-                  })
-                  .map((pos) => (
-                    <option key={pos.id} value={pos.id}>
-                      {pos.name}
-                    </option>
-                  ))}
-              </select>
-              {(() => {
-                const selected = positions.find((p) => String(p.id) === String(form.position_id))?.name?.toLowerCase() || "";
-                if (selected.includes("mentor") || selected.includes("project manager")) {
-                  return (
-                    <div className="mt-2">
-                      <label className="label label-text text-base-content">Bidang/Spesialisasi</label>
-                      <select
-                        name="base_position"
-                        value={form.base_position || ""}
-                        onChange={handleChange}
-                        className="select select-bordered w-full"
-                        required
-                      >
-                        <option value="">Pilih Bidang</option>
-                        {BASE_POSITIONS.map((b) => (
-                          <option key={b} value={b}>{b}</option>
-                        ))}
-                      </select>
-                    </div>
-                  );
-                }
-                if (selected === "developer") {
-                  return (
-                    <div className="mt-2">
-                      <label className="label label-text text-base-content">Bidang Developer</label>
-                      <select
-                        name="developer_specialization"
-                        value={form.developer_specialization || ""}
-                        onChange={handleChange}
-                        className="select select-bordered w-full"
-                        required
-                      >
-                        <option value="">Pilih Bidang Developer</option>
-                        {DEVELOPER_SPECIALIZATIONS.map((b) => (
-                          <option key={b.value} value={b.value}>{b.label}</option>
-                        ))}
-                      </select>
-                    </div>
-                  );
-                }
-                return null;
-              })()}
-            </div>
-            <div>
-              <label className="label label-text text-base-content">Judul</label>
-              <input name="title" value={form.title} onChange={handleChange} required className="input input-bordered w-full" />
-            </div>
-            <div className="md:col-span-2">
-              <label className="label label-text text-base-content">Deskripsi</label>
-              <textarea name="description" value={form.description} onChange={handleChange} className="textarea textarea-bordered w-full" />
-            </div>
-            <div className="md:col-span-2">
-              <label className="label label-text text-base-content">Persyaratan</label>
-              <textarea name="requirements" value={form.requirements} onChange={handleChange} className="textarea textarea-bordered w-full" />
-            </div>
-            <div className="md:col-span-2">
-              <label className="label label-text text-base-content">Tanggung Jawab</label>
-              <textarea name="responsibilities" value={form.responsibilities} onChange={handleChange} className="textarea textarea-bordered w-full" />
-            </div>
-            <div>
-              <label className="label label-text text-base-content">Kuota</label>
-              <input type="number" name="quota" value={form.quota} onChange={handleChange} className="input input-bordered w-full" />
-            </div>
-            <div>
-              <label className="label label-text text-base-content">Jenis</label>
-              <select name="employment_type" value={form.employment_type} onChange={handleChange} className="select select-bordered w-full">
-                <option value="permanent">Tetap</option>
-                <option value="contract">Kontrak</option>
-                <option value="intern">Magang</option>
-              </select>
-            </div>
-            <div>
-              <label className="label label-text text-base-content">Gaji Minimum</label>
-              <input type="text" name="salary_range_min" value={formatWithDots(form.salary_range_min)} onChange={handleChange} className="input input-bordered w-full" inputMode="numeric" pattern="[0-9.]*" />
-            </div>
-            <div>
-              <label className="label label-text text-base-content">Gaji Maksimum</label>
-              <input type="text" name="salary_range_max" value={formatWithDots(form.salary_range_max)} onChange={handleChange} className="input input-bordered w-full" inputMode="numeric" pattern="[0-9.]*" />
-            </div>
-            <div>
-              <label className="label label-text text-base-content">Lokasi</label>
-              <input name="location" value={form.location} onChange={handleChange} className="input input-bordered w-full" />
-            </div>
-            <div>
-              <label className="label label-text text-base-content">Deadline</label>
-              <input type="date" name="deadline" value={form.deadline ? form.deadline.substring(0, 10) : ""} onChange={handleChange} className="input input-bordered w-full" />
-            </div>
-            <div>
-              <label className="label label-text text-base-content">Status</label>
-              <select name="status" value={form.status} onChange={handleChange} className="select select-bordered w-full">
-                <option value="open">Buka</option>
-                {editMode && <option value="closed">Tutup</option>}
-                <option value="draft">Draft</option>
-              </select>
-            </div>
-            <div>
-              <label className="label label-text text-base-content">Hiring Status</label>
-              <select name="hiring_status" value={form.hiring_status || ""} onChange={handleChange} className={`select select-bordered w-full ${!editMode ? "opacity-60" : ""}`} required disabled={!editMode}>
-                <option value="">Pilih Status</option>
-                <option value="ongoing">Ongoing</option>
-                <option value="shortlisting">Shortlisting</option>
-                <option value="interview">Interview</option>
-                <option value="offering">Offering</option>
-                <option value="completed">Completed</option>
-                <option value="canceled">Canceled</option>
-              </select>
-              {!editMode && <p className="text-xs text-base-content/60 mt-1">Status awal: <span className="font-medium">Ongoing</span> (tidak dapat diubah saat membuat)</p>}
-            </div>
-            <div className="md:col-span-2 flex gap-2">
-              <button type="submit" className="btn btn-primary" disabled={loading}>{editMode ? "Update" : "Simpan"}</button>
-              {editMode && <button type="button" className="btn btn-ghost" onClick={handleCancelEdit} disabled={loading}>Batal</button>}
-            </div>
-            {error && <div className="text-error md:col-span-2">{error}</div>}
-              </form>
-            </div>
-          )}
+        {/* Daftar Lowongan Aktif / Semua Lowongan */}
+        {(activeTab === "all" || activeTab === "active") && (
+          <div className="rounded-3xl border border-base-200 bg-base-100 p-6 shadow-sm">
+            {loading ? (
+              <div className="text-center py-10">Loading...</div>
+            ) : (
+              <>
+                <div className="rounded-2xl border border-base-200 bg-base-100 p-4 mb-5">
+                  <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
+                    <label className="input input-bordered flex w-full items-center gap-2 rounded-xl">
+                      <Search className="h-4 w-4 text-base-content/50" />
+                      <input
+                        type="text"
+                        placeholder="Cari judul lowongan..."
+                        className="grow"
+                        value={filtersActive.title}
+                        onChange={(e) =>
+                          handleFilterChange("active", "title", e.target.value)
+                        }
+                      />
+                    </label>
 
-          {activeTab === "active" && (
-            <div className="rounded-2xl border border-base-200 bg-base-100 p-6">
-              {loading ? (
-                <div className="text-center py-6">Loading...</div>
-              ) : (
-                <>
-                  <div className="grid grid-cols-1 md:grid-cols-4 gap-3 mb-4">
-                    <input type="text" placeholder="Cari Judul" className="input input-bordered w-full" value={filtersActive.title} onChange={(e) => handleFilterChange("active", "title", e.target.value)} />
-                    <select className="select select-bordered w-full" value={filtersActive.position_id} onChange={(e) => handleFilterChange("active", "position_id", e.target.value)}>
+                    <select
+                      className="select select-bordered w-full rounded-xl"
+                      value={filtersActive.position_id}
+                      onChange={(e) =>
+                        handleFilterChange(
+                          "active",
+                          "position_id",
+                          e.target.value,
+                        )
+                      }
+                    >
                       <option value="">Semua Posisi</option>
-                      {positions.map((p) => (<option key={p.id} value={p.id}>{p.name}</option>))}
+                      {positions.map((p) => (
+                        <option key={p.id} value={p.id}>
+                          {p.name}
+                        </option>
+                      ))}
                     </select>
-                    <input type="number" placeholder="Kuota min" className="input input-bordered w-full" value={filtersActive.quota} onChange={(e) => handleFilterChange("active", "quota", e.target.value)} />
-                    <div className="flex items-center gap-2">
-                      <button type="button" className="btn btn-secondary btn-sm rounded-full" onClick={() => resetFilters("active")}>Reset</button>
-                    </div>
-                  </div>
-                  <div className="overflow-x-auto">
-                    <table className="table table-zebra w-full">
-                      <thead>
-                        <tr>
-                          <th>Judul</th><th>Posisi</th><th>Kuota</th><th>Gaji</th><th>Deadline</th><th>Status</th><th className="text-center">Aksi</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {paginatedActive.length === 0 ? (
-                          <tr><td colSpan={7} className="text-center py-4">Tidak ada lowongan aktif.</td></tr>
-                        ) : (
-                          paginatedActive.map((j) => (
-                            <tr key={j.id} className="hover">
-                              <td className="font-semibold">{j.title}</td>
-                              <td>{positions.find((p) => p.id === j.position_id)?.name || "-"}</td>
-                              <td>{j.quota}</td>
-                              <td>{j.salary_range_min && j.salary_range_max ? `Rp ${parseInt(j.salary_range_min).toLocaleString("id-ID")} - Rp ${parseInt(j.salary_range_max).toLocaleString("id-ID")}` : "Dirahasiakan"}</td>
-                              <td>{j.deadline ? new Date(j.deadline).toLocaleDateString("id-ID") : "-"}</td>
-                              <td><span className={`badge ${j.status === "open" ? "badge-success" : j.status === "closed" ? "badge-error" : "badge-warning"}`}>{j.status}</span></td>
-                              <td className="text-center">
-                                <div className="flex items-center justify-center gap-2">
-                                  <button className="px-3 py-1 text-xs bg-gradient-to-b from-blue-400 to-blue-600 text-white rounded-full shadow-md hover:shadow-lg border border-blue-600 hover:from-blue-500 hover:to-blue-700 transition-all duration-200" type="button" onClick={() => navigate(`/app/job-openings/${j.id}`)}>Lihat</button>
-                                  <button className="px-3 py-1 text-xs bg-gradient-to-b from-yellow-300 to-yellow-500 text-black rounded-full shadow-md hover:shadow-lg border border-yellow-500 hover:from-yellow-400 hover:to-yellow-600 transition-all duration-200" type="button" onClick={() => handleEdit(j.id)}>Edit</button>
-                                  <button className="btn btn-xs btn-error text-white" type="button" onClick={() => handleCancelJob(j.id)}>Tutup</button>
-                                </div>
-                              </td>
-                            </tr>
-                          ))
-                        )}
-                      </tbody>
-                    </table>
-                  </div>
-                  <Pagination page={activePage} totalPages={Math.max(1, Math.ceil(filteredActive.length / ITEMS_PER_PAGE))} onChangePage={(p) => setActivePage(p)} itemsPerPage={ITEMS_PER_PAGE} />
-                </>
-              )}
-            </div>
-          )}
 
-          {activeTab === "history" && (
-            <div className="rounded-2xl border border-base-200 bg-base-100 p-6">
-              {loading ? (
-                <div className="text-center py-6">Loading...</div>
-              ) : (
-                <>
-                  <div className="grid grid-cols-1 md:grid-cols-4 gap-3 mb-4">
-                    <input type="text" placeholder="Cari Judul" className="input input-bordered w-full" value={filtersHistory.title} onChange={(e) => handleFilterChange("history", "title", e.target.value)} />
-                    <select className="select select-bordered w-full" value={filtersHistory.position_id} onChange={(e) => handleFilterChange("history", "position_id", e.target.value)}>
-                      <option value="">Semua Posisi</option>
-                      {positions.map((p) => (<option key={p.id} value={p.id}>{p.name}</option>))}
-                    </select>
-                    <input type="number" placeholder="Kuota min" className="input input-bordered w-full" value={filtersHistory.quota} onChange={(e) => handleFilterChange("history", "quota", e.target.value)} />
-                    <div className="flex items-center gap-2">
-                      <button type="button" className="btn btn-secondary btn-sm rounded-full" onClick={() => resetFilters("history")}>Reset</button>
-                    </div>
+                    <input
+                      type="number"
+                      placeholder="Kuota min"
+                      className="input input-bordered w-full rounded-xl"
+                      value={filtersActive.quota}
+                      onChange={(e) =>
+                        handleFilterChange("active", "quota", e.target.value)
+                      }
+                    />
+
+                    <button
+                      type="button"
+                      className="btn btn-outline rounded-xl border-primary text-primary hover:bg-primary hover:text-primary-content"
+                      onClick={() => resetFilters("active")}
+                    >
+                      <RotateCcw className="h-4 w-4" />
+                      Reset Filter
+                    </button>
                   </div>
-                  <div className="overflow-x-auto">
-                    <table className="table table-zebra w-full">
-                      <thead>
+                </div>
+
+                <div className="overflow-x-auto rounded-2xl border border-base-200">
+                  <table className="table w-full">
+                    <thead className="bg-base-200 text-base-content">
+                      <tr>
+                        <th>Judul Lowongan</th>
+                        <th>Posisi</th>
+                        <th>Kuota</th>
+                        <th>Gaji</th>
+                        <th>Deadline</th>
+                        {activeTab === "all" && <th>Status</th>}
+                        <th className="text-center">Aksi</th>
+                      </tr>
+                    </thead>
+
+                    <tbody>
+                      {(activeTab === "all" ? paginatedAll : paginatedActive).length === 0 ? (
                         <tr>
-                          <th>Judul</th><th>Posisi</th><th>Kuota</th><th>Gaji</th><th>Deadline</th><th>Status</th><th className="text-center">Aksi</th>
+                          <td colSpan={activeTab === "all" ? 8 : 7} className="text-center py-8">
+                            {activeTab === "all"
+                              ? "Tidak ada lowongan ditemukan."
+                              : "Tidak ada lowongan aktif."}
+                          </td>
                         </tr>
-                      </thead>
-                      <tbody>
-                        {paginatedHistory.length === 0 ? (
-                          <tr><td colSpan={7} className="text-center py-4">Tidak ada riwayat lowongan.</td></tr>
-                        ) : (
-                          paginatedHistory.map((j) => (
-                            <tr key={j.id} className="hover">
-                              <td className="font-semibold">{j.title}</td>
-                              <td>{positions.find((p) => p.id === j.position_id)?.name || "-"}</td>
-                              <td>{j.quota}</td>
-                              <td>{j.salary_range_min && j.salary_range_max ? `Rp ${parseInt(j.salary_range_min).toLocaleString("id-ID")} - Rp ${parseInt(j.salary_range_max).toLocaleString("id-ID")}` : "Dirahasiakan"}</td>
-                              <td>{j.deadline ? new Date(j.deadline).toLocaleDateString("id-ID") : "-"}</td>
-                              <td><span className={`badge ${j.status === "open" ? "badge-success" : j.status === "closed" ? "badge-error" : "badge-warning"}`}>{j.status}</span></td>
-                              <td className="text-center">
-                                <div className="flex items-center justify-center gap-2">
-                                  <button className="px-3 py-1 text-xs bg-gradient-to-b from-blue-400 to-blue-600 text-white rounded-full shadow-md hover:shadow-lg border border-blue-600 hover:from-blue-500 hover:to-blue-700 transition-all duration-200" type="button" onClick={() => navigate(`/app/job-openings/${j.id}`)}>Lihat</button>
-                                  <button className="px-3 py-1 text-xs bg-gradient-to-b from-yellow-300 to-yellow-500 text-black rounded-full shadow-md hover:shadow-lg border border-yellow-500 hover:from-yellow-400 hover:to-yellow-600 transition-all duration-200" type="button" onClick={() => handleEdit(j.id)}>Edit</button>
+                      ) : (
+                        (activeTab === "all" ? paginatedAll : paginatedActive).map((j, index) => (
+                          <tr key={j.id} className="hover:bg-base-200/40">
+                            <td>
+                              <div className="flex items-center gap-3">
+                                <div
+                                  className={`w-11 h-11 rounded-2xl flex items-center justify-center ${
+                                    index % 4 === 0
+                                      ? "bg-orange-100 text-orange-600"
+                                      : index % 4 === 1
+                                        ? "bg-blue-100 text-blue-600"
+                                        : index % 4 === 2
+                                          ? "bg-purple-100 text-purple-600"
+                                          : "bg-green-100 text-green-600"
+                                  }`}
+                                >
+                                  <BriefcaseBusiness className="h-5 w-5" />
                                 </div>
+
+                                <div>
+                                  <p className="font-bold text-base-content">
+                                    {j.title}
+                                  </p>
+                                  <p className="text-xs text-base-content/50">
+                                    ID: JOB-{String(j.id).padStart(4, "0")}
+                                  </p>
+                                </div>
+                              </div>
+                            </td>
+
+                            <td>
+                              {positions.find((p) => p.id === j.position_id)
+                                ?.name || "-"}
+                            </td>
+
+                            <td>{j.quota}</td>
+
+                            <td>
+                              {j.salary_range_min && j.salary_range_max
+                                ? `Rp ${parseInt(
+                                    j.salary_range_min,
+                                  ).toLocaleString("id-ID")} - Rp ${parseInt(
+                                    j.salary_range_max,
+                                  ).toLocaleString("id-ID")}`
+                                : "Dirahasiakan"}
+                            </td>
+
+                            <td>
+                              <span className="flex items-center gap-2">
+                                <CalendarDays className="h-4 w-4 text-base-content/50" />
+                                {j.deadline
+                                  ? new Date(j.deadline).toLocaleDateString(
+                                      "id-ID",
+                                      {
+                                        day: "numeric",
+                                        month: "long",
+                                        year: "numeric",
+                                      },
+                                    )
+                                  : "-"}
+                              </span>
+                            </td>
+
+                            {activeTab === "all" && (
+                              <td>
+                                <span className={`badge badge-sm rounded-full gap-1 ${getJobStatusBadgeClass(j.status)}`}>
+                                  <span className="h-1.5 w-1.5 rounded-full bg-current"></span>
+                                  {String(j.status || "open").toUpperCase()}
+                                </span>
                               </td>
-                            </tr>
-                          ))
-                        )}
-                      </tbody>
-                    </table>
+                            )}
+
+                            <td>
+                              <div className="flex items-center justify-center gap-3 whitespace-nowrap">
+                                <button
+                                  className="rounded-full border border-blue-600 bg-gradient-to-b from-blue-400 to-blue-600 px-3 py-1 text-xs text-white transition-all duration-200 hover:from-blue-500 hover:to-blue-700"
+                                  type="button"
+                                  onClick={() =>
+                                    navigate(`/app/job-openings/${j.id}`)
+                                  }
+                                >
+                                  Lihat
+                                </button>
+
+                                <button
+                                  className="rounded-full border border-yellow-500 bg-gradient-to-b from-yellow-300 to-yellow-500 px-3 py-1 text-xs text-black transition-all duration-200 hover:from-yellow-400 hover:to-yellow-600"
+                                  type="button"
+                                  onClick={() => handleEdit(j.id)}
+                                >
+                                  Edit
+                                </button>
+
+                                <button
+                                  className="rounded-full border border-red-600 bg-gradient-to-b from-red-400 to-red-600 px-3 py-1 text-xs text-white transition-all duration-200 hover:from-red-500 hover:to-red-700"
+                                  type="button"
+                                  onClick={() => handleCancelJob(j.id)}
+                                >
+                                  Tutup
+                                </button>
+                              </div>
+                            </td>
+                          </tr>
+                        ))
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+
+                <div className="mt-4">
+                  <Pagination
+                    page={activePage}
+                    totalPages={Math.max(
+                      1,
+                      Math.ceil((activeTab === "all" ? filteredAll.length : filteredActive.length) / ITEMS_PER_PAGE),
+                    )}
+                    onChangePage={(p) => setActivePage(p)}
+                    itemsPerPage={ITEMS_PER_PAGE}
+                  />
+                </div>
+              </>
+            )}
+          </div>
+        )}
+
+        {/* Riwayat Lowongan */}
+        {activeTab === "history" && (
+          <div className="rounded-3xl border border-base-200 bg-base-100 p-6 shadow-sm">
+            {loading ? (
+              <div className="text-center py-10">Loading...</div>
+            ) : (
+              <>
+                <div className="rounded-2xl border border-base-200 bg-base-100 p-4 mb-5">
+                  <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
+                    <label className="input input-bordered flex w-full items-center gap-2 rounded-xl">
+                      <Search className="h-4 w-4 text-base-content/50" />
+                      <input
+                        type="text"
+                        placeholder="Cari judul lowongan..."
+                        className="grow"
+                        value={filtersHistory.title}
+                        onChange={(e) =>
+                          handleFilterChange("history", "title", e.target.value)
+                        }
+                      />
+                    </label>
+
+                    <select
+                      className="select select-bordered w-full rounded-xl"
+                      value={filtersHistory.position_id}
+                      onChange={(e) =>
+                        handleFilterChange(
+                          "history",
+                          "position_id",
+                          e.target.value,
+                        )
+                      }
+                    >
+                      <option value="">Semua Posisi</option>
+                      {positions.map((p) => (
+                        <option key={p.id} value={p.id}>
+                          {p.name}
+                        </option>
+                      ))}
+                    </select>
+
+                    <input
+                      type="number"
+                      placeholder="Kuota min"
+                      className="input input-bordered w-full rounded-xl"
+                      value={filtersHistory.quota}
+                      onChange={(e) =>
+                        handleFilterChange("history", "quota", e.target.value)
+                      }
+                    />
+
+                    <button
+                      type="button"
+                      className="btn btn-outline rounded-xl border-primary text-primary hover:bg-primary hover:text-primary-content"
+                      onClick={() => resetFilters("history")}
+                    >
+                      <RotateCcw className="h-4 w-4" />
+                      Reset Filter
+                    </button>
                   </div>
-                  <Pagination page={historyPage} totalPages={Math.max(1, Math.ceil(filteredHistory.length / ITEMS_PER_PAGE))} onChangePage={(p) => setHistoryPage(p)} itemsPerPage={ITEMS_PER_PAGE} />
-                </>
-              )}
-            </div>
-          )}
-        </div>
-      </TitleCard>
-    </>
-  );
+                </div>
+
+                <div className="overflow-x-auto rounded-2xl border border-base-200">
+                  <table className="table w-full">
+                    <thead className="bg-base-200 text-base-content">
+                      <tr>
+                        <th>Judul Lowongan</th>
+                        <th>Posisi</th>
+                        <th>Kuota</th>
+                        <th>Gaji</th>
+                        <th>Deadline</th>
+                        <th>Status</th>
+                        <th className="text-center">Aksi</th>
+                      </tr>
+                    </thead>
+
+                    <tbody>
+                      {paginatedHistory.length === 0 ? (
+                        <tr>
+                          <td colSpan={7} className="text-center py-8">
+                            Tidak ada riwayat lowongan.
+                          </td>
+                        </tr>
+                      ) : (
+                        paginatedHistory.map((j, index) => (
+                          <tr key={j.id} className="hover:bg-base-200/40">
+                            <td>
+                              <div className="flex items-center gap-3">
+                                <div
+                                  className={`w-11 h-11 rounded-2xl flex items-center justify-center ${
+                                    index % 4 === 0
+                                      ? "bg-slate-100 text-slate-600"
+                                      : index % 4 === 1
+                                        ? "bg-blue-100 text-blue-600"
+                                        : index % 4 === 2
+                                          ? "bg-purple-100 text-purple-600"
+                                          : "bg-green-100 text-green-600"
+                                  }`}
+                                >
+                                  <BriefcaseBusiness className="h-5 w-5" />
+                                </div>
+
+                                <div>
+                                  <p className="font-bold text-base-content">
+                                    {j.title}
+                                  </p>
+                                  <p className="text-xs text-base-content/50">
+                                    ID: JOB-{String(j.id).padStart(4, "0")}
+                                  </p>
+                                </div>
+                              </div>
+                            </td>
+
+                            <td>
+                              {positions.find((p) => p.id === j.position_id)
+                                ?.name || "-"}
+                            </td>
+
+                            <td>{j.quota}</td>
+
+                            <td>
+                              {j.salary_range_min && j.salary_range_max
+                                ? `Rp ${parseInt(
+                                    j.salary_range_min,
+                                  ).toLocaleString("id-ID")} - Rp ${parseInt(
+                                    j.salary_range_max,
+                                  ).toLocaleString("id-ID")}`
+                                : "Dirahasiakan"}
+                            </td>
+
+                            <td>
+                              <span className="flex items-center gap-2">
+                                <CalendarDays className="h-4 w-4 text-base-content/50" />
+                                {j.deadline
+                                  ? new Date(j.deadline).toLocaleDateString(
+                                      "id-ID",
+                                      {
+                                        day: "numeric",
+                                        month: "long",
+                                        year: "numeric",
+                                      },
+                                    )
+                                  : "-"}
+                              </span>
+                            </td>
+
+                            <td>
+                              <span
+                                className={`badge badge-sm rounded-full ${
+                                  j.status === "closed"
+                                    ? "badge-error"
+                                    : j.status === "draft"
+                                      ? "badge-warning"
+                                      : "badge-success"
+                                }`}
+                              >
+                                {j.status}
+                              </span>
+                            </td>
+
+                            <td>
+                              <div className="flex items-center justify-center gap-3 whitespace-nowrap">
+                                <button
+                                  className="rounded-full border border-blue-600 bg-gradient-to-b from-blue-400 to-blue-600 px-3 py-1 text-xs text-white transition-all duration-200 hover:from-blue-500 hover:to-blue-700"
+                                  type="button"
+                                  onClick={() =>
+                                    navigate(`/app/job-openings/${j.id}`)
+                                  }
+                                >
+                                  Lihat
+                                </button>
+
+                                <button
+                                  className="rounded-full border border-yellow-500 bg-gradient-to-b from-yellow-300 to-yellow-500 px-3 py-1 text-xs text-black transition-all duration-200 hover:from-yellow-400 hover:to-yellow-600"
+                                  type="button"
+                                  onClick={() => handleEdit(j.id)}
+                                >
+                                  Edit
+                                </button>
+                              </div>
+                            </td>
+                          </tr>
+                        ))
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+
+                <div className="mt-4">
+                  <Pagination
+                    page={historyPage}
+                    totalPages={Math.max(
+                      1,
+                      Math.ceil(filteredHistory.length / ITEMS_PER_PAGE),
+                    )}
+                    onChangePage={(p) => setHistoryPage(p)}
+                    itemsPerPage={ITEMS_PER_PAGE}
+                  />
+                </div>
+              </>
+            )}
+          </div>
+        )}
+      </div>
+    </div>
+  </>
+);
 }
