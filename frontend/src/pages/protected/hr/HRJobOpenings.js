@@ -590,34 +590,6 @@ export default function HRJobOpenings() {
     return "badge-success";
   };
 
-  const HeroIllustration = () => (
-    <div className="pointer-events-none absolute right-16 top-3 hidden h-28 w-80 lg:block">
-      <div className="absolute bottom-0 right-0 h-20 w-72 rounded-full bg-orange-100/70" />
-      <div className="absolute bottom-2 right-16 h-10 w-16 rounded-t-full bg-orange-50" />
-
-      <div className="absolute right-36 top-0 h-24 w-20 rotate-[-2deg] rounded-xl border border-base-300 bg-base-100 shadow-md">
-        <div className="flex items-center gap-1 border-b border-orange-100 px-2 py-2">
-          <div className="h-5 w-5 rounded-full bg-teal-100" />
-          <div className="space-y-1">
-            <div className="h-1.5 w-8 rounded-full bg-orange-400" />
-            <div className="h-1.5 w-6 rounded-full bg-slate-300" />
-          </div>
-        </div>
-
-        <div className="space-y-1.5 px-3 py-2">
-          <div className="h-1.5 w-12 rounded-full bg-orange-400" />
-          <div className="h-1.5 w-10 rounded-full bg-orange-300" />
-          <div className="h-1.5 w-12 rounded-full bg-orange-200" />
-          <div className="h-1.5 w-8 rounded-full bg-slate-200" />
-        </div>
-      </div>
-
-      <div className="absolute right-7 top-9 h-12 w-12 rounded-xl bg-primary/20" />
-      <div className="absolute right-5 top-20 h-2 w-16 rounded-full bg-base-300" />
-      <div className="absolute right-8 top-[88px] h-9 w-2 rounded-full bg-base-400" />
-      <div className="absolute right-[72px] top-[88px] h-9 w-2 rounded-full bg-base-400" />
-    </div>
-  );
 
   return (
   <>
@@ -874,7 +846,6 @@ export default function HRJobOpenings() {
       <div className="space-y-5">
         {/* Header sesuai referensi */}
         <div className="relative min-h-[112px] overflow-hidden rounded-[1.4rem] bg-gradient-to-r from-base-100 via-base-100 to-orange-50/70 px-1 py-2 sm:px-2">
-          <HeroIllustration />
           <div className="relative z-10 max-w-3xl">
             <h1 className="text-[28px] font-extrabold leading-tight text-base-content">
               Lowongan Pekerjaan

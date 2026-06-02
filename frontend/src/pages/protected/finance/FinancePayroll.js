@@ -2,9 +2,11 @@ import { useEffect, useMemo, useState } from "react";
 import { useDispatch } from "react-redux";
 import { setPageTitle } from "../../../features/common/headerSlice";
 import TitleCard from "../../../components/Cards/TitleCard";
+import Pagination from "../../../components/Pagination/Pagination";
 import { formatLateDuration } from "../../../components/Typography/LateDurationText";
 import { financeApi } from "../../../features/finance/api";
 import { resolveFixedPositionAllowance } from "../../../utils/fixedPositionAllowance";
+import useTablePagination from "../../../hooks/useTablePagination";
 
 const getCurrentPeriod = () => {
   const now = new Date();
@@ -1101,6 +1103,7 @@ function FinancePayroll() {
   const recapPayrollRows = monthlyPayrollRows.filter(
     (item) => String(item.status || "").toLowerCase() !== "claimed",
   );
+  const recapPagination = useTablePagination(recapPayrollRows);
   const hasDraftToPublish = monthlyPayrollRows.some(
     (item) => item.status === "draft",
   );
@@ -1733,7 +1736,7 @@ function FinancePayroll() {
                 </tr>
               </thead>
               <tbody>
-                {recapPayrollRows.map((item) => (
+                {recapPagination.paginatedItems.map((item) => (
                   <tr key={item.id}>
                     <td>{item.id}</td>
                     <td>{item.employee_name}</td>
@@ -1808,6 +1811,7 @@ function FinancePayroll() {
                 )}
               </tbody>
             </table>
+            <Pagination page={recapPagination.page} totalPages={recapPagination.totalPages} onChangePage={recapPagination.setPage} itemsPerPage={recapPagination.itemsPerPage} />
           </div>
 
           <button
@@ -1940,4 +1944,3 @@ function FinancePayroll() {
 }
 
 export default FinancePayroll;
-

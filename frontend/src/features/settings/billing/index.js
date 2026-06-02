@@ -3,6 +3,8 @@ import { useEffect, useState } from "react"
 import { useDispatch, useSelector } from "react-redux"
 import TitleCard from "../../../components/Cards/TitleCard"
 import { showNotification } from '../../common/headerSlice'
+import Pagination from "../../../components/Pagination/Pagination"
+import useTablePagination from "../../../hooks/useTablePagination"
 
 
 
@@ -30,6 +32,7 @@ function Billing(){
 
 
     const [bills, setBills] = useState(BILLS)
+    const billsPagination = useTablePagination(bills)
 
     const getPaymentStatus = (status) => {
         if(status  === "Paid")return <div className="badge badge-success">{status}</div>
@@ -57,7 +60,7 @@ function Billing(){
                     </thead>
                     <tbody>
                         {
-                            bills.map((l, k) => {
+                            billsPagination.paginatedItems.map((l, k) => {
                                 return(
                                     <tr key={k}>
                                     <td>{l.invoiceNo}</td>
@@ -72,6 +75,7 @@ function Billing(){
                         }
                     </tbody>
                 </table>
+                <Pagination page={billsPagination.page} totalPages={billsPagination.totalPages} onChangePage={billsPagination.setPage} itemsPerPage={billsPagination.itemsPerPage} />
             </div>
             </TitleCard>
         </>

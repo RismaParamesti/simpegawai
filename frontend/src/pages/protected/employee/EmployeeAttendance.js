@@ -757,18 +757,15 @@ function EmployeeAttendance() {
           </table>
         </div>
 
-        {history.length > 0 && (
-          <Pagination
-            page={historyPage}
-            totalPages={totalHistoryPages}
-            onChangePage={setHistoryPage}
-            itemsPerPage={itemsPerPage}
-          />
-        )}
+        <Pagination
+          page={historyPage}
+          totalPages={totalHistoryPages}
+          onChangePage={setHistoryPage}
+          itemsPerPage={itemsPerPage}
+        />
       </TitleCard>
     </>
   );
 }
 
 export default EmployeeAttendance;
-

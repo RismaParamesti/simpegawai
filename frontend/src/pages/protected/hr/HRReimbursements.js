@@ -2,7 +2,9 @@ import { useEffect, useState, useCallback, useMemo, useRef } from 'react'
 import { useDispatch } from 'react-redux'
 import { setPageTitle, showNotification } from '../../../features/common/headerSlice'
 import TitleCard from '../../../components/Cards/TitleCard'
+import Pagination from '../../../components/Pagination/Pagination'
 import { hrApi } from '../../../features/hr/api'
+import useTablePagination from '../../../hooks/useTablePagination'
 
 const getStatusBadge = (status) => {
     if (status === 'included_in_payroll') return 'badge-success'
@@ -194,6 +196,8 @@ function HRReimbursements() {
                 return Number(b?.id || 0) - Number(a?.id || 0)
             })
     }, [items, historyFilters, applyCommonFilters])
+    const pendingPagination = useTablePagination(pendingItems)
+    const historyPagination = useTablePagination(historyItems)
 
     return (
         <>
@@ -274,7 +278,7 @@ function HRReimbursements() {
                                 </tr>
                             </thead>
                             <tbody>
-                                {pendingItems.map((item) => {
+                                {pendingPagination.paginatedItems.map((item) => {
                                     return (
                                         <tr key={item.id}>
                                             <td>
@@ -331,6 +335,7 @@ function HRReimbursements() {
                                 )}
                             </tbody>
                         </table>
+                        <Pagination page={pendingPagination.page} totalPages={pendingPagination.totalPages} onChangePage={pendingPagination.setPage} itemsPerPage={pendingPagination.itemsPerPage} />
                     </div>
                 )}
             </TitleCard>
@@ -423,7 +428,7 @@ function HRReimbursements() {
                                 </tr>
                             </thead>
                             <tbody>
-                                {historyItems.map((item) => (
+                                {historyPagination.paginatedItems.map((item) => (
                                     <tr key={`history-${item.id}`}>
                                         <td>
                                             <div className="font-semibold">{item.employee_name || '-'}</div>
@@ -463,6 +468,7 @@ function HRReimbursements() {
                                 )}
                             </tbody>
                         </table>
+                        <Pagination page={historyPagination.page} totalPages={historyPagination.totalPages} onChangePage={historyPagination.setPage} itemsPerPage={historyPagination.itemsPerPage} />
                     </div>
                 )}
                 </TitleCard>

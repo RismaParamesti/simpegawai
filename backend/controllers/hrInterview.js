@@ -54,7 +54,8 @@ router.get("/interviews", async (req, res) => {
       JOIN candidates c ON a.candidate_id = c.id
       JOIN job_openings j ON a.job_opening_id = j.id
       JOIN positions p ON j.position_id = p.id
-      WHERE i.result = 'passed' AND j.status = 'closed' AND j.hiring_status = 'completed'`;
+      WHERE i.result = 'passed' AND j.status = 'closed' AND j.hiring_status = 'completed'
+        AND c.deleted_at IS NULL`;
     const [rows] = await db.promise().query(query);
     res.json(rows);
   } catch (err) {
@@ -73,7 +74,7 @@ router.get("/interviews/:id", async (req, res) => {
       JOIN candidates c ON a.candidate_id = c.id
       JOIN job_openings j ON a.job_opening_id = j.id
       JOIN positions p ON j.position_id = p.id
-      WHERE i.id = ?`;
+      WHERE i.id = ? AND c.deleted_at IS NULL`;
     const [rows] = await db.promise().query(query, [id]);
     if (!rows || rows.length === 0) {
       return res.status(404).json({ message: "Data kandidat tidak ditemukan" });

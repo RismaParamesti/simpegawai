@@ -7,6 +7,8 @@ import { deleteLead, getLeadsContent } from "./leadSlice"
 import { CONFIRMATION_MODAL_CLOSE_TYPES, MODAL_BODY_TYPES } from '../../utils/globalConstantUtil'
 import TrashIcon from '@heroicons/react/24/outline/TrashIcon'
 import { showNotification } from '../common/headerSlice'
+import Pagination from "../../components/Pagination/Pagination"
+import useTablePagination from "../../hooks/useTablePagination"
 
 const TopSideButtons = () => {
 
@@ -26,6 +28,7 @@ const TopSideButtons = () => {
 function Leads(){
 
     const {leads } = useSelector(state => state.lead)
+    const leadsPagination = useTablePagination(leads)
     const dispatch = useDispatch()
 
     useEffect(() => {
@@ -67,7 +70,7 @@ function Leads(){
                     </thead>
                     <tbody>
                         {
-                            leads.map((l, k) => {
+                            leadsPagination.paginatedItems.map((l, k) => {
                                 return(
                                     <tr key={k}>
                                     <td>
@@ -94,6 +97,7 @@ function Leads(){
                         }
                     </tbody>
                 </table>
+                <Pagination page={leadsPagination.page} totalPages={leadsPagination.totalPages} onChangePage={leadsPagination.setPage} itemsPerPage={leadsPagination.itemsPerPage} />
             </div>
             </TitleCard>
         </>

@@ -11,6 +11,8 @@ import {
 } from "../../../utils/attendanceUtils";
 
 const SP_ALERT_STORAGE_KEY = "lastSeenWarningLetterId";
+const EMPLOYEE_WELCOME_DISMISSED_KEY = "employeeWelcomeDismissed";
+const EMPLOYEE_WELCOME_DURATION_MS = 7 * 24 * 60 * 60 * 1000;
 
 const formatTime = (value) => {
   if (!value) return "-";
@@ -138,6 +140,7 @@ function EmployeeDashboard() {
   const [todayAttendance, setTodayAttendance] = useState({});
   const [warningRules, setWarningRules] = useState([]);
   const [showWarningPopup, setShowWarningPopup] = useState(false);
+  const [showEmployeeWelcome, setShowEmployeeWelcome] = useState(false);
   const [currentMonth, setCurrentMonth] = useState(new Date().getMonth() + 1);
   const [currentYear, setCurrentYear] = useState(new Date().getFullYear());
 
@@ -324,6 +327,25 @@ function EmployeeDashboard() {
       setShowWarningPopup(true);
     }
   }, [attendanceSummary, warningRules]);
+
+  useEffect(() => {
+    const convertedAt = new Date(
+      profile?.converted_at || profile?.employee?.created_at,
+    ).getTime();
+    const storageKey = `${EMPLOYEE_WELCOME_DISMISSED_KEY}:${profile?.user?.id || ""}`;
+    const isWithinWelcomePeriod =
+      Number.isFinite(convertedAt) &&
+      Date.now() - convertedAt >= 0 &&
+      Date.now() - convertedAt < EMPLOYEE_WELCOME_DURATION_MS;
+
+    setShowEmployeeWelcome(
+      Boolean(
+        profile?.converted_from_candidate &&
+          isWithinWelcomePeriod &&
+          !localStorage.getItem(storageKey),
+      ),
+    );
+  }, [profile]);
 
   if (loading) {
     return (
@@ -577,6 +599,34 @@ function EmployeeDashboard() {
   return (
     <div className="mt-4 overflow-hidden rounded-[1.5rem] border border-slate-200/80 bg-white p-4 shadow-[0_20px_70px_rgba(15,23,42,0.07)] dark:border-slate-700 dark:bg-slate-950 dark:shadow-[0_20px_70px_rgba(2,6,23,0.45)] sm:p-7">
       <div className="space-y-6">
+        {showEmployeeWelcome && (
+          <div className="rounded-2xl border border-emerald-200 bg-emerald-50 p-5 text-emerald-700 dark:border-emerald-900/60 dark:bg-emerald-950/30 dark:text-emerald-300">
+            <div className="flex items-start justify-between gap-4">
+              <div>
+                <p className="text-lg font-bold">Anda telah menjadi pegawai.</p>
+                <p className="mt-1 text-sm">
+                  Selamat bergabung. Gunakan dashboard ini untuk aktivitas
+                  kepegawaian Anda.
+                </p>
+              </div>
+              <button
+                type="button"
+                className="btn btn-ghost btn-sm rounded-xl"
+                aria-label="Tutup notifikasi selamat datang"
+                onClick={() => {
+                  localStorage.setItem(
+                    `${EMPLOYEE_WELCOME_DISMISSED_KEY}:${profile?.user?.id || ""}`,
+                    "true",
+                  );
+                  setShowEmployeeWelcome(false);
+                }}
+              >
+                Tutup
+              </button>
+            </div>
+          </div>
+        )}
+
         {error && (
           <div className="rounded-2xl border border-red-200 bg-red-50 p-4 text-red-600 dark:border-red-900/60 dark:bg-red-950/30 dark:text-red-300">
             <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">

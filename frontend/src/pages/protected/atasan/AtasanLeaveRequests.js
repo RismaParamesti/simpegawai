@@ -429,7 +429,7 @@ function AtasanLeaveRequests() {
           </div>
         )}
 
-        {!loading && filteredItems.length > 0 && (
+        {!loading && (
           <Pagination
             page={approvalPage}
             totalPages={totalApprovalPages}

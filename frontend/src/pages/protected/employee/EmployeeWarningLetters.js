@@ -450,16 +450,14 @@ function EmployeeWarningLetters() {
           </table>
         </div>
 
-        {alphaHistory.length > 0 && (
-          <div className="mt-4">
-            <Pagination
-              page={alphaPage}
-              totalPages={totalAlphaPages}
-              onChangePage={setAlphaPage}
-              itemsPerPage={itemsPerPage}
-            />
-          </div>
-        )}
+        <div className="mt-4">
+          <Pagination
+            page={alphaPage}
+            totalPages={totalAlphaPages}
+            onChangePage={setAlphaPage}
+            itemsPerPage={itemsPerPage}
+          />
+        </div>
       </TitleCard>
     </div>
   );

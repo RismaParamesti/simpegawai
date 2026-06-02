@@ -993,7 +993,6 @@ ${ASSESSMENT_END}`.trim();
                             }
                           >
                             <option value="">Pilih</option>
-                            <option value="pending">Menunggu</option>
                             <option value="passed">Lolos</option>
                             <option value="failed">Tidak Lolos</option>
                             <option value="no_show">Tidak Hadir</option>
@@ -1113,7 +1112,6 @@ ${ASSESSMENT_END}`.trim();
                             }
                           >
                             <option value="">Pilih</option>
-                            <option value="pending">Menunggu</option>
                             <option value="passed">Lolos</option>
                             <option value="failed">Tidak Lolos</option>
                             <option value="no_show">Tidak Hadir</option>
@@ -1185,7 +1183,6 @@ ${ASSESSMENT_END}`.trim();
                       };
 
                       const resultLabel = {
-                        pending: "Menunggu",
                         passed: "Lolos",
                         failed: "Tidak Lolos",
                         no_show: "Tidak Hadir",

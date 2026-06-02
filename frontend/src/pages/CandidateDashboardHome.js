@@ -2,6 +2,7 @@ import React, { useEffect, useState } from "react";
 import { useDispatch } from "react-redux";
 import { setPageTitle } from "../features/common/headerSlice";
 import TitleCard from "../components/Cards/TitleCard";
+import Pagination from "../components/Pagination/Pagination";
 import { getCandidateDashboardStats } from "../utils/candidateDashboard";
 import { getCandidateProfile } from "../utils/candidateProfile";
 import axios from "axios";
@@ -9,6 +10,7 @@ import { useNavigate } from "react-router-dom";
 import { Chart as ChartJS, ArcElement, Tooltip, Legend } from "chart.js";
 import { Doughnut } from "react-chartjs-2";
 import { getChartColors, toRgba } from "../utils/themePalette";
+import useTablePagination from "../hooks/useTablePagination";
 
 ChartJS.register(ArcElement, Tooltip, Legend);
 
@@ -43,6 +45,7 @@ export default function CandidateDashboardHome() {
     lolosDokumen: 0,
     wawancara: 0,
   });
+  const latestApplicationsPagination = useTablePagination(stats.latest);
 
   useEffect(() => {
     dispatch(setPageTitle({ title: "Beranda" }));
@@ -149,6 +152,15 @@ export default function CandidateDashboardHome() {
 
   return (
     <div>
+      {profile?.deleted_at && (
+        <div className="mb-4 rounded-2xl border border-emerald-200 bg-emerald-50 p-5 text-emerald-700">
+          <p className="text-lg font-bold">Anda telah menjadi pegawai.</p>
+          <p className="mt-1 text-sm">
+            Silakan login ulang untuk masuk ke dashboard pegawai.
+          </p>
+        </div>
+      )}
+
       {/* STATISTIK */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
         <TitleCard
@@ -247,7 +259,7 @@ export default function CandidateDashboardHome() {
                       </td>
                     </tr>
                   ) : (
-                    stats.latest.map((app, idx) => (
+                    latestApplicationsPagination.paginatedItems.map((app, idx) => (
                       <tr
                         key={idx}
                         role="button"
@@ -330,6 +342,7 @@ export default function CandidateDashboardHome() {
                   )}
                 </tbody>
               </table>
+              <Pagination page={latestApplicationsPagination.page} totalPages={latestApplicationsPagination.totalPages} onChangePage={latestApplicationsPagination.setPage} itemsPerPage={latestApplicationsPagination.itemsPerPage} />
             </div>
           </TitleCard>
 

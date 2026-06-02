@@ -2,6 +2,8 @@ import React, { useEffect, useMemo, useState } from "react";
 import { useDispatch } from "react-redux";
 import axios from "axios";
 import { useNavigate } from "react-router-dom";
+import Pagination from "../../../components/Pagination/Pagination";
+import useTablePagination from "../../../hooks/useTablePagination";
 import {
   CalendarDays,
   CheckCircle2,
@@ -203,6 +205,7 @@ const HRHiredCandidate = () => {
       return true;
     });
   }, [candidates, onboardingStatus, search, statusFilter]);
+  const candidatesPagination = useTablePagination(filteredCandidates);
 
   const resetFilters = () => {
     setSearch("");
@@ -249,7 +252,6 @@ const HRHiredCandidate = () => {
       <div className="space-y-6">
         {/* Header */}
         <div className="relative min-h-[120px] overflow-hidden rounded-[1.4rem] bg-gradient-to-r from-white via-white to-orange-50/80 px-1 py-2 dark:from-slate-950 dark:via-slate-950 dark:to-slate-900 sm:px-2">
-          <HiredHeroIllustration />
           <div className="relative z-10 max-w-3xl">
             <div className="mb-3 inline-flex items-center gap-2 rounded-full border border-orange-200 bg-orange-50 px-3 py-1 text-xs font-bold text-orange-600 dark:border-orange-900/60 dark:bg-orange-950/70 dark:text-orange-300">
               <UserCheck className="h-4 w-4" />
@@ -406,7 +408,7 @@ const HRHiredCandidate = () => {
                     </tr>
                   </thead>
                   <tbody>
-                    {filteredCandidates.map((candidate, index) => {
+                    {candidatesPagination.paginatedItems.map((candidate, index) => {
                       const candidateId = getCandidateId(candidate);
                       const status = onboardingStatus[candidateId] || "Belum dibuat";
                       const badge = getOnboardingBadge(status);
@@ -418,7 +420,7 @@ const HRHiredCandidate = () => {
                           className="hover:bg-orange-50/40 dark:hover:bg-slate-800/60"
                         >
                           <td className="text-center font-semibold text-slate-500 dark:text-slate-400">
-                            {index + 1}
+                            {candidatesPagination.startIndex + index + 1}
                           </td>
 
                           <td>
@@ -478,6 +480,9 @@ const HRHiredCandidate = () => {
                     })}
                   </tbody>
                 </table>
+              </div>
+              <div className="px-4 pb-4">
+                <Pagination page={candidatesPagination.page} totalPages={candidatesPagination.totalPages} onChangePage={candidatesPagination.setPage} itemsPerPage={candidatesPagination.itemsPerPage} />
               </div>
             </div>
           )}

@@ -103,6 +103,7 @@ router.post(
             join_date,
             basic_salary,
             employment_status,
+            candidate_id,
         } = req.body;
 
         // Validasi input dasar untuk user
@@ -151,12 +152,64 @@ router.post(
         let finalRoles = applyPositionBasedRoles(roles);
 
         try {
+            let candidate = null;
+            if (candidate_id) {
+                const [candidateRows] = await db
+                    .promise()
+                    .query(
+                        "SELECT * FROM candidates WHERE id = ? AND deleted_at IS NULL",
+                        [candidate_id],
+                    );
+
+                if (candidateRows.length === 0) {
+                    return res.status(404).json({ message: "Candidate not found" });
+                }
+
+                candidate = candidateRows[0];
+
+                const [candidateCalls] = await db
+                    .promise()
+                    .query(
+                        `SELECT id
+                         FROM candidate_calls
+                         WHERE candidate_id = ?
+                           AND invitation_letter_file IS NOT NULL
+                           AND invitation_letter_file != ''
+                         ORDER BY id DESC
+                         LIMIT 1`,
+                        [candidate_id],
+                    );
+
+                if (candidateCalls.length === 0) {
+                    return res.status(400).json({
+                        message:
+                            "Undangan onboarding harus dibuat sebelum data pegawai.",
+                    });
+                }
+
+                const [existingEmployee] = await db
+                    .promise()
+                    .query(
+                        "SELECT id FROM employees WHERE email = ? AND deleted_at IS NULL LIMIT 1",
+                        [candidate.email],
+                    );
+
+                if (existingEmployee.length > 0) {
+                    return res.status(409).json({
+                        message: "Kandidat sudah terdaftar sebagai pegawai.",
+                    });
+                }
+            }
+
             // Cek apakah email sudah terdaftar
             const [existingUser] = await db
                 .promise()
                 .query("SELECT * FROM users WHERE email = ?", [email]);
 
-            if (existingUser.length > 0) {
+            if (
+                existingUser.length > 0 &&
+                (!candidate || existingUser[0].id !== candidate.user_id)
+            ) {
                 return res
                     .status(409)
                     .json({ message: "Email already registered" });
@@ -167,7 +220,10 @@ router.post(
                 .promise()
                 .query("SELECT * FROM users WHERE username = ?", [username]);
 
-            if (existingUsername.length > 0) {
+            if (
+                existingUsername.length > 0 &&
+                (!candidate || existingUsername[0].id !== candidate.user_id)
+            ) {
                 return res
                     .status(409)
                     .json({ message: "Username already registered" });
@@ -226,9 +282,31 @@ router.post(
                 status || "active",
             ];
 
-            // Simpan user ke database
-            const [userResult] = await db.promise().query(userSql, userValues);
-            const userId = userResult.insertId;
+            let userId;
+            if (candidate) {
+                if (!candidate.user_id) {
+                    return res.status(400).json({
+                        message: "Akun kandidat tidak ditemukan.",
+                    });
+                }
+
+                userId = candidate.user_id;
+                await db.promise().query(
+                    `UPDATE users
+                     SET name = ?, email = ?, username = ?, password = ?,
+                         phone = ?, photo = COALESCE(NULLIF(?, ''), photo),
+                         status = ?, updated_at = NOW()
+                     WHERE id = ?`,
+                    [...userValues.slice(0, 7), userId],
+                );
+                await db
+                    .promise()
+                    .query("DELETE FROM user_roles WHERE user_id = ?", [userId]);
+            } else {
+                // Simpan user ke database
+                const [userResult] = await db.promise().query(userSql, userValues);
+                userId = userResult.insertId;
+            }
 
             // Simpan roles ke tabel user_roles (sudah dinormalisasi)
             for (const role of finalRoles) {
@@ -287,6 +365,15 @@ router.post(
                 .promise()
                 .query(employeeSql, employeeValues);
             const employeeId = employeeResult.insertId;
+
+            if (candidate) {
+                await db.promise().query(
+                    `UPDATE candidates
+                     SET deleted_at = NOW(), deleted_by = ?
+                     WHERE id = ?`,
+                    [req.user.id, candidate.id],
+                );
+            }
 
             // Generate JWT token dengan roles final
             const token = jwt.sign(

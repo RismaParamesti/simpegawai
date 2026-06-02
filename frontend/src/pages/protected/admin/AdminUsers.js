@@ -3,7 +3,9 @@ import { useDispatch } from "react-redux";
 import { useLocation } from "react-router-dom";
 import { setPageTitle } from "../../../features/common/headerSlice";
 import TitleCard from "../../../components/Cards/TitleCard";
+import Pagination from "../../../components/Pagination/Pagination";
 import { adminApi } from "../../../features/admin/api";
+import useTablePagination from "../../../hooks/useTablePagination";
 
 const API_ORIGIN = (process.env.REACT_APP_BASE_URL || "")
   .replace(/\/api\/?$/, "")
@@ -191,6 +193,7 @@ function AdminUsers() {
       );
     });
   }, [employeeByUserId, filters, users]);
+  const usersPagination = useTablePagination(tableUsers);
 
   const handleFilterChange = (field, value) => {
     setFilters((prev) => ({
@@ -554,7 +557,7 @@ function AdminUsers() {
                     </td>
                   </tr>
                 ) : (
-                  tableUsers.map((user) => {
+                  usersPagination.paginatedItems.map((user) => {
                   const linkedEmployee = employeeByUserId[String(user.id)];
 
                   return (
@@ -606,6 +609,12 @@ function AdminUsers() {
                 )}
               </tbody>
             </table>
+            <Pagination
+              page={usersPagination.page}
+              totalPages={usersPagination.totalPages}
+              onChangePage={usersPagination.setPage}
+              itemsPerPage={usersPagination.itemsPerPage}
+            />
           </div>
         )}
       </TitleCard>

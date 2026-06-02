@@ -884,9 +884,7 @@ function EmployeeSalaryAppeal() {
                 </tbody>
               </table>
             </div>
-            {appeals.length > 0 && (
-              <Pagination page={currentPage} totalPages={totalPages} onChangePage={handleChangePage} itemsPerPage={itemsPerPage} />
-            )}
+            <Pagination page={currentPage} totalPages={totalPages} onChangePage={handleChangePage} itemsPerPage={itemsPerPage} />
           </>
         )}
       </TitleCard>

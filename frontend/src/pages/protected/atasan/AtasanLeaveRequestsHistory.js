@@ -334,7 +334,7 @@ function AtasanLeaveRequestsHistory() {
                     </div>
                 )}
 
-                {!loading && filteredHistoryItems.length > 0 && (
+                {!loading && (
                     <Pagination
                         page={historyPage}
                         totalPages={totalHistoryPages}

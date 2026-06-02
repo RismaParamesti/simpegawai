@@ -3,7 +3,9 @@ import { useLocation } from "react-router-dom";
 import { useDispatch } from "react-redux";
 import { setPageTitle } from "../../../features/common/headerSlice";
 import TitleCard from "../../../components/Cards/TitleCard";
+import Pagination from "../../../components/Pagination/Pagination";
 import { adminApi } from "../../../features/admin/api";
+import useTablePagination from "../../../hooks/useTablePagination";
 
 const normalizeText = (value = "") =>
   String(value).toLowerCase().replace(/\s+/g, " ").trim();
@@ -226,6 +228,7 @@ function AdminEmployees() {
       return matchesSearch && matchesPosition && matchesStatus;
     });
   }, [employees, filters.position, filters.search, filters.status]);
+  const employeesPagination = useTablePagination(filteredEmployees);
 
   const loadData = async () => {
     try {
@@ -762,7 +765,7 @@ function AdminEmployees() {
                     </td>
                   </tr>
                 ) : (
-                  filteredEmployees.map((employee) => (
+                  employeesPagination.paginatedItems.map((employee) => (
                   <tr key={employee.id}>
                     <td>{employee.employee_code}</td>
                     <td>{employee.full_name || employee.name}</td>
@@ -823,6 +826,12 @@ function AdminEmployees() {
                 )}
               </tbody>
             </table>
+            <Pagination
+              page={employeesPagination.page}
+              totalPages={employeesPagination.totalPages}
+              onChangePage={employeesPagination.setPage}
+              itemsPerPage={employeesPagination.itemsPerPage}
+            />
           </div>
         )}
       </TitleCard>

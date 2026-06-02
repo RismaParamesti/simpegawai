@@ -3,6 +3,8 @@ import { useEffect, useState } from "react"
 import { useDispatch, useSelector } from "react-redux"
 import TitleCard from "../../../components/Cards/TitleCard"
 import { showNotification } from '../../common/headerSlice'
+import Pagination from "../../../components/Pagination/Pagination"
+import useTablePagination from "../../../hooks/useTablePagination"
 
 const TopSideButtons = () => {
 
@@ -34,6 +36,7 @@ function Team(){
 
 
     const [members, setMembers] = useState(TEAM_MEMBERS)
+    const membersPagination = useTablePagination(members)
 
     const getRoleComponent = (role) => {
         if(role  === "Admin")return <div className="badge badge-secondary">{role}</div>
@@ -62,7 +65,7 @@ function Team(){
                     </thead>
                     <tbody>
                         {
-                            members.map((l, k) => {
+                            membersPagination.paginatedItems.map((l, k) => {
                                 return(
                                     <tr key={k}>
                                     <td>
@@ -87,6 +90,7 @@ function Team(){
                         }
                     </tbody>
                 </table>
+                <Pagination page={membersPagination.page} totalPages={membersPagination.totalPages} onChangePage={membersPagination.setPage} itemsPerPage={membersPagination.itemsPerPage} />
             </div>
             </TitleCard>
         </>

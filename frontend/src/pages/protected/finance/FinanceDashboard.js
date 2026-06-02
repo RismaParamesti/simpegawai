@@ -3,12 +3,17 @@ import { useDispatch } from "react-redux";
 import { useNavigate } from "react-router-dom";
 import { setPageTitle } from "../../../features/common/headerSlice";
 import { financeApi } from "../../../features/finance/api";
+import Pagination from "../../../components/Pagination/Pagination";
 import Chart from "react-apexcharts";
 import {
   WalletIcon,
   GiftIcon,
   ReceiptPercentIcon,
 } from "@heroicons/react/24/outline";
+
+const SummaryPagination = () => (
+  <Pagination page={1} totalPages={1} onChangePage={() => {}} />
+);
 
 const fmt = (n) => `Rp ${Number(n || 0).toLocaleString("id-ID")}`;
 
@@ -32,6 +37,35 @@ const monthLabel = (month, year) =>
     Number(month || 1) - 1,
     1
   ).toLocaleDateString("id-ID", { month: "long" });
+
+const FinanceHeroIllustration = () => (
+  <div className="pointer-events-none absolute right-10 top-2 hidden h-32 w-80 lg:block">
+    <div className="absolute bottom-2 right-0 h-20 w-72 rounded-full bg-orange-100/80 blur-[1px] dark:bg-orange-900/30" />
+    <div className="absolute right-36 top-1 h-24 w-20 rotate-[-3deg] rounded-2xl border border-slate-200 bg-white shadow-lg dark:border-slate-700 dark:bg-slate-900">
+      <div className="flex items-center gap-2 border-b border-orange-100 px-2 py-2 dark:border-slate-700">
+        <div className="flex h-7 w-7 items-center justify-center rounded-full bg-orange-100 text-orange-500 dark:bg-orange-900/40 dark:text-orange-300">
+          Rp
+        </div>
+        <div className="space-y-1">
+          <div className="h-1.5 w-8 rounded-full bg-orange-400 dark:bg-orange-300" />
+          <div className="h-1.5 w-6 rounded-full bg-slate-200 dark:bg-slate-600" />
+        </div>
+      </div>
+      <div className="space-y-1.5 px-3 py-2">
+        <div className="h-1.5 w-12 rounded-full bg-orange-300 dark:bg-orange-400" />
+        <div className="h-1.5 w-10 rounded-full bg-emerald-200 dark:bg-emerald-400" />
+        <div className="h-1.5 w-12 rounded-full bg-slate-200 dark:bg-slate-600" />
+        <div className="h-1.5 w-8 rounded-full bg-orange-200 dark:bg-orange-800" />
+      </div>
+    </div>
+    <div className="absolute right-24 top-16 h-14 w-14 rounded-2xl bg-orange-400 shadow-md dark:bg-orange-500" />
+    <div className="absolute right-8 top-8 h-14 w-14 rounded-2xl bg-emerald-200 shadow-sm dark:bg-emerald-500/70" />
+    <div className="absolute right-12 top-20 h-2 w-20 rounded-full bg-slate-300 dark:bg-slate-600" />
+    <div className="absolute right-14 top-24 h-8 w-2 rounded-full bg-slate-400 dark:bg-slate-500" />
+    <div className="absolute right-28 top-24 h-8 w-2 rounded-full bg-slate-400 dark:bg-slate-500" />
+  </div>
+);
+
 
 function FinanceDashboard() {
   const dispatch = useDispatch();
@@ -317,308 +351,325 @@ function FinanceDashboard() {
     donutTotal > 0 ? `${((val / donutTotal) * 100).toFixed(1)}%` : "0.0%";
 
   return (
-    <div>
-      {/* -- Period filter ----------------------------------- */}
-      <div className="alert bg-base-100 border border-base-300 mb-4">
-        <div className="w-full flex flex-col md:flex-row md:items-center md:justify-between gap-3">
-          <div className="flex flex-wrap items-center gap-2 text-sm">
-            <span className="font-semibold">Periode:</span>
-            <span className="badge badge-primary badge-outline">
-              {monthOptions.find((m) => m.value === selectedMonth)?.label} {selectedYear}
-            </span>
-          </div>
-          <div className="flex items-center gap-2">
-            <select
-              className="select select-bordered select-sm"
-              value={selectedMonth}
-              onChange={(e) => { setSelectedMonth(e.target.value); setSelectedTrendIndex(null); }}
-            >
-              {monthOptions.map((m) => (
-                <option key={m.value} value={m.value}>{m.label}</option>
-              ))}
-            </select>
-            <select
-              className="select select-bordered select-sm"
-              value={selectedYear}
-              onChange={(e) => { setSelectedYear(e.target.value); setSelectedTrendIndex(null); }}
-            >
-              {yearOptions.map((y) => (
-                <option key={y} value={y}>{y}</option>
-              ))}
-            </select>
+    <div className="mt-4 overflow-hidden rounded-[1.5rem] border border-slate-200/80 bg-white p-4 shadow-[0_20px_70px_rgba(15,23,42,0.07)] dark:border-slate-700 dark:bg-slate-950 dark:shadow-[0_20px_70px_rgba(2,6,23,0.45)] sm:p-7">
+      <div className="space-y-6">
+        {/* HERO */}
+        <div className="relative min-h-[130px] overflow-hidden rounded-[1.4rem] bg-gradient-to-r from-white via-white to-orange-50/80 px-5 py-6 dark:from-slate-950 dark:via-slate-950 dark:to-slate-900 sm:px-6">
+          <FinanceHeroIllustration />
+          <div className="relative z-10 max-w-3xl">
+            <div className="mb-3 inline-flex items-center gap-2 rounded-full border border-orange-200 bg-orange-50 px-3 py-1 text-xs font-bold text-orange-600 dark:border-orange-900/60 dark:bg-orange-950/70 dark:text-orange-300">
+              Dashboard Finance
+            </div>
+            <h1 className="text-[28px] font-extrabold leading-tight text-slate-900 dark:text-slate-50">
+              Ringkasan Payroll & Keuangan
+            </h1>
+            <p className="mt-2 max-w-2xl text-sm font-medium text-slate-500 dark:text-slate-400">
+              Pantau total gaji, tunjangan, potongan, reimbursement, dan tren pengeluaran payroll berdasarkan periode yang dipilih.
+            </p>
           </div>
         </div>
-      </div>
 
-      {/* -- Main 2-column grid (left 3/5 + right 2/5) -------- */}
-      <div className="grid grid-cols-1 lg:grid-cols-5 gap-6">
-        {/* ===== LEFT ===== */}
-        <div className="lg:col-span-3 flex flex-col gap-5">
-          {/* 3 stat cards */}
-          <div className="grid grid-cols-3 gap-4">
-            {/* Gaji Pokok */}
-            <div className="card bg-base-100 border border-base-300 shadow p-4">
-              <div className="flex items-center gap-2 mb-2">
-                <div className="bg-blue-100 p-2 rounded-lg">
-                  <WalletIcon className="w-5 h-5 text-blue-700" />
-                </div>
-                <span className="text-xs font-medium text-base-content/70 leading-tight">
-                  Total Gaji Pokok
-                </span>
-              </div>
-              <p className="text-lg font-bold text-blue-700">{fmt(basicSalary)}</p>
+        {/* PERIOD FILTER */}
+        <div className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-700 dark:bg-slate-900">
+          <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+            <div>
+              <h2 className="text-xl font-extrabold text-slate-900 dark:text-slate-50">
+                Periode Laporan
+              </h2>
+              <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
+                Data yang ditampilkan untuk periode {monthOptions.find((m) => m.value === selectedMonth)?.label} {selectedYear}.
+              </p>
             </div>
 
-            {/* Tunjangan */}
-            <div className="card bg-base-100 border border-base-300 shadow p-4">
-              <div className="flex items-center gap-2 mb-2">
-                <div className="bg-cyan-100 p-2 rounded-lg">
-                  <GiftIcon className="w-5 h-5 text-cyan-600" />
-                </div>
-                <span className="text-xs font-medium text-base-content/70 leading-tight">
-                  Total Tunjangan
-                </span>
-              </div>
-              <p className="text-lg font-bold text-cyan-600">{fmt(tunjangan)}</p>
-            </div>
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+              <select
+                className="select select-bordered w-full rounded-xl bg-white text-slate-900 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100"
+                value={selectedMonth}
+                onChange={(e) => {
+                  setSelectedMonth(e.target.value);
+                  setSelectedTrendIndex(null);
+                }}
+              >
+                {monthOptions.map((m) => (
+                  <option key={m.value} value={m.value}>
+                    {m.label}
+                  </option>
+                ))}
+              </select>
 
-            {/* Potongan */}
-            <div className="card bg-base-100 border border-base-300 shadow p-4">
-              <div className="flex items-center gap-2 mb-2">
-                <div className="bg-red-100 p-2 rounded-lg">
-                  <ReceiptPercentIcon className="w-5 h-5 text-red-500" />
+              <select
+                className="select select-bordered w-full rounded-xl bg-white text-slate-900 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100"
+                value={selectedYear}
+                onChange={(e) => {
+                  setSelectedYear(e.target.value);
+                  setSelectedTrendIndex(null);
+                }}
+              >
+                {yearOptions.map((y) => (
+                  <option key={y} value={y}>
+                    {y}
+                  </option>
+                ))}
+              </select>
+            </div>
+          </div>
+        </div>
+
+        {/* STAT CARDS */}
+        <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
+          {[
+            {
+              label: "Total Gaji Pokok",
+              value: fmt(basicSalary),
+              icon: WalletIcon,
+              box: "bg-blue-50 text-blue-600 border-blue-200 dark:bg-blue-950/30 dark:text-blue-300 dark:border-blue-900/50",
+            },
+            {
+              label: "Total Tunjangan",
+              value: fmt(tunjangan),
+              icon: GiftIcon,
+              box: "bg-cyan-50 text-cyan-600 border-cyan-200 dark:bg-cyan-950/30 dark:text-cyan-300 dark:border-cyan-900/50",
+            },
+            {
+              label: "Total Potongan",
+              value: fmt(potongan),
+              icon: ReceiptPercentIcon,
+              box: "bg-red-50 text-red-600 border-red-200 dark:bg-red-950/30 dark:text-red-300 dark:border-red-900/50",
+            },
+          ].map((item) => {
+            const Icon = item.icon;
+            return (
+              <div
+                key={item.label}
+                className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm transition hover:-translate-y-0.5 hover:shadow-md dark:border-slate-700 dark:bg-slate-900"
+              >
+                <div className="flex items-start justify-between gap-4">
+                  <div>
+                    <p className="text-sm font-semibold text-slate-500 dark:text-slate-400">
+                      {item.label}
+                    </p>
+                    <p className="mt-2 text-xl font-extrabold text-slate-900 dark:text-slate-50 sm:text-2xl">
+                      {item.value}
+                    </p>
+                    <p className="mt-1 text-xs font-medium text-slate-500 dark:text-slate-400">
+                      Periode {monthOptions.find((m) => m.value === selectedMonth)?.label} {selectedYear}
+                    </p>
+                  </div>
+                  <div className={`flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl border ${item.box}`}>
+                    <Icon className="h-6 w-6" />
+                  </div>
                 </div>
-                <span className="text-xs font-medium text-base-content/70 leading-tight">
-                  Total Potongan
-                </span>
               </div>
-              <p className="text-lg font-bold text-red-500">{fmt(potongan)}</p>
+            );
+          })}
+        </div>
+
+        <div className="grid grid-cols-1 gap-6 lg:grid-cols-5">
+          {/* LEFT */}
+          <div className="space-y-6 lg:col-span-3">
+            <div className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-700 dark:bg-slate-900">
+              <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                <div>
+                  <h2 className="text-xl font-extrabold text-slate-900 dark:text-slate-50">
+                    Grafik Pengeluaran Payroll
+                  </h2>
+                  <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
+                    Klik titik pada grafik untuk melihat rincian total payroll per bulan.
+                  </p>
+                </div>
+                <div className="w-fit rounded-2xl border border-orange-200 bg-orange-50 px-4 py-3 text-right dark:border-orange-900/60 dark:bg-orange-950/30">
+                  <p className="text-xs font-semibold text-orange-600/80 dark:text-orange-300/80">
+                    Periode aktif
+                  </p>
+                  <p className="text-sm font-extrabold text-orange-600 dark:text-orange-300">
+                    {activePeriodLabel}
+                  </p>
+                </div>
+              </div>
+
+              {trends.length === 0 ? (
+                <div className="rounded-2xl border border-dashed border-slate-200 py-12 text-center dark:border-slate-700">
+                  <p className="font-bold text-slate-700 dark:text-slate-200">
+                    Belum ada data tren
+                  </p>
+                  <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
+                    Data tren payroll akan muncul setelah payroll tersedia.
+                  </p>
+                </div>
+              ) : (
+                <>
+                  <div className="rounded-2xl border border-slate-200 bg-slate-50/60 p-3 dark:border-slate-700 dark:bg-slate-950/50">
+                    <Chart
+                      options={chartOpts}
+                      series={chartSeries}
+                      type="line"
+                      height={280}
+                    />
+                  </div>
+
+                  <div className="mt-5 rounded-3xl border border-slate-200 bg-slate-50/70 p-5 shadow-sm dark:border-slate-700 dark:bg-slate-950/50">
+                    <div className="mb-4 flex flex-col gap-3 border-b border-slate-200 pb-4 dark:border-slate-700 sm:flex-row sm:items-center sm:justify-between">
+                      <div>
+                        <h3 className="text-lg font-extrabold text-slate-900 dark:text-slate-50">
+                          Total Payroll
+                        </h3>
+                        <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
+                          Rincian {activePeriodLabel}
+                        </p>
+                      </div>
+                      <div className="rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-right dark:border-emerald-900/60 dark:bg-emerald-950/30">
+                        <p className="text-xs font-semibold text-emerald-600/80 dark:text-emerald-300/80">
+                          Total Dibayarkan
+                        </p>
+                        <p className="text-base font-extrabold text-emerald-600 dark:text-emerald-300">
+                          {fmt(activeDibayarkan)}
+                        </p>
+                      </div>
+                    </div>
+
+                    <div className="space-y-3 text-sm">
+                      {[
+                        ["Total Pendapatan", "Gross", fmt(activeIncome), "bg-blue-500", "text-blue-600"],
+                        ["Total Tunjangan", "Plus", fmt(activeTunjangan), "bg-cyan-400", "text-cyan-600"],
+                        ["Total Potongan", "Minus", `-${fmt(activePotongan)}`, "bg-red-400", "text-red-500"],
+                        ["Total Dibayarkan", "Netto", fmt(activeDibayarkan), "bg-emerald-500", "text-emerald-600"],
+                      ].map(([label, type, value, dot, text]) => (
+                        <div
+                          key={label}
+                          className="flex items-center justify-between gap-4 rounded-2xl border border-slate-200 bg-white px-4 py-3 dark:border-slate-700 dark:bg-slate-900"
+                        >
+                          <div className="flex min-w-0 items-center gap-3">
+                            <span className={`inline-block h-3 w-3 shrink-0 rounded-full ${dot}`} />
+                            <span className="truncate font-semibold text-slate-600 dark:text-slate-300">
+                              {label}
+                            </span>
+                          </div>
+                          <div className="flex shrink-0 items-center gap-3 text-right">
+                            <span className="hidden text-[11px] font-bold uppercase tracking-wide text-slate-400 sm:inline">
+                              {type}
+                            </span>
+                            <span className={`min-w-[130px] font-extrabold ${text}`}>
+                              {value}
+                            </span>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                </>
+              )}
             </div>
           </div>
 
-          {/* Chart */}
-          <div className="card bg-base-100 border border-base-300 shadow p-5 flex-1">
-            <div className="flex items-start justify-between mb-3 gap-4">
+          {/* RIGHT */}
+          <div className="space-y-6 lg:col-span-2">
+            <div className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-700 dark:bg-slate-900">
               <div>
-                <h3 className="font-semibold text-base">Grafik Pengeluaran Payroll</h3>
-                <p className="text-xs text-base-content/50 mt-1">
-                  Klik titik pada bulan untuk melihat rincian total payroll.
+                <h2 className="text-xl font-extrabold text-slate-900 dark:text-slate-50">
+                  Rincian Gaji Bulan {periodLabel(period.month, period.year)}
+                </h2>
+                <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
+                  Distribusi gaji pokok, tunjangan, reimbursement, dan potongan.
                 </p>
               </div>
-              <div className="text-right shrink-0">
-                <p className="text-xs text-base-content/50">Periode aktif</p>
-                <p className="text-sm font-semibold text-blue-700">{activePeriodLabel}</p>
+
+              <div className="mt-4 rounded-2xl border border-slate-200 bg-slate-50/60 p-3 dark:border-slate-700 dark:bg-slate-950/50">
+                <Chart options={donutOpts} series={donutSeries} type="donut" height={240} />
+              </div>
+
+              <div className="mt-5 space-y-3 text-sm">
+                {[
+                  ["Gaji Pokok", pct(basicSalary), "bg-blue-800"],
+                  ["Tunjangan", pct(tunjangan), "bg-cyan-400"],
+                  ["Reimbursement", pct(reimbursement), "bg-violet-400"],
+                  ["Potongan", pct(potongan), "bg-red-400"],
+                ].map(([label, value, dot]) => (
+                  <div key={label} className="flex items-center justify-between rounded-2xl border border-slate-200 bg-white px-4 py-3 dark:border-slate-700 dark:bg-slate-950">
+                    <div className="flex items-center gap-2">
+                      <span className={`inline-block h-3 w-3 rounded-full ${dot}`} />
+                      <span className="font-medium text-slate-600 dark:text-slate-300">
+                        {label}
+                      </span>
+                    </div>
+                    <span className="font-extrabold text-slate-900 dark:text-slate-50">
+                      {value}
+                    </span>
+                  </div>
+                ))}
               </div>
             </div>
-            {trends.length === 0 ? (
-              <p className="text-center text-base-content/40 py-10">
-                Belum ada data tren
-              </p>
-            ) : (
-              <>
-                <Chart
-                  options={chartOpts}
-                  series={chartSeries}
-                  type="line"
-                  height={270}
-                />
 
-                <div className="mt-4 rounded-xl border border-base-300 bg-gradient-to-br from-base-100 to-slate-50 px-4 py-4 shadow-sm">
-                  <div className="flex items-center justify-between mb-4 gap-4 border-b border-base-300/80 pb-3">
-                    <div>
-                      <h3 className="font-bold text-base">Total Payroll</h3>
-                      <p className="text-xs text-base-content/50 mt-1">{activePeriodLabel}</p>
-                    </div>
-                    <div className="rounded-lg bg-white/80 px-3 py-2 text-right border border-base-300/70">
-                      <p className="text-[11px] uppercase tracking-wide text-base-content/40">Ringkasan</p>
-                      <p className="text-sm font-bold text-green-600">{fmt(activeDibayarkan)}</p>
-                    </div>
-                  </div>
-
-                  <div className="space-y-2.5 text-sm">
-                    <div className="flex items-center justify-between gap-4 rounded-lg bg-white/80 px-3 py-2 border border-slate-200/80">
-                      <div className="flex items-center gap-3 min-w-0">
-                        <span className="w-3 h-3 rounded-full bg-slate-400 inline-block shrink-0" />
-                        <span className="text-base-content/70 truncate">Total Pendapatan</span>
-                      </div>
-                      <div className="flex items-center gap-3 text-right shrink-0">
-                        <span className="text-[11px] uppercase tracking-wide text-base-content/40">
-                          Gross
-                        </span>
-                        <span className="w-32 sm:w-36 font-semibold text-blue-700">
-                          {fmt(activeIncome)}
-                        </span>
-                      </div>
-                    </div>
-
-                    <div className="flex items-center justify-between gap-4 rounded-lg bg-white/80 px-3 py-2 border border-cyan-100">
-                      <div className="flex items-center gap-3 min-w-0">
-                        <span className="w-3 h-3 rounded-full bg-cyan-400 inline-block shrink-0" />
-                        <span className="text-base-content/70 truncate">Total Tunjangan</span>
-                      </div>
-                      <div className="flex items-center gap-3 text-right shrink-0">
-                        <span className="text-[11px] uppercase tracking-wide text-base-content/40">
-                          Plus
-                        </span>
-                        <span className="w-32 sm:w-36 font-semibold text-cyan-600">
-                          {fmt(activeTunjangan)}
-                        </span>
-                      </div>
-                    </div>
-
-                    <div className="flex items-center justify-between gap-4 rounded-lg bg-white/80 px-3 py-2 border border-red-100">
-                      <div className="flex items-center gap-3 min-w-0">
-                        <span className="w-3 h-3 rounded-full bg-red-400 inline-block shrink-0" />
-                        <span className="text-base-content/70 truncate">Total Potongan</span>
-                      </div>
-                      <div className="flex items-center gap-3 text-right shrink-0">
-                        <span className="text-[11px] uppercase tracking-wide text-base-content/40">
-                          Minus
-                        </span>
-                        <span className="w-32 sm:w-36 font-semibold text-red-500">
-                          -{fmt(activePotongan)}
-                        </span>
-                      </div>
-                    </div>
-
-                    <div className="flex items-center justify-between gap-4 rounded-lg bg-green-50 px-3 py-2 border border-green-100">
-                      <div className="flex items-center gap-3 min-w-0">
-                        <span className="w-3 h-3 rounded-full bg-green-500 inline-block shrink-0" />
-                        <span className="text-base-content/70 truncate">Total Dibayarkan</span>
-                      </div>
-                      <div className="flex items-center gap-3 text-right shrink-0">
-                        <span className="text-[11px] uppercase tracking-wide text-base-content/40">
-                          Netto
-                        </span>
-                        <span className="w-32 sm:w-36 font-semibold text-green-600">
-                          {fmt(activeDibayarkan)}
-                        </span>
-                      </div>
-                    </div>
-                  </div>
+            <div className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-700 dark:bg-slate-900">
+              <div className="mb-4 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                <div>
+                  <h2 className="text-xl font-extrabold text-slate-900 dark:text-slate-50">
+                    5 Karyawan dengan Payroll Tertinggi
+                  </h2>
+                  <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
+                    Berdasarkan total payroll pada periode aktif.
+                  </p>
                 </div>
-              </>
-            )}
-          </div>
-        </div>
-
-        {/* ===== RIGHT ===== */}
-        <div className="lg:col-span-2 flex flex-col gap-5">
-          {/* Donut card */}
-          <div className="card bg-base-100 border border-base-300 shadow p-5">
-            <h3 className="font-bold text-base">
-              Rincian Gaji Bulan {periodLabel(period.month, period.year)}
-            </h3>
-            <p className="text-sm text-base-content/50 mb-3">
-              Distribusi Pendapatan
-            </p>
-
-            <Chart
-              options={donutOpts}
-              series={donutSeries}
-              type="donut"
-              height={230}
-            />
-
-            {/* Custom legend */}
-            <div className="mt-4 space-y-2 text-sm">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <span className="w-3 h-3 rounded-full bg-blue-800 inline-block" />
-                  <span>Gaji Pokok:</span>
-                </div>
-                <span className="font-semibold">{pct(basicSalary)}</span>
               </div>
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <span className="w-3 h-3 rounded-full bg-cyan-400 inline-block" />
-                  <span>Tunjangan :</span>
-                </div>
-                <span className="font-semibold">{pct(tunjangan)}</span>
-              </div>
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <span className="w-3 h-3 rounded-full bg-violet-400 inline-block" />
-                  <span>Reimbursement</span>
-                </div>
-                <span className="font-semibold">{pct(reimbursement)}</span>
-              </div>
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <span className="w-3 h-3 rounded-full bg-red-400 inline-block" />
-                  <span>Potongan</span>
-                </div>
-                <span className="font-semibold text-red-500">{pct(potongan)}</span>
-              </div>
-            </div>
-          </div>
 
-          {/* Top 5 Earners table */}
-          <div className="card bg-base-100 border border-base-300 shadow p-5 flex-1">
-            <h3 className="font-bold text-base mb-3">
-              5 Karyawan dengan Payroll Tertinggi
-            </h3>
-            <div className="overflow-x-auto rounded-xl border border-base-300/80">
-              <table className="table table-sm w-full min-w-[520px]">
-                <thead className="bg-slate-50 text-[11px] uppercase tracking-wide text-base-content/50">
-                  <tr>
-                    <th className="w-10">No</th>
-                    <th>Nama Karyawan</th>
-                    <th>Departemen</th>
-                    <th className="text-right">Total Payroll</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {topEarners.length === 0 ? (
+              <div className="overflow-x-auto rounded-2xl border border-slate-200 dark:border-slate-700">
+                <table className="table table-sm w-full min-w-[520px]">
+                  <thead className="bg-slate-50 text-[11px] uppercase tracking-wide text-slate-500 dark:bg-slate-950 dark:text-slate-400">
                     <tr>
-                      <td
-                        colSpan={4}
-                        className="text-center text-base-content/40 py-6"
-                      >
-                        Belum ada data
-                      </td>
+                      <th className="w-10">No</th>
+                      <th>Nama Karyawan</th>
+                      <th>Departemen</th>
+                      <th className="text-right">Total Payroll</th>
                     </tr>
-                  ) : (
-                    topEarners.slice(0, 5).map((emp, i) => (
-                      <tr key={i} className="border-t border-base-200/80 hover:bg-slate-50/80">
-                        <td className="text-base-content/50 text-xs font-medium align-middle">
-                          <span className="inline-flex h-6 w-6 items-center justify-center rounded-full bg-blue-50 text-blue-700">
-                            {i + 1}
-                          </span>
-                        </td>
-                        <td className="align-middle">
-                          <div className="min-w-0">
-                            <p className="text-sm font-semibold text-base-content truncate">
-                              {emp.name || "-"}
-                            </p>
-                            <p className="text-[11px] text-base-content/40">Payroll tertinggi</p>
-                          </div>
-                        </td>
-                        <td className="align-middle text-xs text-base-content/60">
-                          <span className="inline-flex rounded-md bg-base-200 px-2 py-1 whitespace-nowrap">
-                            {emp.department_name || "-"}
-                          </span>
-                        </td>
-                        <td className="align-middle text-right font-semibold text-blue-700 text-sm whitespace-nowrap">
-                          {fmt(emp.total_pay)}
+                  </thead>
+                  <tbody>
+                    {topEarners.length === 0 ? (
+                      <tr>
+                        <td colSpan={4} className="py-8 text-center text-slate-500 dark:text-slate-400">
+                          Belum ada data
                         </td>
                       </tr>
-                    ))
-                  )}
-                </tbody>
-              </table>
-            </div>
-            <div className="text-right mt-3">
-              <button
-                className="text-sm text-blue-700 hover:underline font-medium"
-                onClick={() =>
-                  navigate(
-                    `/app/payroll/transfers?month=${period.month || ""}&year=${period.year || ""}&status=all&sort=top-pay`
-                  )
-                }
-              >
-                Lihat Semua
-              </button>
+                    ) : (
+                      topEarners.slice(0, 5).map((emp, i) => (
+                        <tr key={`${emp.name || "employee"}-${i}`} className="border-t border-slate-100 hover:bg-orange-50/50 dark:border-slate-800 dark:hover:bg-slate-800/60">
+                          <td className="align-middle">
+                            <span className="inline-flex h-7 w-7 items-center justify-center rounded-full bg-orange-50 text-xs font-bold text-orange-600 dark:bg-orange-950/40 dark:text-orange-300">
+                              {i + 1}
+                            </span>
+                          </td>
+                          <td className="align-middle">
+                            <p className="truncate text-sm font-bold text-slate-900 dark:text-slate-50">
+                              {emp.name || "-"}
+                            </p>
+                            <p className="text-[11px] text-slate-400">Payroll tertinggi</p>
+                          </td>
+                          <td className="align-middle text-xs text-slate-600 dark:text-slate-300">
+                            <span className="inline-flex whitespace-nowrap rounded-xl bg-slate-100 px-2 py-1 dark:bg-slate-800">
+                              {emp.department_name || "-"}
+                            </span>
+                          </td>
+                          <td className="whitespace-nowrap text-right text-sm font-extrabold text-orange-600 dark:text-orange-300">
+                            {fmt(emp.total_pay)}
+                          </td>
+                        </tr>
+                      ))
+                    )}
+                  </tbody>
+                </table>
+                <SummaryPagination />
+              </div>
+
+              <div className="mt-4 text-right">
+                <button
+                  className="btn btn-sm rounded-xl border-none bg-orange-500 text-white hover:bg-orange-600"
+                  onClick={() =>
+                    navigate(
+                      `/app/payroll/transfers?month=${period.month || ""}&year=${period.year || ""}&status=all&sort=top-pay`
+                    )
+                  }
+                >
+                  Lihat Semua
+                </button>
+              </div>
             </div>
           </div>
         </div>
@@ -628,4 +679,3 @@ function FinanceDashboard() {
 }
 
 export default FinanceDashboard;
-

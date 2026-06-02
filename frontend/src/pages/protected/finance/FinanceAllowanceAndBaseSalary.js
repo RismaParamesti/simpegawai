@@ -2,8 +2,10 @@ import { useEffect, useState, useCallback } from "react";
 import { useDispatch } from "react-redux";
 import { setPageTitle, showNotification } from "../../../features/common/headerSlice";
 import TitleCard from "../../../components/Cards/TitleCard";
+import Pagination from "../../../components/Pagination/Pagination";
 import { useNavigate } from "react-router-dom";
 import { financeApi } from "../../../features/finance/api";
+import useTablePagination from "../../../hooks/useTablePagination";
 
 const formatCurrency = (value) =>
   `Rp ${Number(value || 0).toLocaleString("id-ID")}`;
@@ -25,6 +27,7 @@ function PositionSalary() {
   const canEdit = activeRole === "hr" || activeRole === "admin";
 
   const [positions, setPositions] = useState([]);
+  const positionsPagination = useTablePagination(positions);
   const [editData, setEditData] = useState({});
   const [loadingId, setLoadingId] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -138,7 +141,7 @@ function PositionSalary() {
           </thead>
 
           <tbody>
-            {positions.map((pos) => {
+            {positionsPagination.paginatedItems.map((pos) => {
               const current = editData[pos.id] || {};
 
               return (
@@ -215,6 +218,7 @@ function PositionSalary() {
             })}
           </tbody>
         </table>
+        <Pagination page={positionsPagination.page} totalPages={positionsPagination.totalPages} onChangePage={positionsPagination.setPage} itemsPerPage={positionsPagination.itemsPerPage} />
       </div>
       )}
     </TitleCard>

@@ -3,8 +3,10 @@ import { useDispatch } from 'react-redux'
 import { useLocation } from 'react-router-dom'
 import { setPageTitle, showNotification } from '../../../features/common/headerSlice'
 import TitleCard from '../../../components/Cards/TitleCard'
+import Pagination from '../../../components/Pagination/Pagination'
 import { adminApi } from '../../../features/admin/api'
 import { getHolidaysInMonth } from '../../../utils/attendanceUtils'
+import useTablePagination from '../../../hooks/useTablePagination'
 
 function AdminAttendance() {
     const dispatch = useDispatch()
@@ -18,6 +20,7 @@ function AdminAttendance() {
         status: 'all',
     })
     const [records, setRecords] = useState([])
+    const recordsPagination = useTablePagination(records)
     const [allRecords, setAllRecords] = useState([])
     const [employees, setEmployees] = useState([])
     const [updatingId, setUpdatingId] = useState(null)
@@ -271,7 +274,7 @@ function AdminAttendance() {
                             </tr>
                         </thead>
                         <tbody>
-                            {records.map((item) => (
+                            {recordsPagination.paginatedItems.map((item) => (
                                 <tr key={item.id}>
                                     <td>{new Date(item.date).toLocaleDateString('id-ID')}</td>
                                     <td>
@@ -311,6 +314,7 @@ function AdminAttendance() {
                             )}
                         </tbody>
                     </table>
+                    <Pagination page={recordsPagination.page} totalPages={recordsPagination.totalPages} onChangePage={recordsPagination.setPage} itemsPerPage={recordsPagination.itemsPerPage} />
                 </div>
             )}
         </TitleCard>

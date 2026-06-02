@@ -7,8 +7,10 @@ import {
   showNotification,
 } from "../../../features/common/headerSlice";
 import TitleCard from "../../../components/Cards/TitleCard";
+import Pagination from "../../../components/Pagination/Pagination";
 import { hrApi } from "../../../features/hr/api";
 import { MagnifyingGlassIcon } from "@heroicons/react/24/outline";
+import useTablePagination from "../../../hooks/useTablePagination";
 
 const normalizeText = (value = "") =>
   String(value).toLowerCase().replace(/\s+/g, " ").trim();
@@ -67,6 +69,7 @@ const getRawAutoRolesForForm = (formState, allPositions) => {
 };
 
 const INITIAL_FORM = {
+  candidate_id: "",
   name: "",
   email: "",
   username: "",
@@ -375,6 +378,7 @@ function HREmployees() {
       );
     });
   }, [employees, filters]);
+  const employeesPagination = useTablePagination(filteredEmployees);
 
   const filteredPositions = useMemo(() => {
     if (!createForm.department_name) return positions;
@@ -494,6 +498,7 @@ function HREmployees() {
 
     const nextForm = {
       ...INITIAL_FORM,
+      candidate_id: candidate?.candidate_id || "",
       name: candidate?.name || candidate?.candidate_name || "",
       email: candidate?.email || candidate?.candidate_email || "",
       username:
@@ -662,6 +667,7 @@ function HREmployees() {
     try {
       setSubmitting(true);
       const createdStaff = await hrApi.createEmployee({
+        candidate_id: createForm.candidate_id || undefined,
         name: createForm.name,
         full_name: createForm.name,
         email: createForm.email,
@@ -1005,7 +1011,7 @@ function HREmployees() {
                 </tr>
               </thead>
               <tbody>
-                {filteredEmployees.map((employee) => (
+                {employeesPagination.paginatedItems.map((employee) => (
                   <tr key={employee.id}>
                     <td className="font-mono font-semibold">
                       {employee.employee_code}
@@ -1095,6 +1101,12 @@ function HREmployees() {
                 ))}
               </tbody>
             </table>
+            <Pagination
+              page={employeesPagination.page}
+              totalPages={employeesPagination.totalPages}
+              onChangePage={employeesPagination.setPage}
+              itemsPerPage={employeesPagination.itemsPerPage}
+            />
           </div>
         ) : (
           <div className="text-center py-10 text-gray-500">

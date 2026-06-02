@@ -253,7 +253,7 @@ function AtasanReimbursementsHistory() {
                     </>
                 )}
 
-                {!loading && historyItems.length > 0 && (
+                {!loading && (
                     <Pagination
                         page={historyPage}
                         totalPages={totalHistoryPages}

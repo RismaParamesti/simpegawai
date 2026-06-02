@@ -1,8 +1,10 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useDispatch } from 'react-redux'
 import TitleCard from '../../../components/Cards/TitleCard'
+import Pagination from '../../../components/Pagination/Pagination'
 import { setPageTitle, showNotification } from '../../../features/common/headerSlice'
 import { atasanApi } from '../../../features/atasan/api'
+import useTablePagination from '../../../hooks/useTablePagination'
 
 const statusLabelMap = {
     draft: 'Draft',
@@ -37,6 +39,7 @@ function AtasanPayrollAdjustments() {
 
     const [teamMembers, setTeamMembers] = useState([])
     const [adjustments, setAdjustments] = useState([])
+    const adjustmentsPagination = useTablePagination(adjustments)
 
     const [selectedEmployeeId, setSelectedEmployeeId] = useState('')
     const [form, setForm] = useState({
@@ -232,7 +235,7 @@ function AtasanPayrollAdjustments() {
                                 </tr>
                             </thead>
                             <tbody>
-                                {adjustments.map((item) => (
+                                {adjustmentsPagination.paginatedItems.map((item) => (
                                     <tr key={item.id}>
                                         <td>
                                             <div className="font-semibold">{item.employee_name}</div>
@@ -257,6 +260,7 @@ function AtasanPayrollAdjustments() {
                                 )}
                             </tbody>
                         </table>
+                        <Pagination page={adjustmentsPagination.page} totalPages={adjustmentsPagination.totalPages} onChangePage={adjustmentsPagination.setPage} itemsPerPage={adjustmentsPagination.itemsPerPage} />
                     </div>
                 )}
             </TitleCard>

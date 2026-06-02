@@ -447,14 +447,12 @@ function EmployeeReimbursement() {
                 </tbody>
               </table>
             </div>
-            {items.length > 0 && (
-              <Pagination
-                page={currentPage}
-                totalPages={totalPages}
-                onChangePage={handleChangePage}
-                itemsPerPage={itemsPerPage}
-              />
-            )}
+            <Pagination
+              page={currentPage}
+              totalPages={totalPages}
+              onChangePage={handleChangePage}
+              itemsPerPage={itemsPerPage}
+            />
           </>
         )}
       </TitleCard>
@@ -522,4 +520,3 @@ function EmployeeReimbursement() {
 }
 
 export default EmployeeReimbursement;
-

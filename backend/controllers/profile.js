@@ -217,10 +217,23 @@ router.get("/", verifyToken, async (req, res) => {
 
         const roles = rolesResults.map((r) => r.name);
 
+        const [convertedCandidateRows] = await db.promise().query(
+            `SELECT id, deleted_at
+             FROM candidates
+             WHERE user_id = ?
+               AND (deleted_at IS NOT NULL OR status = 'inactive')
+             ORDER BY COALESCE(deleted_at, updated_at, created_at) DESC
+             LIMIT 1`,
+            [userId]
+        );
+
         res.json({
             user,
             employee,
             roles,
+            converted_from_candidate: convertedCandidateRows.length > 0,
+            converted_at:
+                convertedCandidateRows[0]?.deleted_at || employee?.created_at || null,
         });
     } catch (error) {
         console.error(error);

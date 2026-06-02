@@ -2,6 +2,8 @@ import { useCallback, useEffect, useState } from "react";
 import { useDispatch } from "react-redux";
 import { setPageTitle } from "../../../features/common/headerSlice";
 import { financeApi } from "../../../features/finance/api";
+import Pagination from "../../../components/Pagination/Pagination";
+import useTablePagination from "../../../hooks/useTablePagination";
 import * as XLSX from "xlsx";
 
 // (format helpers not required in this simplified report view)
@@ -12,6 +14,7 @@ function FinanceReports() {
   const [error, setError] = useState("");
   const [dashboard, setDashboard] = useState(null);
   const [payrolls, setPayrolls] = useState([]);
+  const payrollsPagination = useTablePagination(payrolls);
   const now = new Date();
   const [selectedMonth, setSelectedMonth] = useState(
     String(now.getMonth() + 1),
@@ -344,9 +347,9 @@ const getStatusLabel = (status) => {
                 </tr>
               </thead>
               <tbody>
-                {payrolls.map((item, index) => (
+                {payrollsPagination.paginatedItems.map((item, index) => (
                   <tr key={item.id}>
-                    <td>{index + 1}</td>
+                    <td>{payrollsPagination.startIndex + index + 1}</td>
                     <td>{item.employee_name}</td>
 
                     <td>{formatRupiah(item.basic_salary)}</td>
@@ -425,6 +428,7 @@ const getStatusLabel = (status) => {
                 </tr>
               </tfoot>
             </table>
+            <Pagination page={payrollsPagination.page} totalPages={payrollsPagination.totalPages} onChangePage={payrollsPagination.setPage} itemsPerPage={payrollsPagination.itemsPerPage} />
           </div>
         </div>
       </div>

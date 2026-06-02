@@ -3,7 +3,6 @@ import { useDispatch } from "react-redux";
 import axios from "axios";
 import { useNavigate } from "react-router-dom";
 import {
-  Award,
   BriefcaseBusiness,
   CheckCircle2,
   ChevronDown,
@@ -23,6 +22,7 @@ import {
 } from "lucide-react";
 
 import { setPageTitle } from "../../../features/common/headerSlice";
+import Pagination from "../../../components/Pagination/Pagination";
 import HRInterviewDetailLowongan from "./HRInterviewNilai";
 
 const ratingLabelMap = {
@@ -48,6 +48,7 @@ const resultLabelMap = {
 
 const ASSESSMENT_START = "[ASSESSMENT_CRITERIA]";
 const ASSESSMENT_END = "[/ASSESSMENT_CRITERIA]";
+const ITEMS_PER_PAGE = 10;
 
 const parseInterviewerNotes = (notes) => {
   const rawNotes = String(notes || "");
@@ -132,6 +133,8 @@ const HREvaluatedCandidates = () => {
   const [isDetailOpen, setIsDetailOpen] = useState(false);
   const [selectedCandidate, setSelectedCandidate] = useState(null);
   const [showTop3Only, setShowTop3Only] = useState(false);
+  const [candidateSort, setCandidateSort] = useState("rating_desc");
+  const [groupPages, setGroupPages] = useState({});
 
   useEffect(() => {
     dispatch(setPageTitle({ title: "Final Review" }));
@@ -303,11 +306,16 @@ const HREvaluatedCandidates = () => {
     setExpandedGroups(next);
   };
 
+  const setGroupPage = (groupKey, page) => {
+    setGroupPages((prev) => ({ ...prev, [groupKey]: page }));
+  };
+
   const resetFilters = () => {
     setSearch("");
     setPositionFilter("");
     setStatusFilter("");
     setRatingFilter("");
+    setGroupPages({});
   };
 
   const completeJobOpening = async (jobOpeningId, jobTitle) => {
@@ -621,19 +629,34 @@ const HREvaluatedCandidates = () => {
               {groupedEntries.map((group) => {
                 const isExpanded = Boolean(expandedGroups[group.key]);
 
+                const recWeight = (value) =>
+                  value === "hire" ? 3 : value === "consider" ? 2 : value === "reject" ? 1 : 0;
+                const resultWeight = (value) =>
+                  value === "passed" ? 3 : value === "pending" ? 2 : value === "failed" ? 1 : 0;
+
                 const sortedItems = (group.items || []).slice().sort((a, b) => {
                   const ra = getRatingNumber(a.rating);
                   const rb = getRatingNumber(b.rating);
-                  if (rb !== ra) return rb - ra;
-                  const recWeight = (r) =>
-                    r === "hire" ? 3 : r === "consider" ? 2 : r === "reject" ? 1 : 0;
-                  const raw = recWeight(b.recommendation) - recWeight(a.recommendation);
-                  if (raw !== 0) return raw;
-                  const resWeight = (r) => (r === "passed" ? 2 : r === "failed" ? 1 : 0);
-                  const resw = resWeight(b.result) - resWeight(a.result);
-                  if (resw !== 0) return resw;
+                  const nameA = String(a.candidate_name || "").toLowerCase();
+                  const nameB = String(b.candidate_name || "").toLowerCase();
                   const da = new Date(a.scheduled_date || 0).getTime();
                   const db = new Date(b.scheduled_date || 0).getTime();
+
+                  if (candidateSort === "rating_asc") {
+                    if (ra !== rb) return ra - rb;
+                    return nameA.localeCompare(nameB);
+                  }
+
+                  if (candidateSort === "name_asc") return nameA.localeCompare(nameB);
+                  if (candidateSort === "name_desc") return nameB.localeCompare(nameA);
+                  if (candidateSort === "date_desc") return db - da;
+                  if (candidateSort === "date_asc") return da - db;
+
+                  if (rb !== ra) return rb - ra;
+                  const recommendationDiff = recWeight(b.recommendation) - recWeight(a.recommendation);
+                  if (recommendationDiff !== 0) return recommendationDiff;
+                  const resultDiff = resultWeight(b.result) - resultWeight(a.result);
+                  if (resultDiff !== 0) return resultDiff;
                   return db - da;
                 });
 
@@ -667,6 +690,18 @@ const HREvaluatedCandidates = () => {
                 const displayItems = showTop3Only
                   ? sortedItems.slice(0, 3)
                   : sortedItems;
+                const totalCandidatePages = Math.max(
+                  1,
+                  Math.ceil(displayItems.length / ITEMS_PER_PAGE),
+                );
+                const candidatePage = Math.min(
+                  Math.max(1, Number(groupPages[group.key]) || 1),
+                  totalCandidatePages,
+                );
+                const paginatedDisplayItems = displayItems.slice(
+                  (candidatePage - 1) * ITEMS_PER_PAGE,
+                  candidatePage * ITEMS_PER_PAGE,
+                );
 
                 return (
                   <div
@@ -793,115 +828,141 @@ const HREvaluatedCandidates = () => {
 
                     {isExpanded && (
                       <div className="p-4 sm:p-5">
-                        <div className="grid grid-cols-1 gap-4 xl:grid-cols-2">
-                          {displayItems.map((item, index) => {
-                            const ratingNumber = getRatingNumber(item.rating);
-                            const isGood =
-                              ratingNumber >= 4 ||
-                              item.recommendation === "hire" ||
-                              item.result === "passed";
-
-                            return (
-                              <div
-                                key={item.id || `${item.candidate_name}-${index}`}
-                                className={`rounded-3xl border p-5 shadow-sm transition hover:-translate-y-0.5 hover:shadow-md ${
-                                  isGood
-                                    ? "border-emerald-200 bg-emerald-50/60 dark:border-emerald-900/50 dark:bg-emerald-950/20"
-                                    : "border-slate-200 bg-white dark:border-slate-700 dark:bg-slate-900"
-                                }`}
-                              >
-                                <div className="flex items-start justify-between gap-4">
-                                  <div className="flex items-start gap-3">
-                                    <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-orange-100 text-orange-600 dark:bg-orange-950/50 dark:text-orange-300">
-                                      <Award className="h-6 w-6" />
-                                    </div>
-                                    <div>
-                                      <h4 className="font-extrabold text-slate-900 dark:text-slate-50">
-                                        {item.candidate_name}
-                                      </h4>
-                                      <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
-                                        Interviewer: {item.interviewer_name || "-"}
-                                      </p>
-                                      <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
-                                        Tanggal: {formatDate(item.scheduled_date)}
-                                      </p>
-                                    </div>
-                                  </div>
-
-                                  <div className="rounded-2xl bg-white px-4 py-3 text-center shadow-sm dark:bg-slate-950">
-                                    <p className="text-[11px] font-bold uppercase text-slate-400">
-                                      Nilai
-                                    </p>
-                                    <p className="text-2xl font-extrabold text-orange-600 dark:text-orange-300">
-                                      {ratingNumber || "-"}
-                                    </p>
-                                  </div>
-                                </div>
-
-                                <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2">
-                                  <div className="rounded-2xl border border-slate-200 bg-white p-3 dark:border-slate-700 dark:bg-slate-950">
-                                    <p className="text-[11px] font-bold uppercase text-slate-400">
-                                      Keterangan Nilai
-                                    </p>
-                                    <p className="mt-1 text-sm font-semibold text-slate-700 dark:text-slate-200">
-                                      {ratingLabelMap[ratingNumber] || "-"}
-                                    </p>
-                                  </div>
-
-                                  <div className="rounded-2xl border border-slate-200 bg-white p-3 dark:border-slate-700 dark:bg-slate-950">
-                                    <p className="text-[11px] font-bold uppercase text-slate-400">
-                                      Hasil
-                                    </p>
-                                    <span
-                                      className={`mt-1 inline-flex rounded-full border px-3 py-1 text-xs font-bold ${getResultBadgeClass(
-                                        item.result,
-                                      )}`}
-                                    >
-                                      {resultLabelMap[item.result] || item.result || "-"}
-                                    </span>
-                                  </div>
-                                </div>
-
-                                <div className="mt-3 rounded-2xl border border-slate-200 bg-white p-3 dark:border-slate-700 dark:bg-slate-950">
-                                  <p className="text-[11px] font-bold uppercase text-slate-400">
-                                    Rekomendasi
-                                  </p>
-                                  <span
-                                    className={`mt-1 inline-flex rounded-full border px-3 py-1 text-xs font-bold ${getRecommendationBadgeClass(
-                                      item.recommendation,
-                                    )}`}
-                                  >
-                                    {recommendationLabelMap[item.recommendation] ||
-                                      item.recommendation ||
-                                      "-"}
-                                  </span>
-                                </div>
-
-                                <div className="mt-3 rounded-2xl border border-slate-200 bg-white p-3 dark:border-slate-700 dark:bg-slate-950">
-                                  <p className="text-[11px] font-bold uppercase text-slate-400">
-                                    Catatan Interviewer
-                                  </p>
-                                  <p className="mt-1 line-clamp-3 text-sm text-slate-600 dark:text-slate-300">
-                                    {item.interviewer_notes||
-                                      "-"}
-                                  </p>
-                                </div>
-
-                                <button
-                                  type="button"
-                                  className="btn mt-4 w-full rounded-xl border-none bg-orange-500 text-white shadow-md hover:bg-orange-600"
-                                  onClick={() => {
-                                    setSelectedCandidate(item);
-                                    setIsDetailOpen(true);
-                                  }}
-                                >
-                                  <Eye className="h-4 w-4" />
-                                  Lihat / Edit Nilai
-                                </button>
-                              </div>
-                            );
-                          })}
+                        <div className="mb-4 flex flex-col gap-3 rounded-2xl border border-slate-200 bg-slate-50/70 p-4 dark:border-slate-700 dark:bg-slate-900/60 lg:flex-row lg:items-center lg:justify-between">
+                          <div>
+                            <p className="text-sm font-extrabold text-slate-900 dark:text-slate-50">
+                              Tabel Ranking Kandidat
+                            </p>
+                            <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
+                              Data bisa diurutkan dari nilai tertinggi ke terendah, nilai terendah ke tertinggi, nama, atau tanggal interview.
+                            </p>
+                          </div>
+                          <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+                            <select
+                              className="select select-bordered select-sm rounded-xl bg-white text-slate-900 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100"
+                              value={candidateSort}
+                              onChange={(event) => setCandidateSort(event.target.value)}
+                            >
+                              <option value="rating_desc">Nilai Tertinggi</option>
+                              <option value="rating_asc">Nilai Terendah</option>
+                              <option value="name_asc">Nama A-Z</option>
+                              <option value="name_desc">Nama Z-A</option>
+                              <option value="date_desc">Tanggal Terbaru</option>
+                              <option value="date_asc">Tanggal Terlama</option>
+                            </select>
+                          </div>
                         </div>
+
+                        <div className="overflow-x-auto rounded-2xl border border-slate-200 dark:border-slate-700">
+                          <table className="table table-zebra w-full min-w-[980px]">
+                            <thead className="bg-slate-50 text-xs uppercase tracking-wide text-slate-500 dark:bg-slate-900 dark:text-slate-400">
+                              <tr>
+                                <th className="w-24">Peringkat</th>
+                                <th>Kandidat</th>
+                                <th className="text-center">Nilai</th>
+                                <th>Keterangan Nilai</th>
+                                <th>Rekomendasi</th>
+                                <th>Hasil</th>
+                                <th>Interviewer</th>
+                                <th>Tanggal</th>
+                                <th className="text-right">Aksi</th>
+                              </tr>
+                            </thead>
+                            <tbody>
+                              {paginatedDisplayItems.map((item, index) => {
+                                const globalIndex =
+                                  (candidatePage - 1) * ITEMS_PER_PAGE + index;
+                                const ratingNumber = getRatingNumber(item.rating);
+                                const rankLabel =
+                                  globalIndex === 0
+                                    ? "🥇 1"
+                                    : globalIndex === 1
+                                      ? "🥈 2"
+                                      : globalIndex === 2
+                                        ? "🥉 3"
+                                        : `#${globalIndex + 1}`;
+
+                                return (
+                                  <tr
+                                    key={item.id || `${item.candidate_name}-${globalIndex}`}
+                                    className={
+                                      ratingNumber >= 4 || item.recommendation === "hire" || item.result === "passed"
+                                        ? "bg-emerald-50/50 dark:bg-emerald-950/10"
+                                        : ""
+                                    }
+                                  >
+                                    <td>
+                                      <span className="inline-flex rounded-full bg-orange-100 px-3 py-1 text-xs font-extrabold text-orange-700 dark:bg-orange-950/50 dark:text-orange-300">
+                                        {rankLabel}
+                                      </span>
+                                    </td>
+                                    <td>
+                                      <div className="font-extrabold text-slate-900 dark:text-slate-50">
+                                        {item.candidate_name || "-"}
+                                      </div>
+                                      <p className="mt-1 max-w-[260px] truncate text-xs text-slate-500 dark:text-slate-400">
+                                        {item.interviewer_notes || "Tidak ada catatan"}
+                                      </p>
+                                    </td>
+                                    <td className="text-center">
+                                      <span className="inline-flex h-9 min-w-9 items-center justify-center rounded-xl bg-orange-500 px-3 text-sm font-extrabold text-white shadow-sm">
+                                        {ratingNumber || "-"}
+                                      </span>
+                                    </td>
+                                    <td className="text-sm font-medium text-slate-600 dark:text-slate-300">
+                                      {ratingLabelMap[ratingNumber] || "-"}
+                                    </td>
+                                    <td>
+                                      <span
+                                        className={`inline-flex rounded-full border px-3 py-1 text-xs font-bold ${getRecommendationBadgeClass(
+                                          item.recommendation,
+                                        )}`}
+                                      >
+                                        {recommendationLabelMap[item.recommendation] ||
+                                          item.recommendation ||
+                                          "-"}
+                                      </span>
+                                    </td>
+                                    <td>
+                                      <span
+                                        className={`inline-flex rounded-full border px-3 py-1 text-xs font-bold ${getResultBadgeClass(
+                                          item.result,
+                                        )}`}
+                                      >
+                                        {resultLabelMap[item.result] || item.result || "-"}
+                                      </span>
+                                    </td>
+                                    <td className="text-sm text-slate-600 dark:text-slate-300">
+                                      {item.interviewer_name || "-"}
+                                    </td>
+                                    <td className="whitespace-nowrap text-sm text-slate-600 dark:text-slate-300">
+                                      {formatDate(item.scheduled_date)}
+                                    </td>
+                                    <td className="text-right">
+                                      <button
+                                        type="button"
+                                        className="btn btn-sm rounded-xl border-none bg-orange-500 text-white shadow-sm hover:bg-orange-600"
+                                        onClick={() => {
+                                          setSelectedCandidate(item);
+                                          setIsDetailOpen(true);
+                                        }}
+                                      >
+                                        <Eye className="h-4 w-4" />
+                                        Detail
+                                      </button>
+                                    </td>
+                                  </tr>
+                                );
+                              })}
+                            </tbody>
+                          </table>
+                        </div>
+                        <Pagination
+                          page={candidatePage}
+                          totalPages={totalCandidatePages}
+                          onChangePage={(page) => setGroupPage(group.key, page)}
+                          itemsPerPage={ITEMS_PER_PAGE}
+                        />
                       </div>
                     )}
                   </div>
