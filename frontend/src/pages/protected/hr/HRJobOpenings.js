@@ -89,6 +89,25 @@ export default function HRJobOpenings() {
     return [];
   }
 
+  function formatAssessmentScore(score) {
+    if (score === null || score === undefined || score === "") return "-";
+
+    const raw = String(score).trim();
+    if (raw.endsWith("%")) return raw;
+
+    const numeric = Number(raw);
+    return Number.isFinite(numeric) ? `${numeric}%` : raw;
+  }
+
+  function parsePercentageValue(value) {
+    const normalized = String(value ?? "")
+      .replace(/%/g, "")
+      .replace(/,/g, ".")
+      .trim();
+    const number = Number(normalized);
+    return Number.isFinite(number) ? Math.max(0, number) : 0;
+  }
+
   useEffect(() => {
     fetchJobOpenings();
     fetchPositions();
@@ -194,9 +213,36 @@ export default function HRJobOpenings() {
         .filter((item) => item.criterion || item.score)
         .map((item) => ({
           criterion: String(item.criterion || "").trim(),
-          score: String(item.score || "").trim(),
+          score: String(item.score || "")
+            .replace(/%/g, "")
+            .replace(/,/g, ".")
+            .trim(),
         }))
         .filter((item) => item.criterion || item.score);
+
+      const hasIncompleteCriteria = normalizedAssessmentCriteria.some(
+        (item) => !item.criterion || item.score === "",
+      );
+      if (hasIncompleteCriteria) {
+        setError("Lengkapi semua kriteria dan bobot sebelum menyimpan.");
+        setLoading(false);
+        return;
+      }
+
+      if (normalizedAssessmentCriteria.length > 0) {
+        const totalWeight = normalizedAssessmentCriteria.reduce(
+          (sum, item) => sum + parsePercentageValue(item.score),
+          0,
+        );
+
+        if (Math.abs(totalWeight - 100) > 0.01) {
+          setError(
+            `Total bobot kriteria harus 100%. Saat ini: ${totalWeight.toFixed(2)}%`,
+          );
+          setLoading(false);
+          return;
+        }
+      }
       // Pastikan base_position, developer_specialization
       if (!payload.base_position) payload.base_position = "";
       if (!payload.developer_specialization)
@@ -238,34 +284,66 @@ export default function HRJobOpenings() {
     // setTimeout is scheduled only if a message was set
   }
 
-  function handleEdit(id) {
+  async function handleEdit(id) {
     // Cari di jobOpenings, jika tidak ada cari di historyOpenings
     let data = jobOpenings.find((j) => j.id === id);
     if (!data) {
       data = historyOpenings.find((j) => j.id === id);
     }
     if (data) {
-      // Pastikan hiring_status tetap ada di form, walau null/undefined
-      setForm((f) => ({
-        ...f,
-        ...data,
-        base_position:
-          data.base_position !== undefined ? data.base_position : "",
-        hiring_status:
-          data.hiring_status !== undefined ? data.hiring_status : "",
-        assessment_criteria: parseAssessmentCriteria(data.assessment_criteria)
-          .length
-          ? parseAssessmentCriteria(data.assessment_criteria).map((item) => ({
-              criterion: item.criterion || "",
-              score: item.score || "",
-            }))
-          : [
-              {
-                criterion: "",
-                score: "",
-              },
-            ],
-      }));
+      try {
+        const detailResponse = await jobService.getJobOpening(id);
+        const detailData = detailResponse?.job || detailResponse?.data?.job || {};
+        const mergedData = {
+          ...data,
+          ...detailData,
+        };
+
+        // Pastikan hiring_status tetap ada di form, walau null/undefined
+        setForm((f) => ({
+          ...f,
+          ...mergedData,
+          base_position:
+            mergedData.base_position !== undefined ? mergedData.base_position : "",
+          hiring_status:
+            mergedData.hiring_status !== undefined ? mergedData.hiring_status : "",
+          assessment_criteria: parseAssessmentCriteria(
+            mergedData.assessment_criteria,
+          ).length
+            ? parseAssessmentCriteria(mergedData.assessment_criteria).map((item) => ({
+                criterion: item.criterion || "",
+                score: item.score || "",
+              }))
+            : [
+                {
+                  criterion: "",
+                  score: "",
+                },
+              ],
+        }));
+      } catch (error) {
+        // Fallback ke data list jika request detail gagal
+        setForm((f) => ({
+          ...f,
+          ...data,
+          base_position:
+            data.base_position !== undefined ? data.base_position : "",
+          hiring_status:
+            data.hiring_status !== undefined ? data.hiring_status : "",
+          assessment_criteria: parseAssessmentCriteria(data.assessment_criteria)
+            .length
+            ? parseAssessmentCriteria(data.assessment_criteria).map((item) => ({
+                criterion: item.criterion || "",
+                score: item.score || "",
+              }))
+            : [
+                {
+                  criterion: "",
+                  score: "",
+                },
+              ],
+        }));
+      }
       setEditMode(true);
       setEditId(id);
       setActiveTab("add");
@@ -320,11 +398,20 @@ export default function HRJobOpenings() {
   }
 
   function updateAssessmentCriterion(index, field, value) {
+    const normalizedValue =
+      field === "score"
+        ? String(value)
+            .replace(/[^0-9.,]/g, "")
+            .replace(/,/g, ".")
+        : value;
+
     setForm((f) => ({
       ...f,
       assessment_criteria: (f.assessment_criteria || []).map(
         (item, itemIndex) =>
-          itemIndex === index ? { ...item, [field]: value } : item,
+          itemIndex === index
+            ? { ...item, [field]: normalizedValue }
+            : item,
       ),
     }));
   }
@@ -489,6 +576,11 @@ export default function HRJobOpenings() {
   const paginatedHistory = filteredHistory.slice(
     (historyPage - 1) * ITEMS_PER_PAGE,
     historyPage * ITEMS_PER_PAGE,
+  );
+
+  const assessmentWeightTotal = (form.assessment_criteria || []).reduce(
+    (sum, item) => sum + parsePercentageValue(item?.score),
+    0,
   );
 
   const getJobStatusBadgeClass = (status) => {
@@ -675,7 +767,7 @@ export default function HRJobOpenings() {
                             <td className="font-medium">
                               {item.criterion || "-"}
                             </td>
-                            <td>{item.score || "-"}</td>
+                            <td>{formatAssessmentScore(item.score)}</td>
                           </tr>
                         ))}
                       </tbody>
@@ -1143,7 +1235,7 @@ export default function HRJobOpenings() {
                   value={form.location}
                   onChange={handleChange}
                   className="input input-bordered w-full rounded-xl"
-                  placeholder="Contoh: Surabaya / Remote"
+                  placeholder="Contoh: Surabaya"
                 />
               </div>
 
@@ -1215,6 +1307,15 @@ export default function HRJobOpenings() {
                     </h3>
                     <p className="text-xs text-base-content/60 mt-1">
                       Kriteria ini akan tampil otomatis pada halaman interview.
+                    </p>
+                    <p
+                      className={`text-xs mt-1 font-semibold ${
+                        Math.abs(assessmentWeightTotal - 100) <= 0.01
+                          ? "text-success"
+                          : "text-warning"
+                      }`}
+                    >
+                      Total Bobot: {assessmentWeightTotal.toFixed(2)}% (harus 100%)
                     </p>
                   </div>
 
@@ -1288,7 +1389,7 @@ export default function HRJobOpenings() {
                 {editMode && (
                   <button
                     type="button"
-                    className="btn btn-ghost btn-sm rounded-xl"
+                    className="btn btn-ghost rounded-xl h-12 px-6"
                     onClick={handleCancelEdit}
                     disabled={loading}
                   >
@@ -1298,7 +1399,7 @@ export default function HRJobOpenings() {
 
                 <button
                   type="submit"
-                  className="btn btn-primary rounded-xl px-8"
+                  className="btn btn-primary rounded-xl px-8 h-12"
                   disabled={loading}
                 >
                   {loading
@@ -1472,7 +1573,7 @@ export default function HRJobOpenings() {
                             <td>
                               <div className="flex items-center justify-center gap-3 whitespace-nowrap">
                                 <button
-                                  className="rounded-full border border-blue-600 bg-gradient-to-b from-blue-400 to-blue-600 px-3 py-1 text-xs text-white transition-all duration-200 hover:from-blue-500 hover:to-blue-700"
+                                  className="h-8 inline-flex items-center justify-center rounded-full border border-blue-600 bg-gradient-to-b from-blue-400 to-blue-600 px-3 py-1 text-xs text-white transition-all duration-200 hover:from-blue-500 hover:to-blue-700"
                                   type="button"
                                   onClick={() =>
                                     navigate(`/app/job-openings/${j.id}`)
@@ -1482,7 +1583,7 @@ export default function HRJobOpenings() {
                                 </button>
 
                                 <button
-                                  className="rounded-full border border-yellow-500 bg-gradient-to-b from-yellow-300 to-yellow-500 px-3 py-1 text-xs text-black transition-all duration-200 hover:from-yellow-400 hover:to-yellow-600"
+                                  className="h-8 inline-flex items-center justify-center rounded-full border border-yellow-500 bg-gradient-to-b from-yellow-300 to-yellow-500 px-3 py-1 text-xs text-black transition-all duration-200 hover:from-yellow-400 hover:to-yellow-600"
                                   type="button"
                                   onClick={() => handleEdit(j.id)}
                                 >
@@ -1490,7 +1591,7 @@ export default function HRJobOpenings() {
                                 </button>
 
                                 <button
-                                  className="rounded-full border border-red-600 bg-gradient-to-b from-red-400 to-red-600 px-3 py-1 text-xs text-white transition-all duration-200 hover:from-red-500 hover:to-red-700"
+                                  className="h-8 inline-flex items-center justify-center rounded-full border border-red-600 bg-gradient-to-b from-red-400 to-red-600 px-3 py-1 text-xs text-white transition-all duration-200 hover:from-red-500 hover:to-red-700"
                                   type="button"
                                   onClick={() => handleCancelJob(j.id)}
                                 >
@@ -1684,7 +1785,7 @@ export default function HRJobOpenings() {
                             <td>
                               <div className="flex items-center justify-center gap-3 whitespace-nowrap">
                                 <button
-                                  className="rounded-full border border-blue-600 bg-gradient-to-b from-blue-400 to-blue-600 px-3 py-1 text-xs text-white transition-all duration-200 hover:from-blue-500 hover:to-blue-700"
+                                  className="h-8 inline-flex items-center justify-center rounded-full border border-blue-600 bg-gradient-to-b from-blue-400 to-blue-600 px-3 py-1 text-xs text-white transition-all duration-200 hover:from-blue-500 hover:to-blue-700"
                                   type="button"
                                   onClick={() =>
                                     navigate(`/app/job-openings/${j.id}`)
@@ -1694,7 +1795,7 @@ export default function HRJobOpenings() {
                                 </button>
 
                                 <button
-                                  className="rounded-full border border-yellow-500 bg-gradient-to-b from-yellow-300 to-yellow-500 px-3 py-1 text-xs text-black transition-all duration-200 hover:from-yellow-400 hover:to-yellow-600"
+                                  className="h-8 inline-flex items-center justify-center rounded-full border border-yellow-500 bg-gradient-to-b from-yellow-300 to-yellow-500 px-3 py-1 text-xs text-black transition-all duration-200 hover:from-yellow-400 hover:to-yellow-600"
                                   type="button"
                                   onClick={() => handleEdit(j.id)}
                                 >

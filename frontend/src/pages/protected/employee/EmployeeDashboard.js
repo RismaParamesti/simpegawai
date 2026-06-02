@@ -407,8 +407,11 @@ function EmployeeDashboard() {
     warningRules,
     sanctionLevel,
   );
-  const currentWarningRuleLabel = currentWarningRule?.sanction_label || formatSanctionLabel(currentWarningRule?.sanction_level || sanctionLevel);
-  const currentWarningRuleThresholdSummary = getRuleThresholdSummary(currentWarningRule);
+  const currentWarningRuleLabel =
+    currentWarningRule?.sanction_label ||
+    formatSanctionLabel(currentWarningRule?.sanction_level || sanctionLevel);
+  const currentWarningRuleThresholdSummary =
+    getRuleThresholdSummary(currentWarningRule);
   const currentNoticeKey = `${sanctionLevel}:${currentWarningRule?.id || "none"}:${discipline?.alpha_last_evaluated_at || ""}`;
   const totalWorkdays = calculateWorkdaysInMonth(currentMonth, currentYear);
   const performancePercent = calculateAccuratePercentage(
@@ -487,231 +490,339 @@ function EmployeeDashboard() {
     });
   };
 
-  return (
-    <div className="space-y-6">
-      {error && (
-        <div className="alert alert-error">
-          <span>{error}</span>
-          <button className="btn btn-xs" onClick={loadDashboard}>
-            Muat Ulang
-          </button>
+  const DashboardHeroIllustration = () => (
+    <div className="pointer-events-none absolute right-10 top-2 hidden h-32 w-80 lg:block">
+      <div className="absolute bottom-2 right-0 h-20 w-72 rounded-full bg-orange-100/80 blur-[1px] dark:bg-orange-900/30" />
+      <div className="absolute right-36 top-1 h-24 w-20 rotate-[-3deg] rounded-2xl border border-slate-200 bg-white shadow-lg dark:border-slate-700 dark:bg-slate-900">
+        <div className="flex items-center gap-2 border-b border-orange-100 px-2 py-2 dark:border-slate-700">
+          <div className="flex h-7 w-7 items-center justify-center rounded-full bg-orange-100 text-orange-500 dark:bg-orange-900/40 dark:text-orange-300">
+            ✓
+          </div>
+          <div className="space-y-1">
+            <div className="h-1.5 w-8 rounded-full bg-orange-400 dark:bg-orange-300" />
+            <div className="h-1.5 w-6 rounded-full bg-slate-200 dark:bg-slate-600" />
+          </div>
         </div>
-      )}
+        <div className="space-y-1.5 px-3 py-2">
+          <div className="h-1.5 w-12 rounded-full bg-orange-300 dark:bg-orange-400" />
+          <div className="h-1.5 w-10 rounded-full bg-emerald-200 dark:bg-emerald-400" />
+          <div className="h-1.5 w-12 rounded-full bg-slate-200 dark:bg-slate-600" />
+          <div className="h-1.5 w-8 rounded-full bg-orange-200 dark:bg-orange-800" />
+        </div>
+      </div>
+      <div className="absolute right-24 top-16 h-14 w-14 rounded-2xl bg-orange-400 shadow-md dark:bg-orange-500" />
+      <div className="absolute right-8 top-8 h-14 w-14 rounded-2xl bg-emerald-200 shadow-sm dark:bg-emerald-500/70" />
+      <div className="absolute right-12 top-20 h-2 w-20 rounded-full bg-slate-300 dark:bg-slate-600" />
+      <div className="absolute right-14 top-24 h-8 w-2 rounded-full bg-slate-400 dark:bg-slate-500" />
+      <div className="absolute right-28 top-24 h-8 w-2 rounded-full bg-slate-400 dark:bg-slate-500" />
+    </div>
+  );
 
-      <div className="grid lg:grid-cols-3 gap-6">
-        <div className="lg:col-span-2 space-y-6">
-          <TitleCard
-            title={`Hai, ${profile?.user?.name || profile?.user?.username || "Pegawai"}!`}
-            topMargin="mt-0"
-          >
-            <p className="opacity-70">
+  const attendanceCards = [
+    {
+      label: "Absen Masuk",
+      value: formatTime(todayAttendance?.check_in),
+      tone: "orange",
+    },
+    {
+      label: "Absen Pulang",
+      value: formatTime(todayAttendance?.check_out),
+      tone: "emerald",
+    },
+    {
+      label: "Status",
+      value: todayAttendance?.status || "Belum absen",
+      tone: "amber",
+    },
+    {
+      label: "Durasi Kerja",
+      value: todayAttendance?.working_hours
+        ? `${todayAttendance.working_hours}j`
+        : "-",
+      tone: "slate",
+    },
+  ];
+
+  const monthSummaryCards = [
+    {
+      label: "Hadir",
+      value: `${presentDays} hari`,
+      color: "text-emerald-600",
+      bg: "bg-emerald-50",
+      border: "border-emerald-200",
+    },
+    {
+      label: "Terlambat",
+      value: `${lateDays} hari`,
+      color: "text-amber-600",
+      bg: "bg-amber-50",
+      border: "border-amber-200",
+    },
+    {
+      label: "Izin/Cuti",
+      value: `${permissionDays} hari`,
+      color: "text-blue-600",
+      bg: "bg-blue-50",
+      border: "border-blue-200",
+    },
+    {
+      label: "Alpha",
+      value: `${absentDays} hari`,
+      color: "text-red-600",
+      bg: "bg-red-50",
+      border: "border-red-200",
+    },
+  ];
+
+  return (
+    <div className="mt-4 overflow-hidden rounded-[1.5rem] border border-slate-200/80 bg-white p-4 shadow-[0_20px_70px_rgba(15,23,42,0.07)] dark:border-slate-700 dark:bg-slate-950 dark:shadow-[0_20px_70px_rgba(2,6,23,0.45)] sm:p-7">
+      <div className="space-y-6">
+        {error && (
+          <div className="rounded-2xl border border-red-200 bg-red-50 p-4 text-red-600 dark:border-red-900/60 dark:bg-red-950/30 dark:text-red-300">
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+              <span className="text-sm font-semibold">{error}</span>
+              <button
+                className="btn btn-sm rounded-xl border-none bg-red-500 text-white hover:bg-red-600"
+                onClick={loadDashboard}
+              >
+                Muat Ulang
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* HERO */}
+        <div className="relative min-h-[130px] overflow-hidden rounded-[1.4rem] bg-gradient-to-r from-white via-white to-orange-50/80 px-5 py-6 dark:from-slate-950 dark:via-slate-950 dark:to-slate-900 sm:px-6">
+          <DashboardHeroIllustration />
+
+          <div className="relative z-10 max-w-3xl">
+            <div className="mb-3 inline-flex items-center gap-2 rounded-full border border-orange-200 bg-orange-50 px-3 py-1 text-xs font-bold text-orange-600 dark:border-orange-900/60 dark:bg-orange-950/70 dark:text-orange-300">
+              Dashboard Pegawai
+            </div>
+
+            <h1 className="text-[28px] font-extrabold leading-tight text-slate-900 dark:text-slate-50">
+              Hai, {profile?.user?.name || profile?.user?.username || "Pegawai"}
+              !
+            </h1>
+          </div>
+        </div>
+        <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm dark:border-slate-700 dark:bg-slate-900">
+          <div className="flex items-center gap-3 mb-4">
+            <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-orange-100 text-xl">
+              🕒
+            </div>
+
+            <div>
+              <h2 className="text-xl font-extrabold text-slate-900 dark:text-slate-50">
+                Absensi Hari Ini
+              </h2>
+
+              <p className="text-sm text-slate-500 dark:text-slate-400">
+                Kehadiran dan aktivitas absensi Anda hari ini
+              </p>
+            </div>
+          </div>
+
+          <div className="rounded-2xl bg-slate-50 p-4 dark:bg-slate-800/50">
+            <p className="text-sm leading-relaxed text-slate-600 dark:text-slate-300">
               {isSundayToday
-                ? "Hari ini hari libur, anda tidak perlu absen!"
+                ? "Hari ini hari libur, kamu tidak perlu absen."
                 : isCheckInCutoffPassed
-                  ? `Jam absensi sudah berakhir pada pukul ${formatTime(attendanceWindow.checkOutTime)}.`
+                  ? `Jam absensi sudah berakhir pada pukul ${formatTime(
+                      attendanceWindow.checkOutTime,
+                    )}.`
                   : isLeaveIntegratedToday
-                    ? `Hari ini status kamu ${todayAttendance?.status || activeApprovedLeaveToday?.leave_type || "izin/cuti"}. Anda tidak perlu absen.`
+                    ? `Hari ini status kamu ${
+                        todayAttendance?.status ||
+                        activeApprovedLeaveToday?.leave_type ||
+                        "izin/cuti"
+                      }. Kamu tidak perlu absen.`
                     : hasApprovedSpecialPermission
-                      ? `Hari ini status kamu ${todayAttendance?.status || activeApprovedLeaveToday?.leave_type || "izin/cuti"}. Kamu dapat melakukan absensi${todayAttendance?.special_permission_time ? ` sebelum pukul ${formatTime(todayAttendance.special_permission_time)}` : " sesuai jadwal yang disetujui"}.`
+                      ? "Kamu memiliki izin khusus hari ini. Silakan absen sesuai waktu yang disetujui."
                       : isCheckInTooEarly
                         ? `Absensi hanya bisa dilakukan pada jam kerja ${attendanceWindow.label}.`
                         : !hasCheckedIn
                           ? "Hari ini kamu belum absen masuk."
                           : !hasCheckedOut
                             ? "Hari ini kamu belum absen pulang."
-                            : "Hari ini kamu sudah absen pulang."}
+                            : "Hari ini kamu sudah menyelesaikan absensi."}
             </p>
-            <div className="flex flex-wrap gap-3 mt-5">
-              <button
-                className="
-      btn btn-primary
-      disabled:bg-gray-300
-      disabled:text-gray-600
-      disabled:border-0
-      disabled:opacity-80
-      disabled:cursor-not-allowed
-    "
-                disabled={!canCheckInNow}
-                onClick={handleCheckIn}
-              >
-                Absen Masuk
-              </button>
+          </div>
 
-              <button
-                className="
-      btn btn-secondary
-      disabled:bg-gray-300
-      disabled:text-gray-600
-      disabled:border-0
-      disabled:opacity-80
-      disabled:cursor-not-allowed
-    "
-                disabled={!canCheckOutNow}
-                onClick={handleCheckOut}
-              >
-                Absen Pulang
-              </button>
+          <div className="mt-5 flex flex-col gap-3 sm:flex-row">
+            <button
+              className="btn flex-1 rounded-2xl border-none bg-orange-500 text-white hover:bg-orange-600 disabled:bg-slate-200 disabled:text-slate-500"
+              disabled={!canCheckInNow}
+              onClick={handleCheckIn}
+            >
+              Absen Masuk
+            </button>
+
+            <button
+              className="btn flex-1 rounded-2xl border-none bg-emerald-500 text-white hover:bg-emerald-600 disabled:bg-slate-200 disabled:text-slate-500"
+              disabled={!canCheckOutNow}
+              onClick={handleCheckOut}
+            >
+              Absen Pulang
+            </button>
+          </div>
+        </div>
+
+        <div className="grid grid-cols-1 gap-6 xl:grid-cols-3">
+          <div className="space-y-6 xl:col-span-2">
+            <div
+              className="cursor-pointer rounded-3xl border border-slate-200 bg-white p-5 shadow-sm transition hover:-translate-y-0.5 hover:border-orange-200 hover:shadow-md dark:border-slate-700 dark:bg-slate-900"
+              onClick={openAttendanceTodayCard}
+              onKeyDown={(event) => {
+                if (event.key === "Enter" || event.key === " ") {
+                  event.preventDefault();
+                  openAttendanceTodayCard();
+                }
+              }}
+              role="button"
+              tabIndex={0}
+              aria-label="Buka halaman Absensi Hari Ini"
+            >
+              <div className="mb-4 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                <div>
+                  <h2 className="text-xl font-extrabold text-slate-900 dark:text-slate-50">
+                    Status Kehadiran Hari Ini
+                  </h2>
+                  <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
+                    Klik card ini untuk membuka detail absensi.
+                  </p>
+                </div>
+                <span className="w-fit rounded-full border border-orange-200 bg-orange-50 px-3 py-1 text-xs font-bold text-orange-600 dark:border-orange-900/60 dark:bg-orange-950/70 dark:text-orange-300">
+                  {attendanceWindow.label}
+                </span>
+              </div>
+
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
+                {attendanceCards.map((item) => (
+                  <div
+                    key={item.label}
+                    className="rounded-2xl border border-slate-200 bg-slate-50/80 p-4 dark:border-slate-700 dark:bg-slate-950/50"
+                  >
+                    <p className="text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
+                      {item.label}
+                    </p>
+                    <p className="mt-2 text-lg font-extrabold capitalize text-slate-900 dark:text-slate-50">
+                      {item.value}
+                    </p>
+                  </div>
+                ))}
+              </div>
             </div>
-          </TitleCard>
-          <div
-            className="cursor-pointer"
-            onClick={openAttendanceTodayCard}
-            onKeyDown={(event) => {
-              if (event.key === "Enter" || event.key === " ") {
-                event.preventDefault();
-                openAttendanceTodayCard();
-              }
-            }}
-            role="button"
-            tabIndex={0}
-            aria-label="Buka halaman Absensi Hari Ini"
-          >
-            <TitleCard title="Status Kehadiran Hari Ini" topMargin="mt-6">
-              <div className="grid md:grid-cols-4 grid-cols-2 gap-4">
-                <div className="text-center p-3 bg-info/10 border border-info/25 rounded-lg">
-                  <p className="text-sm opacity-70">Absen Masuk</p>
-                  <p className="font-semibold">
-                    {formatTime(todayAttendance?.check_in)}
-                  </p>
-                </div>
-                <div className="text-center p-3 bg-success/10 border border-success/25 rounded-lg">
-                  <p className="text-sm opacity-70">Absen Pulang</p>
-                  <p className="font-semibold">
-                    {formatTime(todayAttendance?.check_out)}
-                  </p>
-                </div>
-                <div className="text-center p-3 bg-warning/10 border border-warning/25 rounded-lg">
-                  <p className="text-sm opacity-70">Status</p>
-                  <p className="font-semibold capitalize">
-                    {todayAttendance?.status || "Belum absen"}
-                  </p>
-                </div>
-                <div className="text-center p-3 bg-primary/10 border border-primary/25 rounded-lg">
-                  <p className="text-sm opacity-70">Durasi Kerja</p>
-                  <p className="font-semibold">
-                    {todayAttendance?.working_hours
-                      ? `${todayAttendance.working_hours}j`
-                      : "-"}
+
+            <div className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-700 dark:bg-slate-900">
+              <div className="mb-4 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                <div>
+                  <h2 className="text-xl font-extrabold text-slate-900 dark:text-slate-50">
+                    Ringkasan Bulan Ini
+                  </h2>
+                  <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
+                    Rekap kehadiran bulan{" "}
+                    {new Date(currentYear, currentMonth - 1).toLocaleString(
+                      "id-ID",
+                      { month: "long" },
+                    )}{" "}
+                    {currentYear}.
                   </p>
                 </div>
               </div>
-            </TitleCard>
-          </div>
-          <TitleCard title="Ringkasan Bulan Ini" topMargin="mt-0">
-            <div className="grid grid-cols-2 gap-4 text-sm">
-              <button
-                type="button"
-                onClick={() => navigate("/app/attendance")}
-                className="p-3 bg-success/10 border border-success/25 rounded-lg text-left hover:bg-success/20 transition"
-              >
-                <p className="text-xs opacity-70 mb-1">Hadir</p>
-                <p className="text-lg font-bold text-success">
-                  {presentDays} hari
-                </p>
-              </button>
-              <button
-                type="button"
-                onClick={() => navigate("/app/attendance")}
-                className="p-3 bg-warning/10 border border-warning/25 rounded-lg text-left hover:bg-warning/20 transition"
-              >
-                <p className="text-xs opacity-70 mb-1">Terlambat</p>
-                <p className="text-lg font-bold text-warning">
-                  {lateDays} hari
-                </p>
-              </button>
-              <button
-                type="button"
-                onClick={() => navigate("/app/attendance")}
-                className="p-3 bg-info/10 border border-info/25 rounded-lg text-left hover:bg-info/20 transition"
-              >
-                <p className="text-xs opacity-70 mb-1">Izin/Cuti</p>
-                <p className="text-lg font-bold text-info">
-                  {permissionDays} hari
-                </p>
-              </button>
-              <button
-                type="button"
-                onClick={() => navigate("/app/attendance")}
-                className="p-3 bg-error/10 border border-error/25 rounded-lg text-left hover:bg-error/20 transition"
-              >
-                <p className="text-xs opacity-70 mb-1">Alpha</p>
-                <p className="text-lg font-bold text-error">
-                  {absentDays} hari
-                </p>
-              </button>
-              <button
-                type="button"
-                onClick={() => navigate("/app/attendance")}
-                className="col-span-2 p-3 bg-primary/10 border border-primary/25 rounded-lg text-center hover:bg-primary/20 transition"
-              >
-                <p className="text-xs opacity-70 mb-1">Persentase Kehadiran</p>
-                <p className="text-2xl font-bold text-primary">
-                  {performancePercent}%
-                </p>
-                <p className="text-xs opacity-70 mt-1">
-                  dari {totalWorkdays} hari kerja
-                </p>
-              </button>
-              <div className="col-span-2 p-3 bg-base-200 rounded-lg border border-base-300">
-                <p className="text-xs opacity-70 mb-1">
-                  Status Sanksi Disiplin Kehadiran
-                </p>
-                <div className="grid md:grid-cols-5 grid-cols-1 gap-2 text-xs mb-2">
-                  <div className="bg-base-100 rounded px-2 py-2">
-                    <p className="opacity-70">Sanksi Saat Ini</p>
+
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                {monthSummaryCards.map((item) => (
+                  <button
+                    key={item.label}
+                    type="button"
+                    onClick={() => navigate("/app/attendance")}
+                    className={`rounded-2xl border ${item.border} ${item.bg} p-4 text-left shadow-sm transition hover:-translate-y-0.5 hover:shadow-md dark:border-slate-700 dark:bg-slate-950/50`}
+                  >
+                    <p className="text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
+                      {item.label}
+                    </p>
+                    <p className={`mt-2 text-2xl font-extrabold ${item.color}`}>
+                      {item.value}
+                    </p>
+                  </button>
+                ))}
+
+                <button
+                  type="button"
+                  onClick={() => navigate("/app/attendance")}
+                  className="rounded-2xl border border-orange-200 bg-orange-50 p-5 text-center shadow-sm transition hover:-translate-y-0.5 hover:shadow-md dark:border-orange-900/60 dark:bg-orange-950/30"
+                >
+                  <p className="text-xs font-semibold uppercase tracking-wide text-orange-600/80 dark:text-orange-300">
+                    Persentase Kehadiran
+                  </p>
+                  <p className="mt-2 text-4xl font-extrabold text-orange-600 dark:text-orange-300">
+                    {performancePercent}%
+                  </p>
+                  <p className="mt-1 text-xs font-medium text-orange-600/80 dark:text-orange-300/80">
+                    dari {totalWorkdays} hari kerja
+                  </p>
+                </button>
+
+                <div className="rounded-2xl border border-slate-200 bg-slate-50/80 p-5 dark:border-slate-700 dark:bg-slate-950/50">
+                  <p className="text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
+                    Status Sanksi Disiplin
+                  </p>
+                  <div className="mt-3 flex flex-wrap items-center gap-2">
                     <span className={`badge ${sanctionBadgeClass}`}>
                       {sanctionLabel}
                     </span>
+                    {currentWarningRuleThresholdSummary ? (
+                      <span className="text-xs text-slate-500 dark:text-slate-400">
+                        {currentWarningRuleThresholdSummary}
+                      </span>
+                    ) : null}
                   </div>
-                  <div className="bg-base-100 rounded px-2 py-2">
-                    <p className="opacity-70">Alpha Berturut</p>
-                    <p className="font-semibold">
-                      {Number(discipline?.alpha_consecutive_days || 0)} hari
-                    </p>
-                  </div>
-                  <div className="bg-base-100 rounded px-2 py-2">
-                    <p className="opacity-70">Alpha Akumulasi</p>
-                    <p className="font-semibold">
-                      {Number(discipline?.alpha_accumulated_days || 0)} hari
-                    </p>
-                  </div>
-                  <div className="bg-base-100 rounded px-2 py-2">
-                    <p className="opacity-70">Terlambat Berturut</p>
-                    <p className="font-semibold">{consecutiveLate} kali</p>
-                  </div>
-                  <div className="bg-base-100 rounded px-2 py-2">
-                    <p className="opacity-70">Terlambat Akumulasi</p>
-                    <p className="font-semibold">{lateDays} kali</p>
+                  <div className="mt-4 grid grid-cols-2 gap-2 text-xs">
+                    <div className="rounded-xl border border-slate-200 bg-white p-3 dark:border-slate-700 dark:bg-slate-900">
+                      <p className="text-slate-500 dark:text-slate-400">
+                        Alpha Berturut
+                      </p>
+                      <p className="mt-1 font-bold text-slate-900 dark:text-slate-50">
+                        {Number(discipline?.alpha_consecutive_days || 0)} hari
+                      </p>
+                    </div>
+                    <div className="rounded-xl border border-slate-200 bg-white p-3 dark:border-slate-700 dark:bg-slate-900">
+                      <p className="text-slate-500 dark:text-slate-400">
+                        Terlambat
+                      </p>
+                      <p className="mt-1 font-bold text-slate-900 dark:text-slate-50">
+                        {lateDays} kali
+                      </p>
+                    </div>
                   </div>
                 </div>
               </div>
             </div>
-          </TitleCard>
-        </div>
+          </div>
 
-        <TitleCard title="" topMargin="mt-0">
-          <div className="mb-6 pb-6 border-b">
-            <div className="flex items-center justify-center gap-2 mb-5">
+          <div className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-700 dark:bg-slate-900">
+            <div className="mb-5 flex items-center justify-between">
               <button
-                className="px-2 py-1 hover:bg-base-200 rounded transition text-sm"
+                className="rounded-xl px-3 py-2 text-sm font-bold text-slate-500 hover:bg-slate-100 dark:text-slate-400 dark:hover:bg-slate-800"
                 onClick={handlePreviousMonth}
                 title="Bulan sebelumnya"
               >
                 ←
               </button>
-              <span className="text-sm font-bold">
-                {new Date(currentYear, currentMonth - 1).toLocaleString(
-                  "id-ID",
-                  {
-                    month: "long",
-                  },
-                )}
-              </span>
-
-              <span className="text-sm font-bold">{currentYear}</span>
-
+              <div className="text-center">
+                <p className="text-lg font-extrabold text-slate-900 dark:text-slate-50">
+                  {new Date(currentYear, currentMonth - 1).toLocaleString(
+                    "id-ID",
+                    { month: "long" },
+                  )}
+                </p>
+                <p className="text-xs font-semibold text-slate-500 dark:text-slate-400">
+                  {currentYear}
+                </p>
+              </div>
               <button
-                className="px-2 py-1 hover:bg-base-200 rounded transition text-sm"
+                className="rounded-xl px-3 py-2 text-sm font-bold text-slate-500 hover:bg-slate-100 dark:text-slate-400 dark:hover:bg-slate-800"
                 onClick={handleNextMonth}
                 title="Bulan berikutnya"
               >
@@ -723,269 +834,207 @@ function EmployeeDashboard() {
               year={currentYear}
               attendanceData={attendanceHistory}
             />
-          </div>
 
-          <div className="space-y-4">
-            {" "}
-            <p className="text-[11px] uppercase tracking-wide opacity-70 mb-3">
-              Keterangan Status Absensi
-            </p>
-            <div>
-              <div className="flex justify-between text-sm mb-1">
-                <span>Hadir</span>
-                <span>{presentDays}</span>
-              </div>
-              <progress
-                className="progress progress-success w-full"
-                value={presentDays}
-                max={Math.max(totalWorkdays, 1)}
-              ></progress>
-            </div>
-            <div>
-              <div className="flex justify-between text-sm mb-1">
-                <span>Terlambat</span>
-                <span>{lateDays}</span>
-              </div>
-              <progress
-                className="progress progress-warning w-full"
-                value={lateDays}
-                max={Math.max(totalWorkdays, 1)}
-              ></progress>
-            </div>
-            <div>
-              <div className="flex justify-between text-sm mb-1">
-                <span>Izin/Cuti</span>
-                <span>{permissionDays}</span>
-              </div>
-              <progress
-                className="progress progress-info w-full"
-                value={permissionDays}
-                max={Math.max(totalWorkdays, 1)}
-              ></progress>
-            </div>
-            <div>
-              <div className="flex justify-between text-sm mb-1">
-                <span>Alpha</span>
-                <span>{absentDays}</span>
-              </div>
-              <progress
-                className="progress progress-error w-full"
-                value={absentDays}
-                max={Math.max(totalWorkdays, 1)}
-              ></progress>
-            </div>
-          </div>
-        </TitleCard>
-      </div>
-
-      <div className="grid md:grid-cols-2 grid-cols-1 gap-6">
-        <TitleCard title="Pending Approval" topMargin="mt-0">
-          <div className="space-y-2">
-            <button
-              type="button"
-              onClick={() => navigate("/app/leave-requests")}
-              className="w-full bg-info/10 border border-info/25 p-3 rounded-lg text-left hover:bg-info/20 transition"
-            >
-              <p className="text-xs opacity-70">Cuti/Izin</p>
-              <p className="text-2xl font-bold text-info">
-                {summary.pending_leave_requests || 0}
+            <div className="mt-6 space-y-4 border-t border-slate-200 pt-5 dark:border-slate-700">
+              <p className="text-xs font-bold uppercase tracking-wide text-slate-500 dark:text-slate-400">
+                Keterangan Status Absensi
               </p>
-            </button>
-            <button
-              type="button"
-              onClick={() => navigate("/app/reimbursements")}
-              className="w-full bg-success/10 border border-success/25 p-3 rounded-lg text-left hover:bg-success/20 transition"
-            >
-              <p className="text-xs opacity-70">Reimbursement</p>
-              <p className="text-2xl font-bold text-success">
-                {summary.pending_reimbursements || 0}
-              </p>
-            </button>
-            <button
-              type="button"
-              onClick={() => navigate("/app/salary-appeals")}
-              className="w-full bg-warning/10 border border-warning/25 p-3 rounded-lg text-left hover:bg-warning/20 transition"
-            >
-              <p className="text-xs opacity-70">Banding Gaji</p>
-              <p className="text-2xl font-bold text-warning">
-                {summary.pending_salary_appeals || 0}
-              </p>
-            </button>
-          </div>
-        </TitleCard>
-
-        <TitleCard title="Slip Gaji Terbaru" topMargin="mt-0">
-          <div className="space-y-2">
-            {payrolls.length === 0 && (
-              <p className="opacity-60 text-sm text-center py-4">
-                Belum ada slip gaji
-              </p>
-            )}
-            {payrolls.slice(0, 5).map((item) => (
-              <button
-                key={item.id}
-                type="button"
-                onClick={() => navigate("/app/payroll")}
-                className="w-full border border-base-300 rounded-lg p-3 hover:bg-base-200/50 transition text-left"
-              >
-                <div className="flex justify-between items-start">
-                  <div>
-                    <p className="font-semibold">
-                      {item.period_month}/{item.period_year}
-                    </p>
-                    <p className="text-xs opacity-70">
-                      Rp{" "}
-                      {Number(
-                        item.final_amount || item.net_salary || 0,
-                      ).toLocaleString("id-ID")}
-                    </p>
+              {[
+                ["Hadir", presentDays, "progress-success"],
+                ["Terlambat", lateDays, "progress-warning"],
+                ["Izin/Cuti", permissionDays, "progress-info"],
+                ["Alpha", absentDays, "progress-error"],
+              ].map(([label, value, progressClass]) => (
+                <div key={label}>
+                  <div className="mb-1 flex justify-between text-sm text-slate-600 dark:text-slate-300">
+                    <span>{label}</span>
+                    <span className="font-bold">{value}</span>
                   </div>
-                  <span className="badge badge-outline capitalize text-xs">
-                    {item.status}
-                  </span>
+                  <progress
+                    className={`progress ${progressClass} w-full`}
+                    value={value}
+                    max={Math.max(totalWorkdays, 1)}
+                  />
                 </div>
-              </button>
-            ))}
-            {payrolls.length > 5 ? (
-              <div className="text-right pt-1">
-                <button
-                  type="button"
-                  className="btn btn-ghost btn-sm"
-                  onClick={() => navigate("/app/payroll")}
-                >
-                  Lihat Semua
-                </button>
-              </div>
-            ) : null}
-          </div>
-        </TitleCard>
-      </div>
-      {showWarningPopup && currentWarningRule ? (
-        <div className="modal modal-open backdrop-blur-sm">
-          <div className="modal-box max-w-xl p-0 overflow-hidden rounded-3xl shadow-2xl border border-error/30">
-            {/* HEADER */}
-            <div className="bg-gradient-to-r from-error to-red-600 text-white px-6 py-5">
-              <div className="flex items-center gap-4">
-                <div className="w-14 h-14 rounded-2xl bg-white/20 flex items-center justify-center shadow-md">
-                  <svg
-                    xmlns="http://www.w3.org/2000/svg"
-                    className="w-8 h-8"
-                    fill="none"
-                    viewBox="0 0 24 24"
-                    stroke="currentColor"
-                  >
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth={2}
-                      d="M12 9v2m0 4h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"
-                    />
-                  </svg>
-                </div>
-
-                <div>
-                  <h3 className="text-xl font-bold">
-                    Peringatan Disiplin Pegawai
-                  </h3>
-
-                  <p className="text-sm opacity-90 mt-1">
-                    Sistem mendeteksi pelanggaran kehadiran
-                  </p>
-                </div>
-              </div>
-            </div>
-
-            {/* BODY */}
-            <div className="p-6">
-              {/* INFO BOX */}
-              <div className="rounded-2xl border border-error/20 bg-error/5 p-4 mb-5">
-                <div className="flex flex-wrap items-center gap-2 mb-3">
-                  <div className="badge badge-error badge-lg">
-                    {currentWarningRuleLabel}
-                  </div>
-                  <div className="badge badge-outline badge-warning">
-                    {normalizeSanctionLevel(currentWarningRule?.sanction_level || sanctionLevel) === "tindak_lanjut" || normalizeSanctionLevel(currentWarningRule?.sanction_level || sanctionLevel) === "evaluasi_hr"
-                      ? "Menghadap Atasan / HR"
-                      : `Level ${formatSanctionLabel(currentWarningRule?.sanction_level || sanctionLevel)}`}
-                  </div>
-                </div>
-
-                <h4 className="text-base font-bold text-error mb-1">
-                  {currentWarningRule?.rule_name || "Aturan Peringatan Kehadiran"}
-                </h4>
-
-                <p className="text-sm leading-6 text-base-content/90">
-                  {currentWarningRule?.description ||
-                    currentWarningRule?.recommendation ||
-                    "Deskripsi aturan tidak tersedia."}
-                </p>
-
-                <div className="mt-4 rounded-xl bg-base-100 p-3 border border-base-300">
-                  <p className="text-xs uppercase font-bold opacity-60 mb-1">
-                    Keterangan Pelanggaran
-                  </p>
-
-                  <div className="grid grid-cols-2 gap-3 text-sm">
-                    <div className="rounded-xl bg-base-100 border p-3">
-                      <p className="text-xs opacity-60">Alpha Berturut</p>
-                      <p className="font-bold text-error">
-                        {Number(discipline?.alpha_consecutive_days || 0)} hari
-                      </p>
-                    </div>
-
-                    <div className="rounded-xl bg-base-100 border p-3">
-                      <p className="text-xs opacity-60">Alpha Akumulasi</p>
-                      <p className="font-bold text-error">
-                        {Number(discipline?.alpha_accumulated_days || 0)} hari
-                      </p>
-                    </div>
-
-                    <div className="rounded-xl bg-base-100 border p-3">
-                      <p className="text-xs opacity-60">Terlambat Berturut</p>
-                      <p className="font-bold text-error">{consecutiveLate} kali</p>
-                    </div>
-
-                    <div className="rounded-xl bg-base-100 border p-3">
-                      <p className="text-xs opacity-60">Terlambat Akumulasi</p>
-                      <p className="font-bold text-error">{lateDays} kali</p>
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              {/* FOOTER */}
-              <div className="flex flex-col sm:flex-row gap-3 justify-end">
-                <button
-                  className="btn btn-outline btn-warning rounded-xl flex-1 sm:flex-none"
-                  onClick={() => {
-                    localStorage.setItem(
-                      SP_ALERT_STORAGE_KEY,
-                      currentNoticeKey,
-                    );
-                    setShowWarningPopup(false);
-                    navigate("/app/warning-letters");
-                  }}
-                >
-                  Lihat Pelanggaran
-                </button>
-
-                <button
-                  className="btn btn-error rounded-xl flex-1 sm:flex-none"
-                  onClick={() => {
-                    localStorage.setItem(
-                      SP_ALERT_STORAGE_KEY,
-                      currentNoticeKey,
-                    );
-                    setShowWarningPopup(false);
-                  }}
-                >
-                  Saya Mengerti
-                </button>
-              </div>
+              ))}
             </div>
           </div>
         </div>
-      ) : null}
+
+        <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
+          <div className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-700 dark:bg-slate-900">
+            <h2 className="text-xl font-extrabold text-slate-900 dark:text-slate-50">
+              Pending Approval
+            </h2>
+            <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
+              Permintaan yang masih perlu diproses.
+            </p>
+            <div className="mt-5 space-y-3">
+              {[
+                [
+                  "Cuti/Izin",
+                  summary.pending_leave_requests || 0,
+                  "/app/leave-requests",
+                  "bg-blue-50 text-blue-600 border-blue-200",
+                ],
+                [
+                  "Reimbursement",
+                  summary.pending_reimbursements || 0,
+                  "/app/reimbursements",
+                  "bg-emerald-50 text-emerald-600 border-emerald-200",
+                ],
+                [
+                  "Banding Gaji",
+                  summary.pending_salary_appeals || 0,
+                  "/app/salary-appeals",
+                  "bg-amber-50 text-amber-600 border-amber-200",
+                ],
+              ].map(([label, value, path, cls]) => (
+                <button
+                  key={label}
+                  type="button"
+                  onClick={() => navigate(path)}
+                  className={`w-full rounded-2xl border p-4 text-left transition hover:-translate-y-0.5 hover:shadow-md ${cls} dark:border-slate-700 dark:bg-slate-950/50`}
+                >
+                  <p className="text-xs font-semibold uppercase tracking-wide opacity-80">
+                    {label}
+                  </p>
+                  <p className="mt-1 text-2xl font-extrabold">{value}</p>
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <div className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-700 dark:bg-slate-900">
+            <h2 className="text-xl font-extrabold text-slate-900 dark:text-slate-50">
+              Slip Gaji Terbaru
+            </h2>
+            <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
+              Ringkasan slip gaji terakhir yang tersedia.
+            </p>
+            <div className="mt-5 space-y-3">
+              {payrolls.length === 0 && (
+                <div className="rounded-2xl border border-dashed border-slate-200 py-8 text-center text-sm text-slate-500 dark:border-slate-700 dark:text-slate-400">
+                  Belum ada slip gaji
+                </div>
+              )}
+              {payrolls.slice(0, 5).map((item) => (
+                <button
+                  key={item.id}
+                  type="button"
+                  onClick={() => navigate("/app/payroll")}
+                  className="w-full rounded-2xl border border-slate-200 bg-slate-50/70 p-4 text-left transition hover:bg-orange-50 dark:border-slate-700 dark:bg-slate-950/50 dark:hover:bg-slate-800"
+                >
+                  <div className="flex items-start justify-between gap-3">
+                    <div>
+                      <p className="font-bold text-slate-900 dark:text-slate-50">
+                        {item.period_month}/{item.period_year}
+                      </p>
+                      <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
+                        Rp{" "}
+                        {Number(
+                          item.final_amount || item.net_salary || 0,
+                        ).toLocaleString("id-ID")}
+                      </p>
+                    </div>
+                    <span className="badge badge-outline capitalize text-xs">
+                      {item.status}
+                    </span>
+                  </div>
+                </button>
+              ))}
+              {payrolls.length > 5 ? (
+                <div className="text-right pt-1">
+                  <button
+                    type="button"
+                    className="btn btn-ghost btn-sm rounded-xl text-orange-600"
+                    onClick={() => navigate("/app/payroll")}
+                  >
+                    Lihat Semua
+                  </button>
+                </div>
+              ) : null}
+            </div>
+          </div>
+        </div>
+
+        {showWarningPopup && currentWarningRule ? (
+          <div className="modal modal-open backdrop-blur-sm">
+            <div className="modal-box max-w-xl overflow-hidden rounded-3xl border border-red-200 p-0 shadow-2xl dark:border-red-900/60">
+              <div className="bg-gradient-to-r from-red-500 to-red-600 px-6 py-5 text-white">
+                <div className="flex items-center gap-4">
+                  <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-white/20 text-3xl shadow-md">
+                    ⚠️
+                  </div>
+                  <div>
+                    <h3 className="text-xl font-bold">
+                      Peringatan Disiplin Pegawai
+                    </h3>
+                    <p className="mt-1 text-sm opacity-90">
+                      Sistem mendeteksi pelanggaran kehadiran
+                    </p>
+                  </div>
+                </div>
+              </div>
+              <div className="p-6">
+                <div className="mb-5 rounded-2xl border border-red-200 bg-red-50 p-4 dark:border-red-900/60 dark:bg-red-950/30">
+                  <div className="mb-3 flex flex-wrap items-center gap-2">
+                    <div className="badge badge-error badge-lg">
+                      {currentWarningRuleLabel}
+                    </div>
+                    <div className="badge badge-outline badge-warning">
+                      {normalizeSanctionLevel(
+                        currentWarningRule?.sanction_level || sanctionLevel,
+                      ) === "tindak_lanjut" ||
+                      normalizeSanctionLevel(
+                        currentWarningRule?.sanction_level || sanctionLevel,
+                      ) === "evaluasi_hr"
+                        ? "Menghadap Atasan / HR"
+                        : `Level ${formatSanctionLabel(currentWarningRule?.sanction_level || sanctionLevel)}`}
+                    </div>
+                  </div>
+                  <h4 className="mb-1 text-base font-bold text-red-600 dark:text-red-300">
+                    {currentWarningRule?.rule_name ||
+                      "Aturan Peringatan Kehadiran"}
+                  </h4>
+                  <p className="text-sm leading-6 text-slate-700 dark:text-slate-300">
+                    {currentWarningRule?.description ||
+                      currentWarningRule?.recommendation ||
+                      "Deskripsi aturan tidak tersedia."}
+                  </p>
+                </div>
+                <div className="flex flex-col justify-end gap-3 sm:flex-row">
+                  <button
+                    className="btn btn-outline btn-warning rounded-xl"
+                    onClick={() => {
+                      localStorage.setItem(
+                        SP_ALERT_STORAGE_KEY,
+                        currentNoticeKey,
+                      );
+                      setShowWarningPopup(false);
+                      navigate("/app/warning-letters");
+                    }}
+                  >
+                    Lihat Pelanggaran
+                  </button>
+                  <button
+                    className="btn rounded-xl border-none bg-red-500 text-white hover:bg-red-600"
+                    onClick={() => {
+                      localStorage.setItem(
+                        SP_ALERT_STORAGE_KEY,
+                        currentNoticeKey,
+                      );
+                      setShowWarningPopup(false);
+                    }}
+                  >
+                    Saya Mengerti
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        ) : null}
+      </div>
     </div>
   );
 }

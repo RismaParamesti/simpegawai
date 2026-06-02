@@ -15,6 +15,15 @@ const jobService = {
         }
     },
 
+    async getJobOpening(id) {
+        try {
+            const response = await axios.get(`/api/job-openings/${id}`);
+            return response.data || {};
+        } catch (error) {
+            throw new Error(parseApiError(error, 'Gagal memuat detail lowongan'));
+        }
+    },
+
     async createJobOpening(payload) {
         try {
             const response = await axios.post('/api/job-openings', payload);
