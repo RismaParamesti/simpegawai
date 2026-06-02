@@ -43,6 +43,10 @@ const formatLateDuration = (lateMinutes) => {
   return `${hh} jam ${mm} menit ${ss} detik`;
 };
 
+const SummaryPagination = () => (
+  <Pagination page={1} totalPages={1} onChangePage={() => {}} />
+);
+
 const formatDateLabel = (value) => {
   if (!value) return "-";
   const date = new Date(value);
@@ -276,22 +280,27 @@ function AtasanDashboard() {
 
   if (loading) {
     return (
-      <div className="text-center py-10 text-lg">
-        Memuat dashboard atasan...
+      <div className="mt-4 rounded-[1.5rem] border border-slate-200 bg-white p-8 text-center shadow-sm dark:border-slate-700 dark:bg-slate-950">
+        <span className="loading loading-spinner loading-lg text-orange-500" />
+        <p className="mt-3 text-sm font-semibold text-slate-500 dark:text-slate-400">
+          Memuat dashboard atasan...
+        </p>
       </div>
     );
   }
 
   if (error) {
     return (
-      <TitleCard title="Dashboard Atasan" topMargin="mt-0">
-        <div className="alert alert-error mb-4">
-          <span>{error}</span>
-        </div>
-        <button className="btn btn-primary" onClick={loadDashboard}>
+      <div className="mt-4 rounded-[1.5rem] border border-red-200 bg-red-50 p-6 shadow-sm dark:border-red-900/60 dark:bg-red-950/30">
+        <p className="font-bold text-red-600 dark:text-red-300">Data gagal dimuat</p>
+        <p className="mt-1 text-sm text-red-500 dark:text-red-300/80">{error}</p>
+        <button
+          className="btn mt-4 rounded-xl border-none bg-red-500 text-white hover:bg-red-600"
+          onClick={loadDashboard}
+        >
           Muat Ulang
         </button>
-      </TitleCard>
+      </div>
     );
   }
 
@@ -319,546 +328,373 @@ function AtasanDashboard() {
       value: team.total_members || 0,
       detail: `Tetap: ${team.permanent || 0} | Kontrak: ${team.contract || 0}`,
       path: "/app/team-attendance",
+      tone: "orange",
     },
     {
       title: "Hadir Hari Ini",
       value: today.present || 0,
       detail: `Terlambat: ${today.late || 0} | Tidak Hadir: ${today.absent || 0}`,
       path: "/app/team-attendance",
+      tone: "emerald",
     },
     {
       title: "Approval Pending",
       value: approvals.total || 0,
       detail: `Cuti/Izin: ${approvals.leave_requests || 0} | Reimbursement: ${approvals.reimbursements || 0}`,
       path: "/app/leave-requests",
+      tone: "amber",
     },
     {
       title: "Total Terlambat Bulan Ini",
       value: summary.total_late || 0,
       detail: `Rekap ${summary.total_records || 0} catatan kehadiran`,
       path: "/app/team-attendance",
+      tone: "red",
     },
   ];
 
-  return (
-    <>
-      <div className="alert bg-base-100 border border-base-300 mb-4">
-        <div className="w-full flex flex-col md:flex-row md:items-center md:justify-between gap-3">
-          <div className="flex flex-wrap items-center gap-2 text-sm">
-            <span className="font-semibold">Scope Tim:</span>
-            <span className="badge badge-primary badge-outline">
-              {scopeInfo.department_name || "Departemen belum terdefinisi"}
-            </span>
-            <span className="opacity-70">•</span>
-          </div>
+  const toneClassMap = {
+    orange: "border-orange-200 bg-orange-50 text-orange-700 dark:border-orange-900/50 dark:bg-orange-950/30 dark:text-orange-300",
+    emerald: "border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-900/50 dark:bg-emerald-950/30 dark:text-emerald-300",
+    amber: "border-amber-200 bg-amber-50 text-amber-700 dark:border-amber-900/50 dark:bg-amber-950/30 dark:text-amber-300",
+    red: "border-red-200 bg-red-50 text-red-700 dark:border-red-900/50 dark:bg-red-950/30 dark:text-red-300",
+  };
 
-          <div className="flex items-center gap-2">
-            <select
-              className="select select-bordered select-sm"
-              value={selectedMonth}
-              onChange={(event) => setSelectedMonth(event.target.value)}
-            >
-              {monthOptions.map((month) => (
-                <option key={month.value} value={month.value}>
-                  {month.label}
-                </option>
-              ))}
-            </select>
-            <select
-              className="select select-bordered select-sm"
-              value={selectedYear}
-              onChange={(event) => setSelectedYear(event.target.value)}
-            >
-              {yearOptions.map((year) => (
-                <option key={year} value={year}>
-                  {year}
-                </option>
-              ))}
-            </select>
+  const DashboardHeroIllustration = () => (
+    <div className="pointer-events-none absolute right-10 top-2 hidden h-32 w-80 lg:block">
+      <div className="absolute bottom-2 right-0 h-20 w-72 rounded-full bg-orange-100/80 blur-[1px] dark:bg-orange-900/30" />
+      <div className="absolute right-36 top-1 h-24 w-20 rotate-[-3deg] rounded-2xl border border-slate-200 bg-white shadow-lg dark:border-slate-700 dark:bg-slate-900">
+        <div className="flex items-center gap-2 border-b border-orange-100 px-2 py-2 dark:border-slate-700">
+          <div className="flex h-7 w-7 items-center justify-center rounded-full bg-orange-100 text-orange-500 dark:bg-orange-900/40 dark:text-orange-300">
+            👥
+          </div>
+          <div className="space-y-1">
+            <div className="h-1.5 w-8 rounded-full bg-orange-400 dark:bg-orange-300" />
+            <div className="h-1.5 w-6 rounded-full bg-slate-200 dark:bg-slate-600" />
           </div>
         </div>
-      </div>
-
-      <div className="grid grid-cols-4 gap-2 sm:gap-4 lg:gap-6">
-        {statCards.map((item) => (
-          <button
-            key={item.title}
-            type="button"
-            onClick={() => navigate(item.path)}
-            className="card w-full bg-base-100 shadow-lg text-left hover:bg-base-200/60 transition"
-          >
-            <div className="card-body p-2 sm:p-4 lg:p-6">
-              <p className="text-xs leading-tight opacity-70">{item.title}</p>
-              <p className="text-xl sm:text-2xl font-bold text-primary mt-1">
-                {item.value}
-              </p>
-              <p className="text-xs opacity-70 mt-1 hidden sm:block">
-                {item.detail}
-              </p>
-              <p className="text-xs opacity-60 mt-0.5">Klik &rarr;</p>
-            </div>
-          </button>
-        ))}
-      </div>
-
-      <TitleCard
-        title={`Daftar Nama Anggota Departemen ${scopeInfo.department_name || "Departemen belum terdefinisi"}`}
-        topMargin="mt-6"
-      >
-        <div className="overflow-x-auto">
-          <table className="table table-zebra table-sm">
-            <thead>
-              <tr>
-                <th>Nama</th>
-                <th>Kode Pegawai</th>
-                <th>Departemen</th>
-                <th>Jabatan</th>
-                <th>Level</th>
-              </tr>
-            </thead>
-            <tbody>
-              {paginatedTeamMembers.map((member) => (
-                <tr
-                  key={
-                    member.id ||
-                    member.employee_id ||
-                    `${member.employee_code || "member"}-${member.position_name || "pos"}`
-                  }
-                >
-                  <td className="font-semibold">
-                    <span
-                      className="cursor-pointer hover:underline"
-                      onClick={() =>
-                        navigate('/app/employees', { state: { employeeId: member.id || member.employee_id } })
-                      }
-                    >
-                      {member.employee_name || member.name || "-"}
-                    </span>
-                  </td>
-                  <td>
-                    <span
-                      className="cursor-pointer hover:underline"
-                      onClick={() =>
-                        navigate('/app/employees', { state: { employeeId: member.id || member.employee_id } })
-                      }
-                    >
-                      {member.employee_code || "-"}
-                    </span>
-                  </td>
-                  <td>{member.department_name || scopeInfo.department_name || "-"}</td>
-                  <td>
-                    <span
-                      className="cursor-pointer hover:underline"
-                      onClick={() =>
-                        navigate('/app/employees', { state: { employeeId: member.id || member.employee_id } })
-                      }
-                    >
-                      {member.position_name || "-"}
-                    </span>
-                  </td>
-                  <td>
-                    <span
-                      className="cursor-pointer hover:underline"
-                      onClick={() =>
-                        navigate('/app/employees', { state: { employeeId: member.id || member.employee_id } })
-                      }
-                    >
-                      {member.level || member.level_name || "-"}
-                    </span>
-                  </td>
-                </tr>
-              ))}
-              {teamMembers.length === 0 && (
-                <tr>
-                  <td colSpan={5} className="text-center opacity-70">
-                    Belum ada anggota tim
-                  </td>
-                </tr>
-              )}
-            </tbody>
-          </table>
+        <div className="space-y-1.5 px-3 py-2">
+          <div className="h-1.5 w-12 rounded-full bg-orange-300 dark:bg-orange-400" />
+          <div className="h-1.5 w-10 rounded-full bg-emerald-200 dark:bg-emerald-400" />
+          <div className="h-1.5 w-12 rounded-full bg-slate-200 dark:bg-slate-600" />
+          <div className="h-1.5 w-8 rounded-full bg-orange-200 dark:bg-orange-800" />
         </div>
-        {teamMembers.length > 0 && (
-          <div className="mt-2">
-            <Pagination
-              page={teamPage}
-              totalPages={totalTeamPages}
-              onChangePage={setTeamPage}
-              itemsPerPage={itemsPerPage}
-            />
-          </div>
-        )}
-      </TitleCard>
+      </div>
+      <div className="absolute right-24 top-16 h-14 w-14 rounded-2xl bg-orange-400 shadow-md dark:bg-orange-500" />
+      <div className="absolute right-8 top-8 h-14 w-14 rounded-2xl bg-emerald-200 shadow-sm dark:bg-emerald-500/70" />
+      <div className="absolute right-12 top-20 h-2 w-20 rounded-full bg-slate-300 dark:bg-slate-600" />
+    </div>
+  );
 
-      <TitleCard title="Pegawai dengan Pelanggaran Aktif" topMargin="mt-6">
-        {activeViolations.length > 0 ? (
-          <div className="overflow-x-auto">
-            <table className="table table-zebra table-sm">
-              <thead>
-                <tr>
-                  <th>Pegawai</th>
-                  <th>SP Aktif</th>
-                  <th>Keterangan Pelanggaran</th>
-                  <th>Berlaku Sampai</th>
-                  <th>Status</th>
-                </tr>
-              </thead>
-              <tbody>
-                {activeViolations.slice(0, 8).map((item) => (
-                  <tr key={item.id}>
-                    <td>
-                      <div
-                        className="font-semibold cursor-pointer hover:underline"
-                        onClick={() =>
-                          navigate('/app/employees', { state: { employeeId: item.employee_id } })
-                        }
-                      >
-                        {item.employee_name || "-"}
-                      </div>
-                      <div className="text-xs opacity-70">
-                        {item.employee_code || "-"} • {item.department_name || scopeInfo.department_name || "-"}
-                      </div>
-                    </td>
-                    <td>
-                      <span className="badge badge-warning badge-sm">
-                        {formatSanctionLabel(item.sp_level)}
-                      </span>
-                    </td>
-                    <td className="text-xs leading-5">
-                      {formatViolationCounts(item)}
-                    </td>
-                    <td className="text-sm">
-                      {formatDateLabel(item.valid_until)}
-                      {item.remaining_days !== null ? (
-                        <div className="text-xs opacity-70">
-                          {item.remaining_days} hari lagi
-                        </div>
-                      ) : null}
-                    </td>
-                    <td>
-                      <span className="badge badge-success badge-sm">
-                        active
-                      </span>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        ) : (
-          <div className="text-center text-base-content/60 py-4">
-            Tidak ada pelanggaran aktif pada tim ini
-          </div>
-        )}
-      </TitleCard>
-
-      <div className="grid lg:grid-cols-3 grid-cols-1 gap-6 mt-6">
-        <TitleCard title={`Top 5 Pegawai Sering Terlambat (${monthLabel(selectedMonth)} ${selectedYear})`} topMargin="mt-0">
-          <div className="overflow-x-auto">
-            <table className="table table-zebra table-sm">
-              <thead>
-                <tr>
-                  <th>Nama Pegawai</th>
-                  <th>Total Keterlambatan</th>
-                  <th>Jumlah Hari Telat</th>
-                </tr>
-              </thead>
-              <tbody>
-                {topLateEmployees.slice(0, 5).map((employee) => (
-                  <tr
-                    key={employee.id || employee.employee_code || employee.name}
-                  >
-                    <td>
-                      <div
-                        className="font-semibold cursor-pointer hover:underline"
-                        onClick={() =>
-                          navigate('/app/employees', { state: { employeeId: employee.id || employee.employee_code } })
-                        }
-                      >
-                        {employee.name || "-"}
-                      </div>
-                      <div className="text-xs opacity-70">
-                        {employee.employee_code || "-"}
-                      </div>
-                    </td>
-                    <td className="font-semibold">
-                      {formatLateDuration(employee.total_late_minutes)}
-                    </td>
-                    <td>
-                      {Number(employee.late_count) ||
-                        (employee.late_per_day || []).length ||
-                        0}{" "}
-                      hari
-                    </td>
-                  </tr>
-                ))}
-                {topLateEmployees.length === 0 && (
-                  <tr>
-                    <td colSpan={3} className="text-center opacity-70">
-                      Belum ada pegawai yang terlambat
-                    </td>
-                  </tr>
-                )}
-              </tbody>
-            </table>
-          </div>
-        </TitleCard>
-
-        <TitleCard title="Riwayat Aksi Persetujuan Terbaru" topMargin="mt-0">
-          <div className="overflow-y-auto max-h-[320px]">
-            <table className="table table-zebra table-sm">
-              <thead>
-                <tr>
-                  <th>Tipe</th>
-                  <th>Pegawai</th>
-                  <th>Detail</th>
-                  <th>Status</th>
-                  <th>Tanggal</th>
-                </tr>
-              </thead>
-              <tbody>
-                {recentActions.slice(0, 5).map((item) => (
-                  <tr
-                    key={`${item.type}-${item.id}`}
-                    onClick={() => {
-                      if (item.type === "leave") navigate('/app/leave-requests-history', { state: { requestId: item.id } });
-                      else if (item.type === "reimbursement") navigate('/app/reimbursements-history', { state: { reimbursementId: item.id } });
-                    }}
-                    className={item.type === "leave" || item.type === "reimbursement" ? "cursor-pointer hover:bg-base-200/50" : undefined}
-                  >
-                    <td>
-                      <span className="badge badge-ghost badge-sm">
-                        {item.type}
-                      </span>
-                    </td>
-                    <td>
-                      <div
-                        className="font-semibold cursor-pointer hover:underline"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          navigate('/app/employees', { state: { employeeId: item.employee_id || item.employee_code } });
-                        }}
-                      >
-                        {item.employee_name}
-                      </div>
-                      <div className="text-xs opacity-70">
-                        {item.employee_code}
-                      </div>
-                    </td>
-                    <td>{item.type === "leave" ? humanizeType(item.detail) : item.detail || "-"}</td>
-                    <td>
-                      <span
-                        className={`badge badge-sm ${item.status === "approved" ? "badge-success" : "badge-error"}`}
-                      >
-                        {item.status}
-                      </span>
-                    </td>
-                    <td>
-                      {item.action_date
-                        ? new Date(item.action_date).toLocaleString("id-ID")
-                        : "-"}
-                    </td>
-                  </tr>
-                ))}
-                {recentActions.length === 0 && (
-                  <tr>
-                    <td colSpan={5} className="text-center opacity-70">
-                      Belum ada riwayat persetujuan
-                    </td>
-                  </tr>
-                )}
-              </tbody>
-            </table>
-          </div>
-          {recentActions.length > 5 ? (
-            <div className="text-right mt-3">
-              <button
-                className="btn btn-ghost btn-sm"
-                onClick={() => navigate("/app/leave-requests")}
-              >
-                Lihat Semua
-              </button>
-            </div>
+  const CardTitle = ({ title, subtitle, children, action }) => (
+    <div className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-700 dark:bg-slate-900 sm:p-6">
+      <div className="mb-5 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <div>
+          <h2 className="text-xl font-extrabold text-slate-900 dark:text-slate-50">{title}</h2>
+          {subtitle ? (
+            <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">{subtitle}</p>
           ) : null}
-        </TitleCard>
+        </div>
+        {action}
+      </div>
+      {children}
+    </div>
+  );
 
-        <TitleCard title="Pegawai yang Terlambat Hari Ini" topMargin="mt-0">
-          {lateRows.length > 0 ? (
-            <div className="overflow-x-auto">
-              <table className="table table-zebra table-sm">
-                <thead>
+  return (
+    <div className="mt-4 overflow-hidden rounded-[1.5rem] border border-slate-200/80 bg-white p-4 shadow-[0_20px_70px_rgba(15,23,42,0.07)] dark:border-slate-700 dark:bg-slate-950 dark:shadow-[0_20px_70px_rgba(2,6,23,0.45)] sm:p-7">
+      <div className="space-y-6">
+        <div className="relative min-h-[130px] overflow-hidden rounded-[1.4rem] bg-gradient-to-r from-white via-white to-orange-50/80 px-5 py-6 dark:from-slate-950 dark:via-slate-950 dark:to-slate-900 sm:px-6">
+          <DashboardHeroIllustration />
+          <div className="relative z-10 max-w-3xl">
+            <div className="mb-3 inline-flex items-center gap-2 rounded-full border border-orange-200 bg-orange-50 px-3 py-1 text-xs font-bold text-orange-600 dark:border-orange-900/60 dark:bg-orange-950/70 dark:text-orange-300">
+              Dashboard Atasan
+            </div>
+            <h1 className="text-[28px] font-extrabold leading-tight text-slate-900 dark:text-slate-50">
+              Ringkasan Tim {scopeInfo.department_name || "Departemen"}
+            </h1>
+            <p className="mt-2 max-w-2xl text-sm font-medium text-slate-500 dark:text-slate-400">
+              Pantau kehadiran anggota tim, persetujuan pending, pelanggaran aktif,
+              dan riwayat persetujuan dalam satu halaman yang mudah digunakan.
+            </p>
+          </div>
+        </div>
+
+        <div className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-700 dark:bg-slate-900">
+          <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+            <div>
+              <p className="text-xs font-bold uppercase tracking-wide text-slate-500 dark:text-slate-400">Scope Tim</p>
+              <div className="mt-2 flex flex-wrap items-center gap-2">
+                <span className="rounded-full border border-orange-200 bg-orange-50 px-3 py-1 text-sm font-bold text-orange-600 dark:border-orange-900/60 dark:bg-orange-950/70 dark:text-orange-300">
+                  {scopeInfo.department_name || "Departemen belum terdefinisi"}
+                </span>
+                <span className="text-sm text-slate-500 dark:text-slate-400">
+                  Periode {monthLabel(selectedMonth)} {selectedYear}
+                </span>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:w-[360px]">
+              <select
+                className="select select-bordered w-full rounded-xl bg-white text-slate-900 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100"
+                value={selectedMonth}
+                onChange={(event) => setSelectedMonth(event.target.value)}
+              >
+                {monthOptions.map((month) => (
+                  <option key={month.value} value={month.value}>{month.label}</option>
+                ))}
+              </select>
+              <select
+                className="select select-bordered w-full rounded-xl bg-white text-slate-900 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100"
+                value={selectedYear}
+                onChange={(event) => setSelectedYear(event.target.value)}
+              >
+                {yearOptions.map((year) => (
+                  <option key={year} value={year}>{year}</option>
+                ))}
+              </select>
+            </div>
+          </div>
+        </div>
+
+        <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
+          {statCards.map((item) => (
+            <button
+              key={item.title}
+              type="button"
+              onClick={() => navigate(item.path)}
+              className={`rounded-2xl border p-5 text-left shadow-sm transition hover:-translate-y-0.5 hover:shadow-md ${toneClassMap[item.tone]}`}
+            >
+              <div className="flex items-start justify-between gap-4">
+                <div>
+                  <p className="text-sm font-semibold opacity-80">{item.title}</p>
+                  <p className="mt-2 text-3xl font-extrabold">{item.value}</p>
+                  <p className="mt-1 text-xs font-medium opacity-80">{item.detail}</p>
+                </div>
+                <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-white/70 text-xl dark:bg-white/10">
+                  {item.tone === "orange" ? "👥" : item.tone === "emerald" ? "✓" : item.tone === "amber" ? "⏳" : "⚠️"}
+                </div>
+              </div>
+            </button>
+          ))}
+        </div>
+
+        <CardTitle
+          title={`Daftar Anggota Departemen ${scopeInfo.department_name || "-"}`}
+          subtitle="Klik nama pegawai untuk melihat detail data pegawai."
+        >
+          <div className="overflow-x-auto rounded-2xl border border-slate-200 dark:border-slate-700">
+            <table className="table table-sm w-full">
+              <thead className="bg-slate-50 text-slate-600 dark:bg-slate-950 dark:text-slate-300">
+                <tr>
+                  <th>Nama</th>
+                  <th>Kode Pegawai</th>
+                  <th>Departemen</th>
+                  <th>Jabatan</th>
+                  <th>Level</th>
+                </tr>
+              </thead>
+              <tbody>
+                {paginatedTeamMembers.map((member) => (
+                  <tr
+                    key={member.id || member.employee_id || `${member.employee_code || "member"}-${member.position_name || "pos"}`}
+                    className="hover:bg-orange-50/50 dark:hover:bg-slate-800/60"
+                  >
+                    <td className="font-semibold">
+                      <span
+                        className="cursor-pointer text-slate-900 hover:text-orange-600 dark:text-slate-100 dark:hover:text-orange-300"
+                        onClick={() => navigate("/app/employees", { state: { employeeId: member.id || member.employee_id } })}
+                      >
+                        {member.employee_name || member.name || "-"}
+                      </span>
+                    </td>
+                    <td>{member.employee_code || "-"}</td>
+                    <td>{member.department_name || scopeInfo.department_name || "-"}</td>
+                    <td>{member.position_name || "-"}</td>
+                    <td><span className="badge badge-outline badge-sm">{member.level || member.level_name || "-"}</span></td>
+                  </tr>
+                ))}
+                {teamMembers.length === 0 && (
                   <tr>
-                    <th>No</th>
-                    <th>Nama</th>
-                    <th>Kode</th>
-                    <th>Tanggal</th>
-                    <th className="whitespace-nowrap">Terlambat</th>
+                    <td colSpan={5} className="py-8 text-center text-slate-500 dark:text-slate-400">Belum ada anggota tim</td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+          </div>
+          <div className="mt-4">
+            <Pagination page={teamPage} totalPages={totalTeamPages} onChangePage={setTeamPage} itemsPerPage={itemsPerPage} />
+          </div>
+        </CardTitle>
+
+        <CardTitle title="Pegawai dengan Pelanggaran Aktif" subtitle="Daftar anggota tim yang sedang memiliki surat peringatan aktif.">
+          {activeViolations.length > 0 ? (
+            <div className="overflow-x-auto rounded-2xl border border-slate-200 dark:border-slate-700">
+              <table className="table table-sm w-full">
+                <thead className="bg-slate-50 text-slate-600 dark:bg-slate-950 dark:text-slate-300">
+                  <tr>
+                    <th>Pegawai</th>
+                    <th>SP Aktif</th>
+                    <th>Keterangan Pelanggaran</th>
+                    <th>Berlaku Sampai</th>
+                    <th>Status</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {lateRows.slice(0, 5).map((row) => (
-                    <tr key={row.key}>
-                      <td>{row.no}</td>
-                      <td className="font-semibold">{row.name}</td>
-                      <td>{row.employee_code || "-"}</td>
+                  {activeViolations.slice(0, 8).map((item) => (
+                    <tr key={item.id} className="hover:bg-orange-50/50 dark:hover:bg-slate-800/60">
                       <td>
-                        {row.date
-                          ? new Date(row.date).toLocaleDateString("id-ID")
-                          : "-"}
+                        <div
+                          className="cursor-pointer font-semibold text-slate-900 hover:text-orange-600 dark:text-slate-100 dark:hover:text-orange-300"
+                          onClick={() => navigate("/app/employees", { state: { employeeId: item.employee_id } })}
+                        >
+                          {item.employee_name || "-"}
+                        </div>
+                        <div className="text-xs text-slate-500 dark:text-slate-400">{item.employee_code || "-"} • {item.department_name || scopeInfo.department_name || "-"}</div>
                       </td>
-                      <td className="whitespace-nowrap">
-                        {formatLateDuration(row.minutes)}
+                      <td><span className="badge badge-warning badge-sm">{formatSanctionLabel(item.sp_level)}</span></td>
+                      <td className="text-xs leading-5">{formatViolationCounts(item)}</td>
+                      <td className="text-sm">
+                        {formatDateLabel(item.valid_until)}
+                        {item.remaining_days !== null ? <div className="text-xs text-slate-500">{item.remaining_days} hari lagi</div> : null}
                       </td>
+                      <td><span className="badge badge-success badge-sm">active</span></td>
                     </tr>
                   ))}
                 </tbody>
               </table>
-              {lateRows.length > 5 ? (
-                <div className="text-right mt-3">
-                  <button
-                    className="btn btn-ghost btn-sm"
-                    onClick={() => navigate("/app/team-attendance")}
-                  >
-                    Lihat Semua
-                  </button>
-                </div>
-              ) : null}
+              <SummaryPagination />
             </div>
           ) : (
-            <div className="text-center opacity-70 py-10">
-              Belum ada yang terlambat hari ini
-            </div>
+            <div className="rounded-2xl border border-dashed border-slate-200 py-10 text-center text-slate-500 dark:border-slate-700 dark:text-slate-400">Tidak ada pelanggaran aktif pada tim ini</div>
           )}
-        </TitleCard>
-      </div>
+        </CardTitle>
 
-      <div className="grid lg:grid-cols-2 grid-cols-1 gap-6 mt-6">
-        <TitleCard title={`Permohonan Cuti/Izin Pending (${monthLabel(selectedMonth)} ${selectedYear})`} topMargin="mt-0">
-          <div className="overflow-x-auto">
-            <table className="table table-zebra table-sm">
-              <thead>
-                <tr>
-                  <th>Pegawai</th>
-                  <th>Tipe</th>
-                  <th>Tanggal</th>
-                  <th>Status</th>
-                </tr>
-              </thead>
-              <tbody>
-                {pendingLeaves.slice(0, 5).map((item) => (
-                  <tr key={item.id} onClick={() => navigate('/app/leave-requests', { state: { requestId: item.id } })} className="cursor-pointer hover:bg-base-200/50">
-                    <td>
-                      <div
-                        className="font-semibold cursor-pointer hover:underline"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          navigate('/app/employees', { state: { employeeId: item.employee_id || item.employee_code } });
-                        }}
-                      >
-                        {item.employee_name}
-                      </div>
-                      <div className="text-xs opacity-70">
-                        {item.employee_code}
-                      </div>
-                    </td>
-                    <td>{humanizeType(item.leave_type)}</td>
-                    <td>
-                      {new Date(item.start_date).toLocaleDateString("id-ID")} -{" "}
-                      {new Date(item.end_date).toLocaleDateString("id-ID")}
-                    </td>
-                    <td>
-                      <span className="badge badge-warning badge-sm">
-                        {item.status}
-                      </span>
-                    </td>
-                  </tr>
-                ))}
-                {pendingLeaves.length === 0 && (
-                  <tr>
-                    <td colSpan={4} className="text-center opacity-70">
-                      Tidak ada pengajuan cuti/izin pending
-                    </td>
-                  </tr>
-                )}
-              </tbody>
-            </table>
-          </div>
-          {pendingLeaves.length > 5 ? (
-            <div className="text-right mt-3">
-              <button
-                className="btn btn-ghost btn-sm"
-                onClick={() => navigate("/app/leave-requests")}
-              >
-                Lihat Semua
-              </button>
+        <div className="grid grid-cols-1 gap-6 xl:grid-cols-3">
+          <CardTitle title={`Top 5 Pegawai Sering Terlambat`} subtitle={`${monthLabel(selectedMonth)} ${selectedYear}`}>
+            <div className="overflow-x-auto rounded-2xl border border-slate-200 dark:border-slate-700">
+              <table className="table table-sm w-full">
+                <thead className="bg-slate-50 text-slate-600 dark:bg-slate-950 dark:text-slate-300">
+                  <tr><th>Nama Pegawai</th><th>Total</th><th>Hari</th></tr>
+                </thead>
+                <tbody>
+                  {topLateEmployees.slice(0, 5).map((employee) => (
+                    <tr key={employee.id || employee.employee_code || employee.name} className="hover:bg-orange-50/50 dark:hover:bg-slate-800/60">
+                      <td>
+                        <div className="cursor-pointer font-semibold hover:text-orange-600" onClick={() => navigate("/app/employees", { state: { employeeId: employee.id || employee.employee_code } })}>{employee.name || "-"}</div>
+                        <div className="text-xs text-slate-500">{employee.employee_code || "-"}</div>
+                      </td>
+                      <td className="font-semibold">{formatLateDuration(employee.total_late_minutes)}</td>
+                      <td>{Number(employee.late_count) || (employee.late_per_day || []).length || 0} hari</td>
+                    </tr>
+                  ))}
+                  {topLateEmployees.length === 0 && <tr><td colSpan={3} className="py-8 text-center text-slate-500">Belum ada pegawai yang terlambat</td></tr>}
+                </tbody>
+              </table>
+              <SummaryPagination />
             </div>
-          ) : null}
-        </TitleCard>
+          </CardTitle>
 
-        <TitleCard title={`Reimbursement Pending (${monthLabel(selectedMonth)} ${selectedYear})`} topMargin="mt-0">
-          <div className="overflow-x-auto">
-            <table className="table table-zebra table-sm">
-              <thead>
-                <tr>
-                  <th>Pegawai</th>
-                  <th>Jenis</th>
-                  <th>Jumlah</th>
-                  <th>Status</th>
-                </tr>
-              </thead>
-              <tbody>
-                {pendingReimbursements.slice(0, 5).map((item) => (
-                  <tr key={item.id} onClick={() => navigate('/app/reimbursements', { state: { reimbursementId: item.id } })} className="cursor-pointer hover:bg-base-200/50">
-                    <td>
-                      <div
-                        className="font-semibold cursor-pointer hover:underline"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          navigate('/app/employees', { state: { employeeId: item.employee_id || item.employee_code } });
-                        }}
-                      >
-                        {item.employee_name}
-                      </div>
-                      <div className="text-xs opacity-70">
-                        {item.employee_code}
-                      </div>
-                    </td>
-                    <td>{item.reimbursement_type || "-"}</td>
-                    <td className="font-semibold">
-                      Rp {(Number(item.amount) || 0).toLocaleString("id-ID")}
-                    </td>
-                    <td>
-                      <span className="badge badge-warning badge-sm">
-                        {item.status}
-                      </span>
-                    </td>
-                  </tr>
-                ))}
-                {pendingReimbursements.length === 0 && (
-                  <tr>
-                    <td colSpan={4} className="text-center opacity-70">
-                      Tidak ada reimbursement pending
-                    </td>
-                  </tr>
-                )}
-              </tbody>
-            </table>
-          </div>
-          {pendingReimbursements.length > 5 ? (
-            <div className="text-right mt-3">
-              <button
-                className="btn btn-ghost btn-sm"
-                onClick={() => navigate("/app/reimbursements")}
-              >
-                Lihat Semua
-              </button>
+          <CardTitle title="Riwayat Aksi Terbaru" subtitle="Persetujuan cuti dan reimbursement terakhir.">
+            <div className="max-h-[340px] overflow-y-auto rounded-2xl border border-slate-200 dark:border-slate-700">
+              <table className="table table-sm w-full">
+                <thead className="sticky top-0 bg-slate-50 text-slate-600 dark:bg-slate-950 dark:text-slate-300">
+                  <tr><th>Tipe</th><th>Pegawai</th><th>Status</th><th>Tanggal</th></tr>
+                </thead>
+                <tbody>
+                  {recentActions.slice(0, 5).map((item) => (
+                    <tr
+                      key={`${item.type}-${item.id}`}
+                      onClick={() => {
+                        if (item.type === "leave") navigate("/app/leave-requests-history", { state: { requestId: item.id } });
+                        else if (item.type === "reimbursement") navigate("/app/reimbursements-history", { state: { reimbursementId: item.id } });
+                      }}
+                      className={item.type === "leave" || item.type === "reimbursement" ? "cursor-pointer hover:bg-orange-50/50 dark:hover:bg-slate-800/60" : undefined}
+                    >
+                      <td><span className="badge badge-ghost badge-sm">{item.type}</span></td>
+                      <td>
+                        <div className="font-semibold">{item.employee_name}</div>
+                        <div className="text-xs text-slate-500">{item.employee_code}</div>
+                      </td>
+                      <td><span className={`badge badge-sm ${item.status === "approved" ? "badge-success" : "badge-error"}`}>{item.status}</span></td>
+                      <td className="whitespace-nowrap text-xs">{item.action_date ? new Date(item.action_date).toLocaleString("id-ID") : "-"}</td>
+                    </tr>
+                  ))}
+                  {recentActions.length === 0 && <tr><td colSpan={4} className="py-8 text-center text-slate-500">Belum ada riwayat persetujuan</td></tr>}
+                </tbody>
+              </table>
+              <SummaryPagination />
             </div>
-          ) : null}
-        </TitleCard>
+          </CardTitle>
+
+          <CardTitle title="Pegawai Terlambat Hari Ini" subtitle="Daftar keterlambatan hari ini.">
+            {lateRows.length > 0 ? (
+              <div className="overflow-x-auto rounded-2xl border border-slate-200 dark:border-slate-700">
+                <table className="table table-sm w-full">
+                  <thead className="bg-slate-50 text-slate-600 dark:bg-slate-950 dark:text-slate-300"><tr><th>No</th><th>Nama</th><th>Terlambat</th></tr></thead>
+                  <tbody>
+                    {lateRows.slice(0, 5).map((row) => (
+                      <tr key={row.key} className="hover:bg-orange-50/50 dark:hover:bg-slate-800/60">
+                        <td>{row.no}</td>
+                        <td><div className="font-semibold">{row.name}</div><div className="text-xs text-slate-500">{row.employee_code || "-"}</div></td>
+                        <td className="whitespace-nowrap">{formatLateDuration(row.minutes)}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+                <SummaryPagination />
+                {lateRows.length > 5 ? <div className="p-3 text-right"><button className="btn btn-ghost btn-sm rounded-xl text-orange-600" onClick={() => navigate("/app/team-attendance")}>Lihat Semua</button></div> : null}
+              </div>
+            ) : (
+              <div className="rounded-2xl border border-dashed border-slate-200 py-10 text-center text-slate-500 dark:border-slate-700 dark:text-slate-400">Belum ada yang terlambat hari ini</div>
+            )}
+          </CardTitle>
+        </div>
+
+        <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
+          <CardTitle title={`Permohonan Cuti/Izin Pending`} subtitle={`${monthLabel(selectedMonth)} ${selectedYear}`}>
+            <div className="overflow-x-auto rounded-2xl border border-slate-200 dark:border-slate-700">
+              <table className="table table-sm w-full">
+                <thead className="bg-slate-50 text-slate-600 dark:bg-slate-950 dark:text-slate-300"><tr><th>Pegawai</th><th>Tipe</th><th>Tanggal</th><th>Status</th></tr></thead>
+                <tbody>
+                  {pendingLeaves.slice(0, 5).map((item) => (
+                    <tr key={item.id} onClick={() => navigate("/app/leave-requests", { state: { requestId: item.id } })} className="cursor-pointer hover:bg-orange-50/50 dark:hover:bg-slate-800/60">
+                      <td><div className="font-semibold">{item.employee_name}</div><div className="text-xs text-slate-500">{item.employee_code}</div></td>
+                      <td>{humanizeType(item.leave_type)}</td>
+                      <td>{new Date(item.start_date).toLocaleDateString("id-ID")} - {new Date(item.end_date).toLocaleDateString("id-ID")}</td>
+                      <td><span className="badge badge-warning badge-sm">{item.status}</span></td>
+                    </tr>
+                  ))}
+                  {pendingLeaves.length === 0 && <tr><td colSpan={4} className="py-8 text-center text-slate-500">Tidak ada pengajuan cuti/izin pending</td></tr>}
+                </tbody>
+              </table>
+              <SummaryPagination />
+            </div>
+          </CardTitle>
+
+          <CardTitle title={`Reimbursement Pending`} subtitle={`${monthLabel(selectedMonth)} ${selectedYear}`}>
+            <div className="overflow-x-auto rounded-2xl border border-slate-200 dark:border-slate-700">
+              <table className="table table-sm w-full">
+                <thead className="bg-slate-50 text-slate-600 dark:bg-slate-950 dark:text-slate-300"><tr><th>Pegawai</th><th>Jenis</th><th>Jumlah</th><th>Status</th></tr></thead>
+                <tbody>
+                  {pendingReimbursements.slice(0, 5).map((item) => (
+                    <tr key={item.id} onClick={() => navigate("/app/reimbursements", { state: { reimbursementId: item.id } })} className="cursor-pointer hover:bg-orange-50/50 dark:hover:bg-slate-800/60">
+                      <td><div className="font-semibold">{item.employee_name}</div><div className="text-xs text-slate-500">{item.employee_code}</div></td>
+                      <td>{item.reimbursement_type || "-"}</td>
+                      <td className="font-semibold">Rp {(Number(item.amount) || 0).toLocaleString("id-ID")}</td>
+                      <td><span className="badge badge-warning badge-sm">{item.status}</span></td>
+                    </tr>
+                  ))}
+                  {pendingReimbursements.length === 0 && <tr><td colSpan={4} className="py-8 text-center text-slate-500">Tidak ada reimbursement pending</td></tr>}
+                </tbody>
+              </table>
+              <SummaryPagination />
+            </div>
+          </CardTitle>
+        </div>
       </div>
-    </>
+    </div>
   );
 }
 
 export default AtasanDashboard;
-

@@ -289,7 +289,7 @@ function AtasanReimbursements() {
                     </div>
                 )}
 
-                {!loading && pendingItems.length > 0 && (
+                {!loading && (
                     <Pagination
                         page={pendingPage}
                         totalPages={totalPendingPages}

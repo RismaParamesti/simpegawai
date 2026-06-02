@@ -12,12 +12,69 @@ function CandidateApplyPage() {
   const [isApplicationBlocked, setIsApplicationBlocked] = useState(false);
   const [blockReasons, setBlockReasons] = useState([]);
   const formatRupiah = (value) => {
+    const numericValue = Number(String(value || "").replace(/\D/g, ""));
     return new Intl.NumberFormat("id-ID", {
       style: "currency",
       currency: "IDR",
       minimumFractionDigits: 0,
-    }).format(value);
+    }).format(numericValue);
   };
+
+  const formatRupiahInput = (value) => {
+    const digits = String(value || "").replace(/\D/g, "");
+    return digits.replace(/\B(?=(\d{3})+(?!\d))/g, ".");
+  };
+
+  const getEmploymentTypeLabel = (type) => {
+    const typeMap = {
+      permanent: "Pegawai Tetap",
+      contract: "Pegawai Kontrak",
+      intern: "Magang",
+      temporary: "Sementara",
+      part_time: "Paruh Waktu",
+      freelance: "Freelance",
+    };
+    return typeMap[String(type || "").toLowerCase()] || type || "-";
+  };
+
+  const getMaritalStatusLabel = (status) => {
+    const statusMap = {
+      single: "Belum Menikah",
+      married: "Menikah",
+      divorced: "Cerai",
+      widowed: "Janda/Duda",
+      "Belum Menikah": "Belum Menikah",
+      Menikah: "Menikah",
+      Cerai: "Cerai",
+      "Janda/Duda": "Janda/Duda",
+    };
+    return statusMap[status] || status || "-";
+  };
+
+  const isUrlDocumentField = (doc = {}) =>
+    doc.isUrl ||
+    doc.fieldName?.includes("_link") ||
+    doc.fieldName?.includes("github") ||
+    doc.fieldName?.includes("youtube") ||
+    doc.fieldName?.includes("design") ||
+    doc.fieldName?.includes("marketing") ||
+    doc.fieldName?.includes("campaign");
+
+  const hasDocumentValue = (doc) => Boolean(fileNames[doc.fieldName] || files[doc.fieldName]);
+
+  const renderLongTextBlock = (title, value) => (
+    <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-700 dark:bg-slate-900">
+      <p className="mb-2 text-sm font-extrabold text-slate-900 dark:text-slate-50">
+        {title}
+      </p>
+      <div className="whitespace-pre-line rounded-xl bg-slate-50 p-4 text-sm leading-7 text-slate-600 dark:bg-slate-800/60 dark:text-slate-300">
+        {value || "-"}
+      </div>
+    </div>
+  );
+
+  const previewButtonClass =
+    "btn btn-xs rounded-xl border-none bg-orange-500 text-white shadow-sm hover:bg-orange-600";
   // Ambil daftar aplikasi user saat mount
   useEffect(() => {
     const fetchAppliedJobs = async () => {
@@ -401,6 +458,15 @@ function CandidateApplyPage() {
       });
       return;
     }
+
+    if (name === "expected_salary") {
+      const digits = String(value).replace(/\D/g, "");
+      setCandidateData({
+        ...candidateData,
+        expected_salary: digits,
+      });
+      return;
+    }
     setCandidateData({
       ...candidateData,
       [name]: value,
@@ -677,7 +743,7 @@ function CandidateApplyPage() {
           </p>
 
           {selectedJob && (
-            <div className="card bg-base-200">
+            <div className="card border border-slate-200 bg-slate-50/70 shadow-sm">
               <div className="card-body">
                 <div className="flex justify-between items-start mb-2">
                   <h3 className="card-title text-lg mb-2">
@@ -703,14 +769,13 @@ function CandidateApplyPage() {
                   </div>
                   <div>
                     <span className="font-semibold">Tipe Pekerjaan:</span>{" "}
-                    {selectedJob.employment_type}
+                    {getEmploymentTypeLabel(selectedJob.employment_type)}
                   </div>
                   <div>
                     <span className="font-semibold">Kuota:</span>{" "}
                     {selectedJob.quota || 1} orang
                   </div>
                   <div>
-                    <span className="font-semibold">Gaji:</span>{" "}
                     <span className="font-semibold">Gaji:</span>{" "}
                     {selectedJob.salary_range_min &&
                     selectedJob.salary_range_max
@@ -723,7 +788,7 @@ function CandidateApplyPage() {
                   </div>
                   <div>
                     <span className="font-semibold">Deadline:</span>{" "}
-                    {selectedJob.deadline
+                    <span className="inline-flex rounded-full bg-red-50 px-3 py-1 text-xs font-bold text-red-600 ring-1 ring-red-200">{selectedJob.deadline
                       ? new Date(selectedJob.deadline).toLocaleDateString(
                           "id-ID",
                           {
@@ -733,30 +798,17 @@ function CandidateApplyPage() {
                             day: "numeric",
                           },
                         )
-                      : "-"}
+                      : "-"}</span>
                   </div>
                   <div>
                     <span className="font-semibold">Status:</span>{" "}
                     {selectedJob.status}
                   </div>
                 </div>
-                <div className="mb-2">
-                  <span className="font-semibold">Deskripsi Pekerjaan:</span>
-                  <div className="whitespace-pre-line">
-                    {selectedJob.description || "-"}
-                  </div>
-                </div>
-                <div className="mb-2">
-                  <span className="font-semibold">Persyaratan:</span>
-                  <div className="whitespace-pre-line">
-                    {selectedJob.requirements || "-"}
-                  </div>
-                </div>
-                <div className="mb-2">
-                  <span className="font-semibold">Tanggung Jawab:</span>
-                  <div className="whitespace-pre-line">
-                    {selectedJob.responsibilities || "-"}
-                  </div>
+                <div className="space-y-4">
+                  {renderLongTextBlock("Deskripsi Pekerjaan", selectedJob.description)}
+                  {renderLongTextBlock("Persyaratan", selectedJob.requirements)}
+                  {renderLongTextBlock("Tanggung Jawab", selectedJob.responsibilities)}
                 </div>
                 <div className="alert alert-info mt-4">
                   <svg
@@ -804,7 +856,7 @@ function CandidateApplyPage() {
           <div className="space-y-6">
             {/* Row 1: Nama & Email */}
             <div className="grid md:grid-cols-2 gap-4">
-              <div className="form-control">
+              <div className="form-control rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
                 <label className="label">
                   <span className="label-text font-semibold">
                     Nama Lengkap *
@@ -820,7 +872,7 @@ function CandidateApplyPage() {
                   required
                 />
               </div>
-              <div className="form-control">
+              <div className="form-control rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
                 <label className="label">
                   <span className="label-text font-semibold">Email *</span>
                 </label>
@@ -838,7 +890,7 @@ function CandidateApplyPage() {
 
             {/* Row 2: No HP & Gender */}
             <div className="grid md:grid-cols-2 gap-4">
-              <div className="form-control">
+              <div className="form-control rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
                 <label className="label">
                   <span className="label-text font-semibold">Nomor HP *</span>
                 </label>
@@ -852,7 +904,7 @@ function CandidateApplyPage() {
                   required
                 />
               </div>
-              <div className="form-control">
+              <div className="form-control rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
                 <label className="label">
                   <span className="label-text font-semibold">
                     Jenis Kelamin
@@ -873,7 +925,7 @@ function CandidateApplyPage() {
 
             {/* Row 3: Tempat & Tanggal Lahir */}
             <div className="grid md:grid-cols-2 gap-4">
-              <div className="form-control">
+              <div className="form-control rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
                 <label className="label">
                   <span className="label-text font-semibold">
                     Tempat Lahir *
@@ -889,7 +941,7 @@ function CandidateApplyPage() {
                   required
                 />
               </div>
-              <div className="form-control">
+              <div className="form-control rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
                 <label className="label">
                   <span className="label-text font-semibold">
                     Tanggal Lahir *
@@ -908,7 +960,7 @@ function CandidateApplyPage() {
 
             {/* Row 4: Status Pernikahan & Kebangsaan */}
             <div className="grid md:grid-cols-2 gap-4">
-              <div className="form-control">
+              <div className="form-control rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
                 <label className="label">
                   <span className="label-text font-semibold">
                     Status Pernikahan
@@ -921,13 +973,13 @@ function CandidateApplyPage() {
                   onChange={handleCandidateChange}
                 >
                   <option value="">Pilih Status Pernikahan</option>
-                  <option value="single">Belum Menikah</option>
-                  <option value="married">Menikah</option>
-                  <option value="divorced">Cerai</option>
-                  <option value="widowed">Janda/Duda</option>
+                  <option value="Belum Menikah">Belum Menikah</option>
+                  <option value="Menikah">Menikah</option>
+                  <option value="Cerai">Cerai</option>
+                  <option value="Janda/Duda">Janda/Duda</option>
                 </select>
               </div>
-              <div className="form-control">
+              <div className="form-control rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
                 <label className="label">
                   <span className="label-text font-semibold">Kebangsaan</span>
                 </label>
@@ -943,7 +995,7 @@ function CandidateApplyPage() {
             </div>
 
             {/* Row 5: Alamat */}
-            <div className="form-control">
+            <div className="form-control rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
               <label className="label">
                 <span className="label-text font-semibold">
                   Alamat Lengkap *
@@ -962,7 +1014,7 @@ function CandidateApplyPage() {
 
             {/* Row 6: NIK & NPWP */}
             <div className="grid md:grid-cols-2 gap-4">
-              <div className="form-control">
+              <div className="form-control rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
                 <label className="label">
                   <span className="label-text font-semibold">NIK *</span>
                 </label>
@@ -976,7 +1028,7 @@ function CandidateApplyPage() {
                   required
                 />
               </div>
-              <div className="form-control">
+              <div className="form-control rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
                 <label className="label">
                   <span className="label-text font-semibold">
                     NPWP (Opsional)
@@ -995,7 +1047,7 @@ function CandidateApplyPage() {
 
             {/* Row 7: Pendidikan */}
             <div className="grid md:grid-cols-2 gap-4">
-              <div className="form-control">
+              <div className="form-control rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
                 <label className="label">
                   <span className="label-text font-semibold">
                     Tingkat Pendidikan
@@ -1015,7 +1067,7 @@ function CandidateApplyPage() {
                   <option value="S3">S3 (Doktor)</option>
                 </select>
               </div>
-              <div className="form-control">
+              <div className="form-control rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
                 <label className="label">
                   <span className="label-text font-semibold">
                     Sekolah / Universitas
@@ -1034,7 +1086,7 @@ function CandidateApplyPage() {
 
             {/* Row 8: Jurusan & Tahun Lulus */}
             <div className="grid md:grid-cols-2 gap-4">
-              <div className="form-control">
+              <div className="form-control rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
                 <label className="label">
                   <span className="label-text font-semibold">
                     Jurusan/Program Studi
@@ -1049,7 +1101,7 @@ function CandidateApplyPage() {
                   onChange={handleCandidateChange}
                 />
               </div>
-              <div className="form-control">
+              <div className="form-control rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
                 <label className="label">
                   <span className="label-text font-semibold">Tahun Lulus</span>
                 </label>
@@ -1068,7 +1120,7 @@ function CandidateApplyPage() {
 
             {/* Row 9: LinkedIn & Portfolio */}
             <div className="grid md:grid-cols-2 gap-4">
-              <div className="form-control">
+              <div className="form-control rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
                 <label className="label">
                   <span className="label-text font-semibold">
                     LinkedIn Profile{" "}
@@ -1084,7 +1136,7 @@ function CandidateApplyPage() {
                   onChange={handleCandidateChange}
                 />
               </div>
-              <div className="form-control">
+              <div className="form-control rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
                 <label className="label">
                   <span className="label-text font-semibold">
                     Portfolio Website{" "}
@@ -1103,20 +1155,27 @@ function CandidateApplyPage() {
             </div>
 
             {/* Row 10: Expected Salary */}
-            <div className="form-control">
+            <div className="form-control rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
               <label className="label">
                 <span className="label-text font-semibold">
                   Ekspektasi Gaji (Rp)
                 </span>
               </label>
-              <input
-                type="number"
-                name="expected_salary"
-                className="input input-bordered"
-                placeholder="Masukkan ekspektasi gaji"
-                value={candidateData.expected_salary}
-                onChange={handleCandidateChange}
-              />
+              <label className="input input-bordered flex items-center gap-2 rounded-xl">
+                <span className="text-sm font-semibold text-slate-500">Rp</span>
+                <input
+                  type="text"
+                  name="expected_salary"
+                  className="grow bg-transparent outline-none"
+                  placeholder="Contoh: 5.000.000"
+                  inputMode="numeric"
+                  value={formatRupiahInput(candidateData.expected_salary)}
+                  onChange={handleCandidateChange}
+                />
+              </label>
+              <p className="mt-1 text-xs text-slate-500">
+                Angka akan otomatis diberi titik sebagai pemisah ribuan.
+              </p>
             </div>
           </div>
         </div>
@@ -1149,7 +1208,7 @@ function CandidateApplyPage() {
           <div className="bg-base-200 rounded-xl p-4 mb-6 shadow-sm">
             <div className="grid md:grid-cols-3 gap-4">
               {/* Search */}
-              <div className="form-control">
+              <div className="form-control rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
                 <label className="label">
                   <span className="label-text font-semibold">
                     Cari Lowongan
@@ -1167,7 +1226,7 @@ function CandidateApplyPage() {
               </div>
 
               {/* Filter Tipe */}
-              <div className="form-control">
+              <div className="form-control rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
                 <label className="label">
                   <span className="label-text font-semibold">
                     Tipe Pekerjaan
@@ -1179,9 +1238,9 @@ function CandidateApplyPage() {
                   onChange={(e) => setJobTypeFilter(e.target.value)}
                 >
                   <option value="">Semua Tipe</option>
-                  <option value="permanent">Permanent</option>
-                  <option value="contract">Contract</option>
-                  <option value="intern">Intern</option>
+                  <option value="permanent">Tetap</option>
+                  <option value="contract">Kontrak</option>
+                  <option value="intern">Magang</option>
                 </select>
               </div>
               <button
@@ -1262,7 +1321,7 @@ function CandidateApplyPage() {
                         </div>
                         <div>
                           <span className="font-semibold">Tipe:</span>{" "}
-                          {job.employment_type}
+                          {getEmploymentTypeLabel(job.employment_type)}
                         </div>
                         <div>
                           <span className="font-semibold">Kuota:</span>{" "}
@@ -1280,7 +1339,7 @@ function CandidateApplyPage() {
                         </div>
                         <div>
                           <span className="font-semibold">Deadline:</span>{" "}
-                          {job.deadline
+                          <span className="inline-flex rounded-full bg-red-50 px-3 py-1 text-xs font-bold text-red-600 ring-1 ring-red-200">{job.deadline
                             ? new Date(job.deadline).toLocaleDateString(
                                 "id-ID",
                                 {
@@ -1290,7 +1349,7 @@ function CandidateApplyPage() {
                                   day: "numeric",
                                 },
                               )
-                            : "-"}
+                            : "-"}</span>
                         </div>
                         <div>
                           <span className="font-semibold">Status:</span>{" "}
@@ -1337,27 +1396,10 @@ function CandidateApplyPage() {
                       {/* Detail lengkap tampil di bawah card jika tombol lihat selengkapnya diklik */}
                       {detailJobId === job.id && (
                         <div className="mt-4 border-t pt-4">
-                          <div className="mb-2">
-                            <span className="font-semibold">
-                              Deskripsi Pekerjaan:
-                            </span>
-                            <div className="whitespace-pre-line">
-                              {job.description || "-"}
-                            </div>
-                          </div>
-                          <div className="mb-2">
-                            <span className="font-semibold">Persyaratan:</span>
-                            <div className="whitespace-pre-line">
-                              {job.requirements || "-"}
-                            </div>
-                          </div>
-                          <div className="mb-2">
-                            <span className="font-semibold">
-                              Tanggung Jawab:
-                            </span>
-                            <div className="whitespace-pre-line">
-                              {job.responsibilities || "-"}
-                            </div>
+                          <div className="space-y-4">
+                            {renderLongTextBlock("Deskripsi Pekerjaan", job.description)}
+                            {renderLongTextBlock("Persyaratan", job.requirements)}
+                            {renderLongTextBlock("Tanggung Jawab", job.responsibilities)}
                           </div>
                         </div>
                       )}
@@ -1458,7 +1500,7 @@ function CandidateApplyPage() {
                                   <>
                                     <button
                                       type="button"
-                                      className="btn btn-xs btn-outline"
+                                      className={previewButtonClass}
                                       onClick={() => openPreview(fileObj, fileName)}
                                     >
                                       Lihat file
@@ -1467,7 +1509,7 @@ function CandidateApplyPage() {
                                 ) : (
                                   <button
                                     type="button"
-                                    className="btn btn-xs btn-outline"
+                                    className={previewButtonClass}
                                     onClick={() => openPreview(fileObj, fileName)}
                                   >
                                     Download / Lihat Dokumen
@@ -1557,7 +1599,7 @@ function CandidateApplyPage() {
                                   <>
                                     <button
                                       type="button"
-                                      className="btn btn-xs btn-outline"
+                                      className={previewButtonClass}
                                       onClick={() => openPreview(fileObj, fileName)}
                                     >
                                       Lihat File
@@ -1566,13 +1608,8 @@ function CandidateApplyPage() {
                                 ) : (
                                   <button
                                     type="button"
-                                    className="btn btn-xs btn-outline"
-                                    onClick={() =>
-                                      window.open(
-                                        URL.createObjectURL(fileObj),
-                                        "_blank",
-                                      )
-                                    }
+                                    className={previewButtonClass}
+                                    onClick={() => openPreview(fileObj, fileName)}
                                   >
                                     Download / Lihat Dokumen
                                   </button>
@@ -1604,28 +1641,38 @@ function CandidateApplyPage() {
             )}
 
             {/* Cover Letter */}
-            <div className="form-control">
-              <label className="label">
-                <span className="label-text font-semibold">
-                  Surat Lamaran / Cover Letter (File, Opsional)
-                </span>
-              </label>
+            <div className="mt-8 rounded-3xl border border-orange-200 bg-orange-50/60 p-5 shadow-sm dark:border-orange-900/60 dark:bg-orange-950/20">
+              <div className="mb-4">
+                <h3 className="text-lg font-extrabold text-slate-900 dark:text-slate-50">
+                  Surat Lamaran / Cover Letter
+                </h3>
+                <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
+                  File ini opsional. Akan tetapi bernilai plus
+                </p>
+              </div>
               <input
                 type="file"
                 name="cover_letter_file"
-                className="file-input file-input-bordered"
+                className="file-input file-input-bordered w-full rounded-xl bg-white dark:bg-slate-900"
                 accept=".pdf,.doc,.docx"
                 onChange={handleFileChange}
               />
-              <label className="label">
-                <span className="label-text-alt">
-                  Upload file PDF/DOC/DOCX untuk surat lamaran Anda
-                </span>
-              </label>
+              <p className="mt-2 text-xs text-slate-500">
+                Format yang diperbolehkan: PDF, DOC, DOCX.
+              </p>
               {fileNames.cover_letter_file && (
-                <p className="text-sm text-success mt-1">
-                  ✓ {fileNames.cover_letter_file}
-                </p>
+                <div className="mt-3 flex flex-col gap-2 rounded-2xl border border-emerald-200 bg-emerald-50 p-3 text-sm text-emerald-700 sm:flex-row sm:items-center sm:justify-between">
+                  <span className="font-semibold break-all">✓ {fileNames.cover_letter_file}</span>
+                  {files.cover_letter_file instanceof File && (
+                    <button
+                      type="button"
+                      className={previewButtonClass}
+                      onClick={() => openPreview(files.cover_letter_file, fileNames.cover_letter_file)}
+                    >
+                      Lihat File
+                    </button>
+                  )}
+                </div>
               )}
             </div>
           </div>
@@ -1665,7 +1712,7 @@ function CandidateApplyPage() {
 
           <div className="space-y-4">
             {/* Data Diri Lengkap */}
-            <div className="card bg-base-200">
+            <div className="card border border-slate-200 bg-slate-50/70 shadow-sm">
               <div className="card-body">
                 <h3 className="card-title text-lg">Data Diri Lengkap</h3>
                 <div className="grid md:grid-cols-2 gap-4 text-sm">
@@ -1675,7 +1722,13 @@ function CandidateApplyPage() {
                         {f.label}
                       </p>
                       <p className="font-semibold break-words">
-                        {candidateData[f.key] || "-"}
+                        {f.key === "marital_status"
+                          ? getMaritalStatusLabel(candidateData[f.key])
+                          : f.key === "expected_salary"
+                            ? candidateData[f.key]
+                              ? formatRupiah(candidateData[f.key])
+                              : "-"
+                            : candidateData[f.key] || "-"}
                       </p>
                     </div>
                   ))}
@@ -1684,7 +1737,7 @@ function CandidateApplyPage() {
             </div>
 
             {/* Lowongan */}
-            <div className="card bg-base-200">
+            <div className="card border border-slate-200 bg-slate-50/70 shadow-sm">
               <div className="card-body">
                 <h3 className="card-title text-lg">Lowongan yang Dipilih</h3>
                 {selectedJob ? (
@@ -1709,7 +1762,7 @@ function CandidateApplyPage() {
                           Tipe Pekerjaan
                         </p>
                         <p className="font-semibold capitalize">
-                          {selectedJob.employment_type}
+                          {getEmploymentTypeLabel(selectedJob.employment_type)}
                         </p>
                       </div>
                       <div>
@@ -1725,7 +1778,7 @@ function CandidateApplyPage() {
                         <p className="font-semibold">
                           {selectedJob.salary_range_min &&
                           selectedJob.salary_range_max
-                            ? `Rp ${(selectedJob.salary_range_min / 1000000).toFixed(1)}M - Rp ${(selectedJob.salary_range_max / 1000000).toFixed(1)}M`
+                            ? `${formatRupiah(selectedJob.salary_range_min)} - ${formatRupiah(selectedJob.salary_range_max)}`
                             : "Gaji dirahasiakan"}
                         </p>
                       </div>
@@ -1733,7 +1786,7 @@ function CandidateApplyPage() {
                         <p className="text-xs text-gray-600 font-semibold">
                           Deadline
                         </p>
-                        <p className="font-semibold text-warning">
+                        <p className="inline-flex rounded-full bg-red-50 px-3 py-1 text-sm font-bold text-red-600 ring-1 ring-red-200">
                           {selectedJob.deadline
                             ? new Date(selectedJob.deadline).toLocaleDateString(
                                 "id-ID",
@@ -1748,32 +1801,13 @@ function CandidateApplyPage() {
                         </p>
                       </div>
                     </div>
-                    <div>
-                      <p className="text-xs text-gray-600 font-semibold mt-4">
-                        Deskripsi
-                      </p>
-                      <p className="text-sm whitespace-pre-line">
-                        {selectedJob.description || "-"}
-                      </p>
+                    <div className="mt-4 space-y-4">
+                      {renderLongTextBlock("Deskripsi Pekerjaan", selectedJob.description)}
+                      {renderLongTextBlock("Persyaratan", selectedJob.requirements)}
+                      {selectedJob.responsibilities
+                        ? renderLongTextBlock("Tanggung Jawab", selectedJob.responsibilities)
+                        : null}
                     </div>
-                    <div>
-                      <p className="text-xs text-gray-600 font-semibold mt-4">
-                        Persyaratan
-                      </p>
-                      <p className="text-sm whitespace-pre-line">
-                        {selectedJob.requirements || "-"}
-                      </p>
-                    </div>
-                    {selectedJob.responsibilities && (
-                      <div>
-                        <p className="text-xs text-gray-600 font-semibold mt-4">
-                          Tanggung Jawab
-                        </p>
-                        <p className="text-sm whitespace-pre-line">
-                          {selectedJob.responsibilities}
-                        </p>
-                      </div>
-                    )}
                   </div>
                 ) : (
                   <div className="text-error">
@@ -1784,10 +1818,10 @@ function CandidateApplyPage() {
             </div>
 
             {/* Dokumen Wajib */}
-            <div className="card bg-base-200">
+            <div className="card border border-slate-200 bg-slate-50/70 shadow-sm">
               <div className="card-body">
                 <h3 className="card-title text-lg mb-4">📄 Dokumen Wajib</h3>
-                <div className="divide-y divide-gray-200 border rounded-lg overflow-hidden">
+                <div className="grid gap-3">
                   {requiredDocuments.map((doc, idx) => {
                     const fileObj = files[doc.fieldName];
                     const fileName = fileNames[doc.fieldName];
@@ -1807,7 +1841,7 @@ function CandidateApplyPage() {
                     return (
                       <div
                         key={doc.fieldName}
-                        className={`flex flex-col md:flex-row md:items-center gap-2 px-4 py-3 ${idx % 2 === 0 ? "bg-base-100" : ""}`}
+                        className="flex flex-col gap-3 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm md:flex-row md:items-center md:justify-between"
                       >
                         <div className="flex-1">
                           <span className="text-xs text-gray-600 font-semibold block">
@@ -1845,13 +1879,13 @@ function CandidateApplyPage() {
             </div>
 
             {/* Dokumen Opsional */}
-            {optionalDocuments.length > 0 && (
-              <div className="card bg-base-200">
+            {optionalDocuments.some(hasDocumentValue) && (
+              <div className="card border border-slate-200 bg-slate-50/70 shadow-sm">
                 <div className="card-body">
                   <h3 className="card-title text-lg mb-4">
                     ✨ Dokumen Opsional
                   </h3>
-                  <div className="divide-y divide-gray-200 border rounded-lg overflow-hidden">
+                  <div className="grid gap-3">
                     {optionalDocuments.map((doc, idx) => {
                       const fileObj = files[doc.fieldName];
                       const fileName = fileNames[doc.fieldName];
@@ -1871,7 +1905,7 @@ function CandidateApplyPage() {
                       return (
                         <div
                           key={doc.fieldName}
-                          className={`flex flex-col md:flex-row md:items-center gap-2 px-4 py-3 ${idx % 2 === 0 ? "bg-base-100" : ""}`}
+                          className="flex flex-col gap-3 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm md:flex-row md:items-center md:justify-between"
                         >
                           <div className="flex-1">
                             <span className="text-xs text-gray-600 font-semibold block">
@@ -1895,7 +1929,7 @@ function CandidateApplyPage() {
                           {!isUrlField && fileObj && (
                             <button
                               type="button"
-                              className="btn btn-xs btn-outline"
+                              className={previewButtonClass}
                               onClick={() => openPreview(fileObj, fileName)}
                             >
                               {isImage ? "Lihat Gambar" : "Lihat File"}
@@ -1911,7 +1945,7 @@ function CandidateApplyPage() {
 
             {/* Cover Letter */}
             {fileNames.cover_letter_file && (
-              <div className="card bg-base-200">
+              <div className="card border border-slate-200 bg-slate-50/70 shadow-sm">
                 <div className="card-body">
                   <h3 className="card-title text-lg">💌 Surat Lamaran</h3>
                   <div className="bg-white p-4 rounded border border-gray-300 text-sm">
@@ -1927,7 +1961,7 @@ function CandidateApplyPage() {
                       {files.cover_letter_file instanceof File && (
                         <button
                           type="button"
-                          className="btn btn-xs btn-outline"
+                          className={previewButtonClass}
                           onClick={() => openPreview(files.cover_letter_file, fileNames.cover_letter_file)}
                         >
                           Lihat File

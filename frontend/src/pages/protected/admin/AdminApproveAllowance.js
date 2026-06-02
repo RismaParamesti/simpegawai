@@ -1,8 +1,10 @@
 import { useEffect, useMemo, useState } from "react";
 import { useDispatch } from "react-redux";
 import TitleCard from "../../../components/Cards/TitleCard";
+import Pagination from "../../../components/Pagination/Pagination";
 import { setPageTitle, showNotification } from "../../../features/common/headerSlice";
 import { adminApi } from "../../../features/admin/api";
+import useTablePagination from "../../../hooks/useTablePagination";
 
 const statusLabelMap = {
   submitted: "Menunggu Approval",
@@ -50,6 +52,8 @@ function ApproveHRAllowance() {
     () => data.filter((d) => d.status !== "submitted"),
     [data],
   );
+  const pendingPagination = useTablePagination(pendingData);
+  const historyPagination = useTablePagination(historyData);
 
   const handleApprove = async (id) => {
     try {
@@ -118,7 +122,7 @@ function ApproveHRAllowance() {
                 </thead>
 
                 <tbody>
-                  {pendingData.map((item) => (
+                  {pendingPagination.paginatedItems.map((item) => (
                     <tr key={item.id}>
                       <td>
                         <div className="font-semibold">{item.employee_name}</div>
@@ -170,6 +174,7 @@ function ApproveHRAllowance() {
                   )}
                 </tbody>
               </table>
+              <Pagination page={pendingPagination.page} totalPages={pendingPagination.totalPages} onChangePage={pendingPagination.setPage} itemsPerPage={pendingPagination.itemsPerPage} />
             </div>
           )
         )}
@@ -197,7 +202,7 @@ function ApproveHRAllowance() {
               </thead>
 
               <tbody>
-                {historyData.map((item) => (
+                {historyPagination.paginatedItems.map((item) => (
                   <tr key={item.id}>
                     <td>
                       <div className="font-semibold">{item.employee_name}</div>
@@ -250,6 +255,7 @@ function ApproveHRAllowance() {
                 )}
               </tbody>
             </table>
+            <Pagination page={historyPagination.page} totalPages={historyPagination.totalPages} onChangePage={historyPagination.setPage} itemsPerPage={historyPagination.itemsPerPage} />
           </div>
         )}
       </TitleCard>

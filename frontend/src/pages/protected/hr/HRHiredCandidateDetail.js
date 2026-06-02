@@ -11,36 +11,38 @@ const HRHiredCandidateDetail = () => {
   const { id } = useParams();
 
   const [candidate, setCandidate] = useState(null);
+  const [invitationLetterFile, setInvitationLetterFile] = useState("");
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     dispatch(setPageTitle({ title: "Detail Calon Pegawai" }));
-    // Ambil data interview dulu
-    axios
-      .get(`/api/interviews/${id}`)
-      .then((res) => {
+    const fetchCandidate = async () => {
+      try {
+        const res = await axios.get(`/api/interviews/${id}`);
         const interviewData = res.data || {};
-        // Jika sudah ada invitation_letter_file, langsung pakai
-        if (interviewData.invitation_letter_file) {
-          setCandidate(interviewData);
-          setLoading(false);
-        } else {
-          // Jika tidak ada, ambil dari /api/candidates/:id
-          axios
-            .get(`/api/candidates/${id}`)
-            .then((res2) => {
-              setCandidate({ ...interviewData, ...res2.data });
-              setLoading(false);
-            })
-            .catch(() => {
-              setCandidate(interviewData);
-              setLoading(false);
-            });
+        setCandidate(interviewData);
+
+        if (interviewData.candidate_id) {
+          try {
+            const callRes = await axios.get(
+              `/api/candidate-calls/last/${interviewData.candidate_id}`,
+            );
+            setInvitationLetterFile(
+              callRes.data?.invitation_letter_file || "",
+            );
+          } catch {
+            setInvitationLetterFile("");
+          }
         }
-      })
-      .catch(() => {
+      } catch (err) {
+        console.error("Gagal mengambil data kandidat:", err);
+        setCandidate(null);
+      } finally {
         setLoading(false);
-      });
+      }
+    };
+
+    fetchCandidate();
   }, [dispatch, id]);
 
   // Debug: cek isi candidate
@@ -50,13 +52,19 @@ const HRHiredCandidateDetail = () => {
 
   return (
     <TitleCard
-      title={
-        <div className="flex justify-between items-center w-full">
-          <span className="text-2xl font-bold">Detail Calon Pegawai</span>
-          <button className="btn btn-primary" onClick={() => navigate(-1)}>
-            Kembali
-          </button>
-        </div>
+      title={<span className="text-2xl font-bold">Detail Calon Pegawai</span>}
+      TopSideButtons={
+        <button
+          className="btn text-white"
+          style={{
+            backgroundColor: "#f97316",
+            borderColor: "#ea580c",
+            color: "#ffffff",
+          }}
+          onClick={() => navigate(-1)}
+        >
+          Kembali
+        </button>
       }
     >
       <div className="p-6 space-y-6">
@@ -216,6 +224,7 @@ const HRHiredCandidateDetail = () => {
           <div className="flex flex-col sm:flex-row gap-2">
             <button
               className="btn btn-primary w-full sm:w-auto"
+              disabled={Boolean(invitationLetterFile)}
               onClick={() =>
                 navigate(`/app/Hire-candidates-detailmodal/${candidate.id}`)
               }
@@ -225,49 +234,12 @@ const HRHiredCandidateDetail = () => {
 
             <button
               className="btn btn-outline btn-primary w-full sm:w-auto"
-              onClick={async () => {
-                if (candidate.invitation_letter_file) {
-                  const url = candidate.invitation_letter_file.startsWith(
-                    "http",
-                  )
-                    ? candidate.invitation_letter_file
-                    : `http://localhost:5000/${candidate.invitation_letter_file.replace(/^\//, "")}`;
-                  window.open(url, "_blank");
-                } else if (candidate.id || candidate.candidate_id) {
-                  // Coba fetch ke endpoint baru
-                  const candidateId = candidate.candidate_id || candidate.id;
-                  try {
-                    const res = await fetch(
-                      `/api/candidate-calls/last/${candidateId}`,
-                    );
-                    if (res.ok) {
-                      const data = await res.json();
-                      if (data.invitation_letter_file) {
-                        const url = data.invitation_letter_file.startsWith(
-                          "http",
-                        )
-                          ? data.invitation_letter_file
-                          : `http://localhost:5000/${data.invitation_letter_file.replace(/^\//, "")}`;
-                        window.open(url, "_blank");
-                        return;
-                      }
-                    }
-                    alert(
-                      "File surat undangan belum tersedia. Data kandidat: " +
-                        JSON.stringify(candidate, null, 2),
-                    );
-                  } catch (e) {
-                    alert(
-                      "File surat undangan belum tersedia. Data kandidat: " +
-                        JSON.stringify(candidate, null, 2),
-                    );
-                  }
-                } else {
-                  alert(
-                    "File surat undangan belum tersedia. Data kandidat: " +
-                      JSON.stringify(candidate, null, 2),
-                  );
-                }
+              disabled={!invitationLetterFile}
+              onClick={() => {
+                const url = invitationLetterFile.startsWith("http")
+                  ? invitationLetterFile
+                  : `http://localhost:5000/${invitationLetterFile.replace(/^\//, "")}`;
+                window.open(url, "_blank");
               }}
             >
               Cetak Surat
@@ -276,6 +248,7 @@ const HRHiredCandidateDetail = () => {
 
           <button
             className="btn btn-success w-full sm:w-auto"
+            disabled={!invitationLetterFile}
             onClick={() =>
               navigate("/app/employees", {
                 state: { candidateToCreate: candidate },
@@ -292,4 +265,3 @@ const HRHiredCandidateDetail = () => {
 };
 
 export default HRHiredCandidateDetail;
-

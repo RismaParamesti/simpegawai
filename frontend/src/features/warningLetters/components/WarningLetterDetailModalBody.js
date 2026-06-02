@@ -218,16 +218,14 @@ const WarningLetterDetailModalBody = ({ extraObject = {}, closeModal = () => {} 
                   </tbody>
                 </table>
 
-                {filteredAttendance.length > itemsPerPage && (
-                  <div className="p-3 border-t border-base-300">
-                    <Pagination
-                      page={page}
-                      totalPages={totalPages}
-                      onChangePage={(p) => setPage(p)}
-                      itemsPerPage={itemsPerPage}
-                    />
-                  </div>
-                )}
+                <div className="p-3 border-t border-base-300">
+                  <Pagination
+                    page={page}
+                    totalPages={totalPages}
+                    onChangePage={(p) => setPage(p)}
+                    itemsPerPage={itemsPerPage}
+                  />
+                </div>
               </div>
             ) : evidence ? (
               typeof evidence === "object" ? (

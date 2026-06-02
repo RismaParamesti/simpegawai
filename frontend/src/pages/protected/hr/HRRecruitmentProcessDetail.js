@@ -44,6 +44,8 @@ const gradientButtonBase =
   "inline-flex items-center justify-center gap-2 rounded-full px-4 py-2 text-sm font-semibold transition-all duration-200 shadow-sm";
 const gradientBlueButtonClass =
   `${gradientButtonBase} border border-blue-600 bg-gradient-to-b from-blue-400 to-blue-600 text-white hover:from-blue-500 hover:to-blue-700`;
+const gradientOrangeButtonClass =
+  `${gradientButtonBase} border border-orange-600 bg-gradient-to-b from-orange-400 to-orange-600 text-white hover:from-orange-500 hover:to-orange-700`;
 const gradientRedButtonClass =
   `${gradientButtonBase} border border-red-600 bg-gradient-to-b from-red-400 to-red-600 text-white hover:from-red-500 hover:to-red-700`;
 
@@ -171,34 +173,6 @@ function isExternalLink(value) {
   if (!/^https?:\/\//i.test(value)) return false;
   return !/^(https?:\/\/)?(localhost|127\.0\.0\.1)(:\d+)?\//i.test(value);
 }
-
-const RecruitmentHeroIllustration = () => (
-  <div className="pointer-events-none absolute right-10 top-2 hidden h-32 w-80 lg:block">
-    <div className="absolute bottom-2 right-0 h-20 w-72 rounded-full bg-orange-100/80 blur-[1px] dark:bg-orange-900/30" />
-    <div className="absolute right-36 top-1 h-24 w-20 rotate-[-3deg] rounded-2xl border border-slate-200 bg-white shadow-lg dark:border-slate-700 dark:bg-slate-900">
-      <div className="flex items-center gap-2 border-b border-orange-100 px-2 py-2 dark:border-slate-700">
-        <div className="flex h-7 w-7 items-center justify-center rounded-full bg-orange-100 text-orange-500 dark:bg-orange-900/40 dark:text-orange-300">
-          <Users className="h-4 w-4" />
-        </div>
-        <div className="space-y-1">
-          <div className="h-1.5 w-8 rounded-full bg-orange-400 dark:bg-orange-300" />
-          <div className="h-1.5 w-6 rounded-full bg-slate-200 dark:bg-slate-600" />
-        </div>
-      </div>
-      <div className="space-y-1.5 px-3 py-2">
-        <div className="h-1.5 w-12 rounded-full bg-orange-300 dark:bg-orange-400" />
-        <div className="h-1.5 w-10 rounded-full bg-emerald-200 dark:bg-emerald-400" />
-        <div className="h-1.5 w-12 rounded-full bg-slate-200 dark:bg-slate-600" />
-        <div className="h-1.5 w-8 rounded-full bg-orange-200 dark:bg-orange-800" />
-      </div>
-    </div>
-    <div className="absolute right-24 top-16 h-14 w-14 rounded-2xl bg-orange-400 shadow-md dark:bg-orange-500" />
-    <div className="absolute right-8 top-8 h-14 w-14 rounded-2xl bg-emerald-200 shadow-sm dark:bg-emerald-500/70" />
-    <div className="absolute right-12 top-20 h-2 w-20 rounded-full bg-slate-300 dark:bg-slate-600" />
-    <div className="absolute right-14 top-24 h-8 w-2 rounded-full bg-slate-400 dark:bg-slate-500" />
-    <div className="absolute right-28 top-24 h-8 w-2 rounded-full bg-slate-400 dark:bg-slate-500" />
-  </div>
-);
 
 export default function HRRecruitmentProcessDetail() {
   // Untuk popup Tolak
@@ -796,16 +770,14 @@ export default function HRRecruitmentProcessDetail() {
         </table>
       </div>
 
-      {activeTotal > 0 && (
-        <div className="mt-4">
-          <Pagination
-            page={currentPage}
-            totalPages={Math.max(1, currentTotalPages)}
-            onChangePage={setCurrentPage}
-            itemsPerPage={currentItemsPerPage}
-          />
-        </div>
-      )}
+      <div className="mt-4">
+        <Pagination
+          page={currentPage}
+          totalPages={Math.max(1, currentTotalPages)}
+          onChangePage={setCurrentPage}
+          itemsPerPage={currentItemsPerPage}
+        />
+      </div>
     </>
   );
 
@@ -815,22 +787,25 @@ export default function HRRecruitmentProcessDetail() {
         <div className="mt-4 overflow-hidden rounded-[1.5rem] border border-slate-200/80 bg-white p-4 shadow-[0_20px_70px_rgba(15,23,42,0.07)] dark:border-slate-700 dark:bg-slate-950 dark:shadow-[0_20px_70px_rgba(2,6,23,0.45)] sm:p-7">
           <div className="space-y-6">
             <div className="relative overflow-hidden rounded-[1.4rem] bg-gradient-to-r from-white via-white to-orange-50/80 px-4 py-5 dark:from-slate-950 dark:via-slate-950 dark:to-slate-900 sm:px-6 sm:py-6">
-              <RecruitmentHeroIllustration />
+              <button
+                type="button"
+                className={`${gradientOrangeButtonClass} absolute right-4 top-4 z-20 h-9 px-3.5 py-0 text-xs sm:h-10 sm:px-4 sm:text-sm`}
+                style={{
+                  background: "#f97316",
+                  borderColor: "#ea580c",
+                  color: "#ffffff",
+                }}
+                onClick={() => window.history.back()}
+              >
+                <ArrowLeft className="h-4 w-4" />
+                Kembali
+              </button>
               <div className="relative z-10 max-w-3xl">
-                <div className="mb-4 flex items-start justify-between gap-3">
+                <div className="mb-4 flex items-start gap-3">
                   <div className="inline-flex items-center gap-2 rounded-full border border-orange-200 bg-orange-50 px-3 py-1 text-xs font-bold text-orange-600 dark:border-orange-900/60 dark:bg-orange-950/70 dark:text-orange-300">
                     <BriefcaseBusiness className="h-4 w-4" />
                     Proses Rekrutmen
                   </div>
-
-                  <button
-                    type="button"
-                    className={`${gradientBlueButtonClass} h-9 px-3.5 py-0 text-xs sm:h-10 sm:px-4 sm:text-sm`}
-                    onClick={() => window.history.back()}
-                  >
-                    <ArrowLeft className="h-4 w-4" />
-                    Kembali
-                  </button>
                 </div>
 
                 <h1 className="text-[28px] font-extrabold leading-tight text-slate-900 dark:text-slate-50">
@@ -959,7 +934,12 @@ export default function HRRecruitmentProcessDetail() {
             <div className="relative overflow-hidden rounded-[1.4rem] bg-gradient-to-r from-white via-white to-orange-50/80 p-5 dark:from-slate-950 dark:via-slate-950 dark:to-slate-900">
               <button
                 type="button"
-                className={`${gradientBlueButtonClass} absolute right-4 top-4 z-20 px-4 py-2`}
+                className={`${gradientOrangeButtonClass} absolute right-4 top-4 z-20 px-4 py-2`}
+                style={{
+                  background: "#f97316",
+                  borderColor: "#ea580c",
+                  color: "#ffffff",
+                }}
                 onClick={() => setView("list")}
               >
                 <ArrowLeft className="h-4 w-4" />

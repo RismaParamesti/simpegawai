@@ -6,7 +6,9 @@ import {
   showNotification,
 } from "../../../features/common/headerSlice";
 import TitleCard from "../../../components/Cards/TitleCard";
+import Pagination from "../../../components/Pagination/Pagination";
 import { adminApi } from "../../../features/admin/api";
+import useTablePagination from "../../../hooks/useTablePagination";
 
 const isCommissionerPosition = (position = {}) => {
   const name = String(position.name || "")
@@ -65,6 +67,7 @@ function AdminPosition() {
       return matchesSearch && matchesLevel && matchesStatus;
     });
   }, [positions, filters.search, filters.level, filters.status]);
+  const positionsPagination = useTablePagination(filteredPositions);
 
   const availableLevels = useMemo(() => {
     const levels = new Set();
@@ -348,9 +351,9 @@ function AdminPosition() {
                     </td>
                   </tr>
                 ) : (
-                  filteredPositions.map((position, index) => (
+                  positionsPagination.paginatedItems.map((position, index) => (
                     <tr key={position.id}>
-                      <td>{index + 1}</td>
+                      <td>{positionsPagination.startIndex + index + 1}</td>
                       <td>{position.name}</td>
                       <td>{position.level}</td>
                       <td>
@@ -388,6 +391,12 @@ function AdminPosition() {
                 )}
               </tbody>
             </table>
+            <Pagination
+              page={positionsPagination.page}
+              totalPages={positionsPagination.totalPages}
+              onChangePage={positionsPagination.setPage}
+              itemsPerPage={positionsPagination.itemsPerPage}
+            />
           </div>
         )}
       </TitleCard>

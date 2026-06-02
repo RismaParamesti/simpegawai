@@ -504,14 +504,12 @@ function EmployeePayroll() {
                   </tbody>
                 </table>
               </div>
-              {filteredPayrolls.length > 0 && (
-                <Pagination
-                  page={currentPage}
-                  totalPages={totalPages}
-                  onChangePage={handleChangePage}
-                  itemsPerPage={itemsPerPage}
-                />
-              )}
+              <Pagination
+                page={currentPage}
+                totalPages={totalPages}
+                onChangePage={handleChangePage}
+                itemsPerPage={itemsPerPage}
+              />
             </>
           </>
         )}

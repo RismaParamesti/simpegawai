@@ -1,10 +1,12 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useDispatch } from 'react-redux'
 import TitleCard from '../../../components/Cards/TitleCard'
+import Pagination from '../../../components/Pagination/Pagination'
 import { setPageTitle, showNotification } from '../../../features/common/headerSlice'
 import { adminApi } from '../../../features/admin/api'
 import { formatRupiah, resolveFixedPositionAllowance } from '../../../utils/fixedPositionAllowance'
 import { MagnifyingGlassIcon } from '@heroicons/react/24/outline'
+import useTablePagination from '../../../hooks/useTablePagination'
 
 const statusLabelMap = {
     draft: 'Draft',
@@ -195,6 +197,7 @@ function AdminPayrollManagerAdjustments() {
             return hrAtasanOnlyMatch && statusMatch && searchMatch
         })
     }, [historyAdjustments, historyFilters, managerEmployees])
+    const historyPagination = useTablePagination(filteredHistoryRows)
 
     return (
         <>
@@ -333,7 +336,7 @@ function AdminPayrollManagerAdjustments() {
                                 </tr>
                             </thead>
                             <tbody>
-                                {filteredHistoryRows.map((item) => (
+                                {historyPagination.paginatedItems.map((item) => (
                                         <tr key={item.id}>
                                             <td>
                                                 <div className="font-semibold">{item.employee_name}</div>
@@ -358,6 +361,7 @@ function AdminPayrollManagerAdjustments() {
                                 )}
                             </tbody>
                         </table>
+                        <Pagination page={historyPagination.page} totalPages={historyPagination.totalPages} onChangePage={historyPagination.setPage} itemsPerPage={historyPagination.itemsPerPage} />
                     </div>
                 )}
             </TitleCard>

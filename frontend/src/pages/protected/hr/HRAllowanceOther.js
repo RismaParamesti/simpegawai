@@ -1,12 +1,14 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useDispatch } from 'react-redux'
 import TitleCard from '../../../components/Cards/TitleCard'
+import Pagination from '../../../components/Pagination/Pagination'
 import { setPageTitle, showNotification } from '../../../features/common/headerSlice'
 import { hrApi } from '../../../features/hr/api'
 import { financeApi } from '../../../features/finance/api'
 import { resolveFixedPositionAllowance } from '../../../utils/fixedPositionAllowance'
 import { MagnifyingGlassIcon } from '@heroicons/react/24/outline'
 import { useLocation, useNavigate } from 'react-router-dom'
+import useTablePagination from '../../../hooks/useTablePagination'
 
 const statusLabelMap = {
     draft: 'Draft',
@@ -310,6 +312,12 @@ function HRPayrollDirectorAdjustments() {
             return Number(b?.id || 0) - Number(a?.id || 0)
         })
     }, [historyAdjustments, historyFilters.employee_id, historyFilters.month, historyFilters.year, isFinanceHistoryOnlyView])
+    const submittedAllowanceRows = useMemo(
+        () => historyAdjustments.filter(isSubmittedAllowance),
+        [historyAdjustments],
+    )
+    const submittedPagination = useTablePagination(submittedAllowanceRows)
+    const historyPagination = useTablePagination(filteredHistoryRows)
 
     
 
@@ -527,7 +535,7 @@ function HRPayrollDirectorAdjustments() {
                                 </thead>
                                 <tbody>
                                     { /* finance payroll view should show submitted items */ }
-                                    {historyAdjustments.filter(isSubmittedAllowance).map((item) => (
+                                    {submittedPagination.paginatedItems.map((item) => (
                                         <tr key={item.id}>
                                             <td>
                                                 <div className="font-semibold">{item.employee_name}</div>
@@ -544,13 +552,14 @@ function HRPayrollDirectorAdjustments() {
                                             <td className="max-w-xs whitespace-pre-wrap">{item.notes || '-'}</td>
                                         </tr>
                                     ))}
-                                    {!historyAdjustments.filter(isSubmittedAllowance).length && (
+                                    {!submittedAllowanceRows.length && (
                                         <tr>
                                             <td colSpan={8} className="text-center opacity-70">Belum ada data yang di input untuk periode ini</td>
                                         </tr>
                                     )}
                                 </tbody>
                             </table>
+                            <Pagination page={submittedPagination.page} totalPages={submittedPagination.totalPages} onChangePage={submittedPagination.setPage} itemsPerPage={submittedPagination.itemsPerPage} />
                         </div>
                     )}
                 </TitleCard>
@@ -639,7 +648,7 @@ function HRPayrollDirectorAdjustments() {
                                 </tr>
                             </thead>
                             <tbody>
-                                {filteredHistoryRows.map((item) => (
+                                {historyPagination.paginatedItems.map((item) => (
                                     <tr key={item.id}>
                                         <td>
                                             <div className="font-semibold">{item.employee_name}</div>
@@ -663,6 +672,7 @@ function HRPayrollDirectorAdjustments() {
                                 )}
                             </tbody>
                         </table>
+                        <Pagination page={historyPagination.page} totalPages={historyPagination.totalPages} onChangePage={historyPagination.setPage} itemsPerPage={historyPagination.itemsPerPage} />
                     </div>
                 )}
                 </TitleCard>

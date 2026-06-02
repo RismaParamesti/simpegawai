@@ -22,6 +22,9 @@ const HRHiredCandidateDetailModal = () => {
   const navigate = useNavigate();
 
   const [candidate, setCandidate] = useState({});
+  const [invitationExists, setInvitationExists] = useState(false);
+  const [checkingInvitation, setCheckingInvitation] = useState(true);
+  const [sending, setSending] = useState(false);
   const [form, setForm] = useState({
     date: "",
     time: "",
@@ -31,18 +34,31 @@ const HRHiredCandidateDetailModal = () => {
 
   useEffect(() => {
     dispatch(setPageTitle({ title: "Buatkan Undangan Calon Pegawai" }));
-    axios.get(`/api/candidates/${id}`).then((res) => {
-      setCandidate(res.data || {});
-      // Setelah dapat data kandidat, coba ambil data interview detail (jika ada)
-      axios
-        .get(`/api/interviews/${id}`)
-        .then((res2) => {
-          // Gabungkan data interview ke state candidate (prioritaskan data interview jika ada)
-          setCandidate((prev) => ({ ...prev, ...res2.data }));
-        })
-        .catch(() => {});
-    });
-  }, [id]);
+    axios
+      .get(`/api/interviews/${id}`)
+      .then(async (res) => {
+        const interviewData = res.data || {};
+        setCandidate(interviewData);
+
+        if (interviewData.candidate_id) {
+          try {
+            await axios.get(
+              `/api/candidate-calls/last/${interviewData.candidate_id}`,
+            );
+            setInvitationExists(true);
+          } catch {
+            setInvitationExists(false);
+          }
+        }
+      })
+      .catch((err) => {
+        console.error("Gagal mengambil data kandidat:", err);
+        setCandidate({});
+      })
+      .finally(() => {
+        setCheckingInvitation(false);
+      });
+  }, [dispatch, id]);
 
   const handleChange = (e) => {
     setForm({
@@ -107,12 +123,21 @@ const HRHiredCandidateDetailModal = () => {
     return `${hari} ${bulan} ${tahun}`;
   };
   const handleSendInvitation = async () => {
+    if (invitationExists || sending) return;
+
     if (!form.date || !form.time || !form.location) {
       alert("Tanggal, jam, dan lokasi wajib diisi.");
       return;
     }
 
+    const candidateId = candidate.candidate_id;
+    if (!candidateId) {
+      alert("ID kandidat tidak ditemukan. Silakan kembali dan buka ulang detail kandidat.");
+      return;
+    }
+
     try {
+      setSending(true);
       // Inject global style override agar html2canvas tidak mengambil oklch dari Tailwind
       const styleId = "pdf-global-style-override";
       let styleTag = document.getElementById(styleId);
@@ -135,7 +160,7 @@ const HRHiredCandidateDetailModal = () => {
 
       const opt = {
         margin: 0,
-        filename: `undangan_${candidate.id}.pdf`,
+        filename: `undangan_${candidateId}.pdf`,
         image: { type: "jpeg", quality: 1 },
         html2canvas: {
           scale: 3, // 🔥 biar tajam
@@ -153,7 +178,7 @@ const HRHiredCandidateDetailModal = () => {
 
       // 2. Upload
       const formData = new FormData();
-      formData.append("file", pdfBlob, `undangan_${candidate.id}.pdf`);
+      formData.append("file", pdfBlob, `undangan_${candidateId}.pdf`);
 
       const uploadRes = await axios.post("/api/upload-invitation", formData, {
         headers: { "Content-Type": "multipart/form-data" },
@@ -163,7 +188,7 @@ const HRHiredCandidateDetailModal = () => {
 
       // 3. Simpan ke DB
       await axios.post("/api/candidate-calls", {
-        candidate_id: candidate.id,
+        candidate_id: candidateId,
         call_date: form.date,
         call_time: form.time,
         call_location: form.location,
@@ -172,25 +197,36 @@ const HRHiredCandidateDetailModal = () => {
         invitation_letter_file: pdfPath,
       });
 
+      setInvitationExists(true);
       alert("Undangan berhasil dikirim!");
       navigate(-1);
     } catch (err) {
       console.error(err);
-      alert("Gagal mengirim undangan.");
+      alert(err.response?.data?.message || "Gagal mengirim undangan.");
+    } finally {
+      setSending(false);
     }
   };
 
   return (
     <TitleCard
       title={
-        <div className="flex justify-between items-center w-full">
-          <span className="text-2xl font-bold">
-            Kirim Undangan Calon Pegawai
-          </span>
-          <button className="btn btn-outline" onClick={() => navigate(-1)}>
-            Kembali
-          </button>
-        </div>
+        <span className="text-2xl font-bold">
+          Kirim Undangan Calon Pegawai
+        </span>
+      }
+      TopSideButtons={
+        <button
+          className="btn text-white"
+          style={{
+            backgroundColor: "#f97316",
+            borderColor: "#ea580c",
+            color: "#ffffff",
+          }}
+          onClick={() => navigate(-1)}
+        >
+          Kembali
+        </button>
       }
     >
       <div className="p-6 space-y-6">
@@ -450,12 +486,18 @@ const HRHiredCandidateDetailModal = () => {
             color: "white",
             padding: "8px 24px",
             borderRadius: 8,
-            cursor: "pointer",
+            cursor:
+              checkingInvitation || invitationExists || sending
+                ? "not-allowed"
+                : "pointer",
+            opacity:
+              checkingInvitation || invitationExists || sending ? 0.6 : 1,
             border: "none",
           }}
+          disabled={checkingInvitation || invitationExists || sending}
           onClick={handleSendInvitation}
         >
-          Kirim
+          {invitationExists ? "Undangan Sudah Dibuat" : sending ? "Mengirim..." : "Kirim"}
         </button>
       </div>
     </TitleCard>

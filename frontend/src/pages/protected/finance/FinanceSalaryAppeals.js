@@ -3,7 +3,9 @@ import { useDispatch } from 'react-redux'
 import { useNavigate } from 'react-router-dom'
 import { setPageTitle } from '../../../features/common/headerSlice'
 import TitleCard from '../../../components/Cards/TitleCard'
+import Pagination from '../../../components/Pagination/Pagination'
 import { financeApi } from '../../../features/finance/api'
+import useTablePagination from '../../../hooks/useTablePagination'
 
 const formatCurrency = (value) => `Rp ${Number(value || 0).toLocaleString('id-ID')}`
 
@@ -187,6 +189,8 @@ function FinanceSalaryAppeals() {
             return hasRevisedAmount || ['published', 'claimed'].includes(payrollStatus)
         })
     }, [approvedAppeals])
+    const approvedPagination = useTablePagination(filteredAppeals)
+    const historyPagination = useTablePagination(historyAppeals)
 
     const totalAdjustmentAmount = useMemo(() => {
         return filteredAppeals.reduce((total, item) => total + Number(item.expected_amount || 0), 0)
@@ -307,7 +311,7 @@ const payrollStatusLabel = (status) => {
                             </tr>
                         </thead>
                         <tbody>
-                            {filteredAppeals.map((item) => (
+                            {approvedPagination.paginatedItems.map((item) => (
                                 <tr key={item.id}>
                                     <td>{item.full_name || item.employee_name || '-'}</td>
                                     <td>{item.employee_code || '-'}</td>
@@ -338,6 +342,7 @@ const payrollStatusLabel = (status) => {
                             )}
                         </tbody>
                     </table>
+                    <Pagination page={approvedPagination.page} totalPages={approvedPagination.totalPages} onChangePage={approvedPagination.setPage} itemsPerPage={approvedPagination.itemsPerPage} />
                 </div>
             </TitleCard>
 
@@ -356,7 +361,7 @@ const payrollStatusLabel = (status) => {
                             </tr>
                         </thead>
                         <tbody>
-                            {historyAppeals.map((item) => (
+                            {historyPagination.paginatedItems.map((item) => (
                                 <tr key={`history-${item.id}`}>
                                     <td>{item.full_name || item.employee_name || '-'}</td>
                                     <td>{item.employee_code || '-'}</td>
@@ -378,6 +383,7 @@ const payrollStatusLabel = (status) => {
                             )}
                         </tbody>
                     </table>
+                    <Pagination page={historyPagination.page} totalPages={historyPagination.totalPages} onChangePage={historyPagination.setPage} itemsPerPage={historyPagination.itemsPerPage} />
                 </div>
             </TitleCard>
 

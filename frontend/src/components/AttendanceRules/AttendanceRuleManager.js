@@ -5,6 +5,8 @@ import {
   showNotification,
 } from "../../features/common/headerSlice";
 import TitleCard from "../Cards/TitleCard";
+import Pagination from "../Pagination/Pagination";
+import useTablePagination from "../../hooks/useTablePagination";
 
 const normalizeSanctionLevel = (value) => {
   const raw = String(value || "").toLowerCase().trim();
@@ -131,6 +133,7 @@ function AttendanceRuleManager({ pageTitle, subtitle, apiClient }) {
       return haystack.includes(query);
     });
   }, [rules, search]);
+  const rulesPagination = useTablePagination(filteredRules);
 
   const activeRuleCount = useMemo(
     () => rules.filter((item) => item.is_active).length,
@@ -543,7 +546,7 @@ function AttendanceRuleManager({ pageTitle, subtitle, apiClient }) {
                   </td>
                 </tr>
               ) : (
-                filteredRules.map((rule) => (
+                rulesPagination.paginatedItems.map((rule) => (
                   <tr key={rule.id}>
                     <td>{rule.rule_code}</td>
                     <td>
@@ -625,6 +628,7 @@ function AttendanceRuleManager({ pageTitle, subtitle, apiClient }) {
               )}
             </tbody>
           </table>
+          <Pagination page={rulesPagination.page} totalPages={rulesPagination.totalPages} onChangePage={rulesPagination.setPage} itemsPerPage={rulesPagination.itemsPerPage} />
         </div>
       </TitleCard>
       {viewingRule && (

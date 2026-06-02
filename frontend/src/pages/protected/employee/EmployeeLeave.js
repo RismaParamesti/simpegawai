@@ -1303,14 +1303,12 @@ function EmployeeLeave() {
               </tbody>
             </table>
             </div>
-            {requests.length > 0 && (
-              <Pagination
-                page={currentPage}
-                totalPages={totalPages}
-                onChangePage={handleChangePage}
-                itemsPerPage={itemsPerPage}
-              />
-            )}
+            <Pagination
+              page={currentPage}
+              totalPages={totalPages}
+              onChangePage={handleChangePage}
+              itemsPerPage={itemsPerPage}
+            />
           </>
         )}
       </TitleCard>
@@ -1381,4 +1379,3 @@ function EmployeeLeave() {
 }
 
 export default EmployeeLeave;
-

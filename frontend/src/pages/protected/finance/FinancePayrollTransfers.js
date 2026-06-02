@@ -3,7 +3,9 @@ import { useDispatch } from 'react-redux'
 import { useSearchParams } from 'react-router-dom'
 import { setPageTitle } from '../../../features/common/headerSlice'
 import TitleCard from '../../../components/Cards/TitleCard'
+import Pagination from '../../../components/Pagination/Pagination'
 import { financeApi } from '../../../features/finance/api'
+import useTablePagination from '../../../hooks/useTablePagination'
 
 const monthOptions = [
     { value: '1', label: 'Januari' },
@@ -200,6 +202,7 @@ function FinancePayrollTransfers() {
 
         return nextRows
     }, [rows, search, employeeFilter, periodMonth, periodYear, statusFilter, sortMode])
+    const rowsPagination = useTablePagination(filteredRows)
 
     const handleTransferPayroll = async (payrollId) => {
         try {
@@ -363,7 +366,7 @@ const getPayrollStatusLabel = (status) => {
                             </tr>
                         </thead>
                         <tbody>
-                            {filteredRows.map((item) => (
+                            {rowsPagination.paginatedItems.map((item) => (
                                 <tr key={item.id}>
                                     <td>{item.id}</td>
                                     <td>{item.employee_name || '-'}</td>
@@ -414,6 +417,7 @@ const getPayrollStatusLabel = (status) => {
                             )}
                         </tbody>
                     </table>
+                    <Pagination page={rowsPagination.page} totalPages={rowsPagination.totalPages} onChangePage={rowsPagination.setPage} itemsPerPage={rowsPagination.itemsPerPage} />
                 </div>
             </TitleCard>
 

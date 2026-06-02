@@ -442,14 +442,12 @@ function AtasanAttendance() {
                 </tbody>
               </table>
 
-              {records.length > 0 && (
-                <Pagination
-                  page={currentPage}
-                  totalPages={totalPages}
-                  onChangePage={setCurrentPage}
-                  itemsPerPage={itemsPerPage}
-                />
-              )}
+              <Pagination
+                page={currentPage}
+                totalPages={totalPages}
+                onChangePage={setCurrentPage}
+                itemsPerPage={itemsPerPage}
+              />
 
               {activeEditId
                 ? (() => {

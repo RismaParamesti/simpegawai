@@ -3,8 +3,10 @@ import { useDispatch } from 'react-redux'
 import { setPageTitle } from '../../../features/common/headerSlice'
 import { showNotification } from '../../../features/common/headerSlice'
 import TitleCard from '../../../components/Cards/TitleCard'
+import Pagination from '../../../components/Pagination/Pagination'
 import { hrApi } from '../../../features/hr/api'
 import { MagnifyingGlassIcon } from '@heroicons/react/24/outline'
+import useTablePagination from '../../../hooks/useTablePagination'
 
 const formatCurrency = (value) => `Rp ${(parseFloat(value) || 0).toLocaleString('id-ID')}`
 
@@ -165,6 +167,8 @@ function HRSalaryAppeals() {
             return monthMatch && yearMatch
         })
     }, [salaryAppealHistory, historyFilters.month, historyFilters.year])
+    const reviewPagination = useTablePagination(salaryAppeals)
+    const historyPagination = useTablePagination(filteredHistoryAppeals)
 
     const loadEmployeeOptions = useCallback(async () => {
         try {
@@ -441,7 +445,7 @@ function HRSalaryAppeals() {
                                 </tr>
                             </thead>
                             <tbody>
-                                {salaryAppeals.map((item) => (
+                                {reviewPagination.paginatedItems.map((item) => (
                                     <tr key={item.id}>
                                         <td>
                                             <div className="font-bold">{item.employee_name || 'N/A'}</div>
@@ -495,6 +499,7 @@ function HRSalaryAppeals() {
                                 ))}
                             </tbody>
                         </table>
+                        <Pagination page={reviewPagination.page} totalPages={reviewPagination.totalPages} onChangePage={reviewPagination.setPage} itemsPerPage={reviewPagination.itemsPerPage} />
                     </div>
                 ) : (
                     <div className="text-center py-10 text-gray-500">
@@ -591,7 +596,7 @@ function HRSalaryAppeals() {
                                 </tr>
                             </thead>
                             <tbody>
-                                {filteredHistoryAppeals.map((item) => (
+                                {historyPagination.paginatedItems.map((item) => (
                                     <tr key={`history-${item.id}`}>
                                         <td>
                                             <div className="font-bold">{item.employee_name || 'N/A'}</div>
@@ -637,6 +642,7 @@ function HRSalaryAppeals() {
                                 ))}
                             </tbody>
                         </table>
+                        <Pagination page={historyPagination.page} totalPages={historyPagination.totalPages} onChangePage={historyPagination.setPage} itemsPerPage={historyPagination.itemsPerPage} />
                     </div>
                 ) : (
                     <div className="text-center py-10 text-gray-500">

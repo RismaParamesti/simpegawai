@@ -1,4 +1,6 @@
 import TitleCard from "../../../components/Cards/TitleCard";
+import Pagination from "../../../components/Pagination/Pagination";
+import useTablePagination from "../../../hooks/useTablePagination";
 
 const userSourceData = [
   { source: "Facebook Ads", count: "26,345", conversionPercent: 10.2 },
@@ -9,6 +11,8 @@ const userSourceData = [
 ];
 
 function UserChannels() {
+  const channelsPagination = useTablePagination(userSourceData);
+
   return (
     <TitleCard title={"User Signup Source"}>
       {/** Table Data */}
@@ -23,7 +27,7 @@ function UserChannels() {
             </tr>
           </thead>
           <tbody className="[&>tr]:border-b [&>tr]:border-base-300/50">
-            {userSourceData.map((u, k) => {
+            {channelsPagination.paginatedItems.map((u, k) => {
               return (
                 <tr key={k} className="hover:bg-base-200/60 transition-colors">
                   <th className="text-base-content/60">{k + 1}</th>
@@ -39,6 +43,7 @@ function UserChannels() {
             })}
           </tbody>
         </table>
+        <Pagination page={channelsPagination.page} totalPages={channelsPagination.totalPages} onChangePage={channelsPagination.setPage} itemsPerPage={channelsPagination.itemsPerPage} />
       </div>
     </TitleCard>
   );

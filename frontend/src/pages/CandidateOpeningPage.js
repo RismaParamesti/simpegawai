@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from "react";
-import { NotificationManager } from 'react-notifications';
+import { NotificationManager } from "react-notifications";
 import { useDispatch } from "react-redux";
 import { useNavigate } from "react-router-dom";
 import api from "../lib/api";
@@ -40,15 +40,17 @@ export default function CandidateJobList() {
       const jobsData = res.data.jobs || [];
       // Filter: hanya tampilkan yang status open dan deadline belum lewat
       const now = new Date();
-      const filtered = jobsData.filter(job => {
-        if (job.status !== 'open') return false;
+      const filtered = jobsData.filter((job) => {
+        if (job.status !== "open") return false;
         if (!job.deadline) return true;
         return new Date(job.deadline) >= now;
       });
       setJobs(filtered);
       setFilteredJobs(filtered);
       // Extract unique locations
-      const uniqueLocations = [...new Set(filtered.map(job => job.location).filter(Boolean))].sort();
+      const uniqueLocations = [
+        ...new Set(filtered.map((job) => job.location).filter(Boolean)),
+      ].sort();
       setLocations(uniqueLocations);
     } catch (err) {
       setError("Gagal mengambil data lowongan");
@@ -83,9 +85,17 @@ export default function CandidateJobList() {
   useEffect(() => {
     const fetchAppliedJobs = async () => {
       try {
-        const res = await api.get('/candidates/applications');
+        const res = await api.get("/candidates/applications");
         if (res.data.applications) {
-          const ids = res.data.applications.map(app => app.job_opening_id || app.job_openingId || app.job_id || app.jobId).filter(Boolean);
+          const ids = res.data.applications
+            .map(
+              (app) =>
+                app.job_opening_id ||
+                app.job_openingId ||
+                app.job_id ||
+                app.jobId,
+            )
+            .filter(Boolean);
           setAppliedJobIds(ids);
         }
       } catch (err) {
@@ -122,45 +132,45 @@ export default function CandidateJobList() {
     <div>
       <TitleCard title="Lowongan Pekerjaan Tersedia" topMargin="mt-0">
         {/* SEARCH + FILTER */}
-          <div className="flex flex-col md:flex-row md:items-center gap-4 mb-6">
-            {/* SEARCH */}
-            <div className="flex-1">
-              <label className="text-xs font-semibold opacity-60 mb-1 block">
-                Cari Posisi
-              </label>
-              <input
-                type="text"
-                placeholder="Contoh: Supervisor, Mentor..."
-                className="input input-bordered w-full"
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-              />
-            </div>
+        <div className="flex flex-col md:flex-row md:items-center gap-4 mb-6">
+          {/* SEARCH */}
+          <div className="flex-1">
+            <label className="text-xs font-semibold opacity-60 mb-1 block">
+              Cari Posisi
+            </label>
+            <input
+              type="text"
+              placeholder="Contoh: Supervisor, Mentor..."
+              className="input input-bordered w-full"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+            />
+          </div>
 
-            {/* LOCATION FILTER */}
-            <div className="w-full md:w-60">
-              <label className="text-xs font-semibold opacity-60 mb-1 block">
-                Lokasi
-              </label>
-              <select
-                className="select select-bordered w-full"
-                value={locationFilter}
-                onChange={(e) => setLocationFilter(e.target.value)}
-              >
-                <option value="">Semua Lokasi</option>
-                {locations.map((location) => (
-                  <option key={location} value={location}>
-                    {location}
-                  </option>
-                ))}
-              </select>
-            </div>
-            <button
-            className="btn btn-secondary rounded-full px-6 min-h-12 self-start md:self-end md:mt-6"
-              onClick={handleResetFilters}
+          {/* LOCATION FILTER */}
+          <div className="w-full md:w-60">
+            <label className="text-xs font-semibold opacity-60 mb-1 block">
+              Lokasi
+            </label>
+            <select
+              className="select select-bordered w-full"
+              value={locationFilter}
+              onChange={(e) => setLocationFilter(e.target.value)}
             >
-              Reset Filter
-            </button>
+              <option value="">Semua Lokasi</option>
+              {locations.map((location) => (
+                <option key={location} value={location}>
+                  {location}
+                </option>
+              ))}
+            </select>
+          </div>
+          <button
+            className="btn btn-secondary rounded-full px-6 min-h-12 self-start md:self-end md:mt-6"
+            onClick={handleResetFilters}
+          >
+            Reset Filter
+          </button>
         </div>
 
         {/* LOADING */}
@@ -209,13 +219,14 @@ export default function CandidateJobList() {
                   <p className="text-sm">👥 Kuota: {job.quota || 1}</p>
 
                   {/* DEADLINE */}
-                  <p className="text-sm text-warning">
-                    ⏳ Deadline:{" "}
-                    {job.deadline
-                      ? new Date(job.deadline).toLocaleDateString("id-ID")
-                      : "-"}
-                  </p>
-
+                  <div>
+                    <span className="inline-flex items-center rounded-full bg-red-500 px-3 py-1 text-xs font-bold text-white">
+                      ⏳ Deadline:{" "}
+                      {job.deadline
+                        ? new Date(job.deadline).toLocaleDateString("id-ID")
+                        : "-"}
+                    </span>
+                  </div>
                   {/* STATUS */}
                   <div className="mt-2">
                     {job.status === "open" && (
@@ -239,18 +250,28 @@ export default function CandidateJobList() {
                     </button>
 
                     <button
-                      className={appliedJobIds.includes(job.id) ? 'btn btn-primary btn-sm opacity-90 cursor-not-allowed' : 'btn btn-primary btn-sm'}
+                      className={
+                        appliedJobIds.includes(job.id)
+                          ? "btn btn-primary btn-sm opacity-90 cursor-not-allowed"
+                          : "btn btn-primary btn-sm"
+                      }
                       aria-disabled={appliedJobIds.includes(job.id)}
                       tabIndex={appliedJobIds.includes(job.id) ? -1 : 0}
                       onClick={() => {
                         if (appliedJobIds.includes(job.id)) {
-                          NotificationManager.info('Anda sudah pernah melamar posisi ini. Tidak bisa melamar dua kali.', 'Sudah Melamar', 4000);
+                          NotificationManager.info(
+                            "Anda sudah pernah melamar posisi ini. Tidak bisa melamar dua kali.",
+                            "Sudah Melamar",
+                            4000,
+                          );
                           return;
                         }
                         navigate("/candidate/apply", { state: { job } });
                       }}
                     >
-                      {appliedJobIds.includes(job.id) ? 'Sudah Dilamar' : 'Lamar'}
+                      {appliedJobIds.includes(job.id)
+                        ? "Sudah Dilamar"
+                        : "Lamar"}
                     </button>
                   </div>
                 </div>
@@ -271,7 +292,9 @@ export default function CandidateJobList() {
                   <div className="flex items-center gap-3 flex-wrap">
                     <h3 className="text-2xl font-bold text-primary">
                       {selectedJob.position_name}
-                      {selectedJob.base_position ? ` ${selectedJob.base_position}` : ""}
+                      {selectedJob.base_position
+                        ? ` ${selectedJob.base_position}`
+                        : ""}
                     </h3>
 
                     {selectedJob.status === "open" && (
@@ -374,18 +397,28 @@ export default function CandidateJobList() {
             {/* FOOTER */}
             <div className="modal-action p-6 border-t">
               <button
-                className={appliedJobIds.includes(selectedJob.id) ? 'btn btn-primary opacity-90 cursor-not-allowed' : 'btn btn-primary'}
+                className={
+                  appliedJobIds.includes(selectedJob.id)
+                    ? "btn btn-primary opacity-90 cursor-not-allowed"
+                    : "btn btn-primary"
+                }
                 aria-disabled={appliedJobIds.includes(selectedJob.id)}
                 tabIndex={appliedJobIds.includes(selectedJob.id) ? -1 : 0}
                 onClick={() => {
                   if (appliedJobIds.includes(selectedJob.id)) {
-                    NotificationManager.info('Anda sudah pernah melamar posisi ini. Tidak bisa melamar dua kali.', 'Sudah Melamar', 4000);
+                    NotificationManager.info(
+                      "Anda sudah pernah melamar posisi ini. Tidak bisa melamar dua kali.",
+                      "Sudah Melamar",
+                      4000,
+                    );
                     return;
                   }
                   navigate("/candidate/apply", { state: { job: selectedJob } });
                 }}
               >
-                {appliedJobIds.includes(selectedJob.id) ? 'Sudah Dilamar' : 'Lamar Sekarang'}
+                {appliedJobIds.includes(selectedJob.id)
+                  ? "Sudah Dilamar"
+                  : "Lamar Sekarang"}
               </button>
 
               <button className="btn" onClick={() => setOpenModal(false)}>

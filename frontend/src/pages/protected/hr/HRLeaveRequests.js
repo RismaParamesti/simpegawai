@@ -3,7 +3,9 @@ import { useDispatch } from 'react-redux'
 import { setPageTitle } from '../../../features/common/headerSlice'
 import { showNotification } from '../../../features/common/headerSlice'
 import TitleCard from '../../../components/Cards/TitleCard'
+import Pagination from '../../../components/Pagination/Pagination'
 import { hrApi } from '../../../features/hr/api'
+import useTablePagination from '../../../hooks/useTablePagination'
 import { 
     MagnifyingGlassIcon, 
     CheckCircleIcon,
@@ -92,6 +94,7 @@ function HRLeaveRequests() {
             return employeeName.includes(keyword) || employeeCode.includes(keyword)
         })
     }, [leaveRequests, filters.search, filters.month, filters.year])
+    const requestsPagination = useTablePagination(filteredLeaveRequests)
 
     const loadLeaveRequests = useCallback(async () => {
         try {
@@ -313,7 +316,7 @@ function HRLeaveRequests() {
                                 </tr>
                             </thead>
                             <tbody>
-                                {filteredLeaveRequests.map((item) => (
+                                {requestsPagination.paginatedItems.map((item) => (
                                     <tr key={item.id}>
                                         <td>
                                             <div className="font-bold">{item.employee_name || 'N/A'}</div>
@@ -358,6 +361,7 @@ function HRLeaveRequests() {
                                 ))}
                             </tbody>
                         </table>
+                        <Pagination page={requestsPagination.page} totalPages={requestsPagination.totalPages} onChangePage={requestsPagination.setPage} itemsPerPage={requestsPagination.itemsPerPage} />
                     </div>
                 ) : (
                     <div className="text-center py-10 text-gray-500">

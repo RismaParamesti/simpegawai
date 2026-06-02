@@ -7,6 +7,8 @@ import { RECENT_TRANSACTIONS } from "../../utils/dummyData"
 import FunnelIcon from '@heroicons/react/24/outline/FunnelIcon'
 import XMarkIcon from '@heroicons/react/24/outline/XMarkIcon'
 import SearchBar from "../../components/Input/SearchBar"
+import Pagination from "../../components/Pagination/Pagination"
+import useTablePagination from "../../hooks/useTablePagination"
 
 const TopSideButtons = ({removeFilter, applyFilter, applySearch}) => {
 
@@ -58,6 +60,7 @@ function Transactions(){
 
 
     const [trans, setTrans] = useState(RECENT_TRANSACTIONS)
+    const transactionsPagination = useTablePagination(trans)
 
     const removeFilter = () => {
         setTrans(RECENT_TRANSACTIONS)
@@ -93,7 +96,7 @@ function Transactions(){
                     </thead>
                     <tbody>
                         {
-                            trans.map((l, k) => {
+                            transactionsPagination.paginatedItems.map((l, k) => {
                                 return(
                                     <tr key={k}>
                                     <td>
@@ -118,6 +121,7 @@ function Transactions(){
                         }
                     </tbody>
                 </table>
+                <Pagination page={transactionsPagination.page} totalPages={transactionsPagination.totalPages} onChangePage={transactionsPagination.setPage} itemsPerPage={transactionsPagination.itemsPerPage} />
             </div>
             </TitleCard>
         </>

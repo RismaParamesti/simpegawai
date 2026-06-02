@@ -2,7 +2,9 @@ import { useCallback, useEffect, useState } from 'react'
 import { useDispatch } from 'react-redux'
 import { setPageTitle, showNotification } from '../../../features/common/headerSlice'
 import TitleCard from '../../../components/Cards/TitleCard'
+import Pagination from '../../../components/Pagination/Pagination'
 import { adminApi } from '../../../features/admin/api'
+import useTablePagination from '../../../hooks/useTablePagination'
 
 const getStatusBadge = (status) => {
     if (status === 'included_in_payroll') return 'badge-success'
@@ -83,6 +85,8 @@ function AdminReimbursements() {
         if (!matchSearch(item, historyFilters.search)) return false
         return historyFilters.historyStatus ? item.status === historyFilters.historyStatus : true
     })
+    const approvalPagination = useTablePagination(approvalItems)
+    const historyPagination = useTablePagination(historyItems)
 
     return (
         <>
@@ -125,7 +129,7 @@ function AdminReimbursements() {
                                 </tr>
                             </thead>
                             <tbody>
-                                {approvalItems.map((item) => {
+                                {approvalPagination.paginatedItems.map((item) => {
                                     const attachmentUrl = item.attachment
                                         ? `${process.env.REACT_APP_API_URL || 'http://localhost:5000'}/${item.attachment}`
                                         : ''
@@ -183,6 +187,7 @@ function AdminReimbursements() {
                                 )}
                             </tbody>
                         </table>
+                        <Pagination page={approvalPagination.page} totalPages={approvalPagination.totalPages} onChangePage={approvalPagination.setPage} itemsPerPage={approvalPagination.itemsPerPage} />
                     </div>
                 )}
             </TitleCard>
@@ -224,7 +229,7 @@ function AdminReimbursements() {
                                 </tr>
                             </thead>
                             <tbody>
-                                {historyItems.map((item) => {
+                                {historyPagination.paginatedItems.map((item) => {
                                     const attachmentUrl = item.attachment
                                         ? `${process.env.REACT_APP_API_URL || 'http://localhost:5000'}/${item.attachment}`
                                         : ''
@@ -260,6 +265,7 @@ function AdminReimbursements() {
                                 )}
                             </tbody>
                         </table>
+                        <Pagination page={historyPagination.page} totalPages={historyPagination.totalPages} onChangePage={historyPagination.setPage} itemsPerPage={historyPagination.itemsPerPage} />
                     </div>
                 )}
             </TitleCard>
