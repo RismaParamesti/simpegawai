@@ -1,6 +1,46 @@
 ﻿const express = require("express");
 const router = express.Router();
 const db = require("../config/db");
+
+const ASSESSMENT_START = "[ASSESSMENT_CRITERIA]";
+const ASSESSMENT_END = "[/ASSESSMENT_CRITERIA]";
+
+const parseAssessmentSummary = (notes) => {
+  const rawNotes = String(notes || "");
+  const startIndex = rawNotes.indexOf(ASSESSMENT_START);
+  const endIndex = rawNotes.indexOf(ASSESSMENT_END);
+
+  if (startIndex === -1 || endIndex === -1 || endIndex < startIndex) {
+    return null;
+  }
+
+  const json = rawNotes
+    .slice(startIndex + ASSESSMENT_START.length, endIndex)
+    .trim();
+
+  try {
+    return JSON.parse(json);
+  } catch {
+    return null;
+  }
+};
+
+const normalizeAverageRating = (value) => {
+  const number = Number(value);
+  if (!Number.isFinite(number)) return null;
+  return Math.max(0, Math.min(100, Number(number.toFixed(2))));
+};
+
+const resolveAverageRating = ({ average_rating, rating, interviewer_notes }) => {
+  const providedRating = normalizeAverageRating(average_rating ?? rating);
+  if (providedRating !== null) return providedRating;
+
+  const summary = parseAssessmentSummary(interviewer_notes);
+  const assessmentRating = normalizeAverageRating(summary?.rating);
+  if (assessmentRating !== null) return assessmentRating;
+
+  return null;
+};
 const bcrypt = require("bcryptjs");
 const { verifyToken, verifyRole } = require("../middleware/authMiddleware");
 const multer = require("multer");
@@ -467,7 +507,12 @@ router.put(
   async (req, res) => {
     try {
       const { id } = req.params;
-      const { interviewer_notes, rating, result, status, recommendation } = req.body;
+      const { interviewer_notes, rating, average_rating, result, status, recommendation } = req.body;
+      const normalizedRating = resolveAverageRating({
+        average_rating,
+        rating,
+        interviewer_notes,
+      });
 
       const [interview] = await db
         .promise()
@@ -481,12 +526,12 @@ router.put(
       await db.promise().query(
         `UPDATE interviews SET
                 interviewer_notes = COALESCE(?, interviewer_notes),
-                rating = COALESCE(?, rating),
+          rating = COALESCE(?, rating),
                 result = COALESCE(?, result),
                 status = COALESCE(?, status, 'completed'),
                 recommendation = COALESCE(?, recommendation)
              WHERE id = ?`,
-        [interviewer_notes, rating, result, status, recommendation, id],
+        [interviewer_notes, normalizedRating, result, status, recommendation, id],
       );
 
       // Tidak perlu update status aplikasi saat hasil interview disimpan

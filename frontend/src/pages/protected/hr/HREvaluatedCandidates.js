@@ -2,8 +2,26 @@ import React, { useEffect, useMemo, useState } from "react";
 import { useDispatch } from "react-redux";
 import axios from "axios";
 import { useNavigate } from "react-router-dom";
+import {
+  Award,
+  BriefcaseBusiness,
+  CheckCircle2,
+  ChevronDown,
+  ChevronUp,
+  ClipboardCheck,
+  Eye,
+  Filter,
+  ListChecks,
+  RotateCcw,
+  Search,
+  Sparkles,
+  Star,
+  Trophy,
+  UserCheck,
+  Users,
+  XCircle,
+} from "lucide-react";
 
-import TitleCard from "../../../components/Cards/TitleCard";
 import { setPageTitle } from "../../../features/common/headerSlice";
 import HRInterviewDetailLowongan from "./HRInterviewNilai";
 
@@ -28,6 +46,23 @@ const resultLabelMap = {
   pending: "Menunggu",
 };
 
+const ASSESSMENT_START = "[ASSESSMENT_CRITERIA]";
+const ASSESSMENT_END = "[/ASSESSMENT_CRITERIA]";
+
+const parseInterviewerNotes = (notes) => {
+  const rawNotes = String(notes || "");
+  const startIndex = rawNotes.indexOf(ASSESSMENT_START);
+  const endIndex = rawNotes.indexOf(ASSESSMENT_END);
+
+  if (startIndex === -1 || endIndex === -1 || endIndex < startIndex) {
+    return rawNotes.trim();
+  }
+
+  return `${rawNotes.slice(0, startIndex)}${rawNotes.slice(
+    endIndex + ASSESSMENT_END.length,
+  )}`.trim();
+};
+
 const getRatingNumber = (value) => {
   const number = Number(value);
   return Number.isFinite(number) ? number : 0;
@@ -39,6 +74,47 @@ const getJobKey = (item) =>
   item.id ||
   item.job_title ||
   "unknown";
+
+const formatDate = (value) => {
+  if (!value) return "-";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "-";
+  return date.toLocaleDateString("id-ID", {
+    day: "2-digit",
+    month: "short",
+    year: "numeric",
+  });
+};
+
+const FinalReviewHeroIllustration = () => (
+  <div className="pointer-events-none absolute right-10 top-2 hidden h-32 w-80 lg:block">
+    <div className="absolute bottom-2 right-0 h-20 w-72 rounded-full bg-orange-100/80 blur-[1px] dark:bg-orange-900/30" />
+    <div className="absolute right-36 top-1 h-24 w-20 rotate-[-3deg] rounded-2xl border border-slate-200 bg-white shadow-lg dark:border-slate-700 dark:bg-slate-900">
+      <div className="flex items-center gap-2 border-b border-orange-100 px-2 py-2 dark:border-slate-700">
+        <div className="flex h-7 w-7 items-center justify-center rounded-full bg-orange-100 text-orange-500 dark:bg-orange-900/40 dark:text-orange-300">
+          <Star className="h-4 w-4" />
+        </div>
+        <div className="space-y-1">
+          <div className="h-1.5 w-8 rounded-full bg-orange-400 dark:bg-orange-300" />
+          <div className="h-1.5 w-6 rounded-full bg-slate-200 dark:bg-slate-600" />
+        </div>
+      </div>
+      <div className="space-y-1.5 px-3 py-2">
+        <div className="h-1.5 w-12 rounded-full bg-orange-300 dark:bg-orange-400" />
+        <div className="h-1.5 w-10 rounded-full bg-emerald-200 dark:bg-emerald-400" />
+        <div className="h-1.5 w-12 rounded-full bg-slate-200 dark:bg-slate-600" />
+        <div className="h-1.5 w-8 rounded-full bg-orange-200 dark:bg-orange-800" />
+      </div>
+    </div>
+    <div className="absolute right-24 top-16 flex h-14 w-14 items-center justify-center rounded-2xl bg-orange-400 text-white shadow-md dark:bg-orange-500">
+      <Trophy className="h-7 w-7" />
+    </div>
+    <div className="absolute right-8 top-8 h-14 w-14 rounded-2xl bg-emerald-200 shadow-sm dark:bg-emerald-500/70" />
+    <div className="absolute right-12 top-20 h-2 w-20 rounded-full bg-slate-300 dark:bg-slate-600" />
+    <div className="absolute right-14 top-24 h-8 w-2 rounded-full bg-slate-400 dark:bg-slate-500" />
+    <div className="absolute right-28 top-24 h-8 w-2 rounded-full bg-slate-400 dark:bg-slate-500" />
+  </div>
+);
 
 const HREvaluatedCandidates = () => {
   const dispatch = useDispatch();
@@ -86,7 +162,7 @@ const HREvaluatedCandidates = () => {
           rating: item.rating ?? item.interview_rating ?? "",
           recommendation: item.recommendation || "",
           result: item.result || item.interview_result || "",
-          interviewer_notes: item.interviewer_notes || "",
+          interviewer_notes: parseInterviewerNotes(item.interviewer_notes),
         }))
         .filter(
           (item) =>
@@ -227,6 +303,13 @@ const HREvaluatedCandidates = () => {
     setExpandedGroups(next);
   };
 
+  const resetFilters = () => {
+    setSearch("");
+    setPositionFilter("");
+    setStatusFilter("");
+    setRatingFilter("");
+  };
+
   const completeJobOpening = async (jobOpeningId, jobTitle) => {
     if (!jobOpeningId) {
       alert("ID lowongan tidak ditemukan!");
@@ -266,73 +349,194 @@ const HREvaluatedCandidates = () => {
     }
   };
 
-  const getRecommendationBadge = (recommendation) => {
-    if (recommendation === "hire") return "badge badge-success";
-    if (recommendation === "consider") return "badge badge-warning";
-    if (recommendation === "reject") return "badge badge-error";
-    return "badge badge-ghost";
+  const getRecommendationBadgeClass = (recommendation) => {
+    if (recommendation === "hire") return "bg-emerald-100 text-emerald-700 border-emerald-200 dark:bg-emerald-950/40 dark:text-emerald-300 dark:border-emerald-900/60";
+    if (recommendation === "consider") return "bg-amber-100 text-amber-700 border-amber-200 dark:bg-amber-950/40 dark:text-amber-300 dark:border-amber-900/60";
+    if (recommendation === "reject") return "bg-red-100 text-red-700 border-red-200 dark:bg-red-950/40 dark:text-red-300 dark:border-red-900/60";
+    return "bg-slate-100 text-slate-600 border-slate-200 dark:bg-slate-800 dark:text-slate-300 dark:border-slate-700";
   };
 
-  const getResultBadge = (result) => {
-    if (result === "passed") return "badge badge-success";
-    if (result === "failed") return "badge badge-error";
-    if (result === "no_show") return "badge badge-warning";
-    if (result === "pending") return "badge badge-ghost";
-    return "badge badge-outline";
+  const getResultBadgeClass = (result) => {
+    if (result === "passed") return "bg-emerald-100 text-emerald-700 border-emerald-200 dark:bg-emerald-950/40 dark:text-emerald-300 dark:border-emerald-900/60";
+    if (result === "failed") return "bg-red-100 text-red-700 border-red-200 dark:bg-red-950/40 dark:text-red-300 dark:border-red-900/60";
+    if (result === "no_show") return "bg-amber-100 text-amber-700 border-amber-200 dark:bg-amber-950/40 dark:text-amber-300 dark:border-amber-900/60";
+    return "bg-slate-100 text-slate-600 border-slate-200 dark:bg-slate-800 dark:text-slate-300 dark:border-slate-700";
   };
+
+  const summaryCards = [
+    {
+      label: "Total Dinilai",
+      value: summary.total,
+      description: "Semua kandidat yang sudah memiliki nilai interview",
+      icon: Users,
+      active: false,
+    },
+    {
+      label: "Layak Dipertimbangkan",
+      value: summary.good,
+      description: "Rating bagus atau direkomendasikan lolos",
+      icon: UserCheck,
+      active: false,
+    },
+    {
+      label: "Nilai Sempurna",
+      value: summary.top,
+      description: "Kandidat dengan rating 5",
+      icon: Trophy,
+      active: false,
+    },
+    {
+      label: "Nilai Rata-rata",
+      value: summary.averageRating,
+      description: "Nilai rata-rata seluruh kandidat",
+      icon: Star,
+      active: false,
+    },
+  ];
 
   return (
-    <TitleCard
-      title="Final Review Kandidat"
-      subtitle="Bandingkan hasil wawancara kandidat per lowongan sebelum menentukan kandidat yang lolos."
-    >
-      <div className="space-y-5">
-        {/* SUMMARY */}
-        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
+    <div className="mt-4 overflow-hidden rounded-[1.5rem] border border-slate-200/80 bg-white p-4 shadow-[0_20px_70px_rgba(15,23,42,0.07)] dark:border-slate-700 dark:bg-slate-950 dark:shadow-[0_20px_70px_rgba(2,6,23,0.45)] sm:p-7">
+      <div className="space-y-6">
+        {/* Header */}
+        <div className="relative min-h-[126px] overflow-hidden rounded-[1.4rem] bg-gradient-to-r from-white via-white to-orange-50/80 px-1 py-2 dark:from-slate-950 dark:via-slate-950 dark:to-slate-900 sm:px-2">
+          <FinalReviewHeroIllustration />
+          <div className="relative z-10 max-w-3xl">
+            <div className="mb-3 inline-flex items-center gap-2 rounded-full border border-orange-200 bg-orange-50 px-3 py-1 text-xs font-bold text-orange-600 dark:border-orange-900/60 dark:bg-orange-950/70 dark:text-orange-300">
+              <ClipboardCheck className="h-4 w-4" />
+              Final Review Kandidat
+            </div>
+            <h1 className="text-[28px] font-extrabold leading-tight text-slate-900 dark:text-slate-50">
+              Tentukan Kandidat Terbaik
+            </h1>
+            <p className="mt-2 max-w-2xl text-sm font-medium text-slate-500 dark:text-slate-400">
+              Bandingkan hasil wawancara kandidat per lowongan, cek rating dan rekomendasi, lalu selesaikan lowongan saat semua data sudah final.
+            </p>
+          </div>
+        </div>
+
+        {/* Beginner guide */}
+        <div className="grid grid-cols-1 gap-3 lg:grid-cols-3">
           {[
-            { label: "Total Dinilai", value: summary.total },
-            { label: "Layak Dipertimbangkan", value: summary.good },
-            { label: "Nilai Sempurna", value: summary.top },
-            { label: "Rata-rata Rating", value: summary.averageRating },
+            {
+              step: "1",
+              title: "Pilih Lowongan",
+              text: "Buka grup lowongan yang ingin dibandingkan.",
+            },
+            {
+              step: "2",
+              title: "Cek Nilai Kandidat",
+              text: "Lihat rating, rekomendasi, hasil, dan catatan interviewer.",
+            },
+            {
+              step: "3",
+              title: "Selesaikan",
+              text: "Klik Selesaikan jika kandidat sudah final untuk dipublish.",
+            },
           ].map((item) => (
             <div
-              key={item.label}
-              className="rounded-2xl border border-base-300 bg-base-100 p-4 shadow-sm"
+              key={item.step}
+              className="rounded-2xl border border-orange-100 bg-orange-50/60 p-4 dark:border-orange-900/50 dark:bg-orange-950/20"
             >
-              <p className="text-xs font-semibold uppercase tracking-wide text-base-content/60">
-                {item.label}
-              </p>
-              <p className="mt-2 text-2xl font-bold text-primary">
-                {item.value}
-              </p>
+              <div className="flex items-start gap-3">
+                <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-orange-500 text-sm font-extrabold text-white">
+                  {item.step}
+                </div>
+                <div>
+                  <p className="font-extrabold text-slate-900 dark:text-slate-50">
+                    {item.title}
+                  </p>
+                  <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
+                    {item.text}
+                  </p>
+                </div>
+              </div>
             </div>
           ))}
         </div>
 
-        {/* FILTER */}
-        <div className="rounded-2xl border border-base-300 bg-base-100 p-4 shadow-sm">
-          <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-4">
-            <div>
-              <label className="label py-1">
-                <span className="label-text text-xs font-semibold">
-                  Cari Kandidat
-                </span>
-              </label>
-              <input
-                type="text"
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-                className="input input-bordered input-sm w-full"
-                placeholder="Nama, posisi, rekomendasi..."
-              />
-            </div>
+        {/* Summary */}
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
+          {summaryCards.map((item) => {
+            const Icon = item.icon;
+            return (
+              <div
+                key={item.label}
+                className="rounded-2xl border border-slate-200 bg-slate-50 p-5 text-left shadow-sm transition hover:-translate-y-0.5 hover:bg-orange-50 hover:shadow-md dark:border-slate-700 dark:bg-slate-900 dark:hover:bg-slate-800"
+              >
+                <div className="flex items-start justify-between gap-4">
+                  <div>
+                    <p className="text-sm font-semibold text-slate-500 dark:text-slate-400">
+                      {item.label}
+                    </p>
+                    <p className="mt-2 text-3xl font-extrabold text-slate-900 dark:text-slate-50">
+                      {item.value}
+                    </p>
+                    <p className="mt-1 text-xs font-medium text-slate-500 dark:text-slate-400">
+                      {item.description}
+                    </p>
+                  </div>
+                  <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-orange-100 text-orange-600 dark:bg-orange-950/50 dark:text-orange-300">
+                    <Icon className="h-6 w-6" />
+                  </div>
+                </div>
+              </div>
+            );
+          })}
+        </div>
 
+        {/* Main content */}
+        <div className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-700 dark:bg-slate-900 sm:p-6">
+          <div className="mb-5 flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
             <div>
-              <label className="label py-1">
-                <span className="label-text text-xs font-semibold">Posisi</span>
+              <h2 className="text-xl font-extrabold text-slate-900 dark:text-slate-50">
+                Review per Lowongan
+              </h2>
+              <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
+                Gunakan filter agar lebih mudah mencari kandidat atau lowongan tertentu.
+              </p>
+            </div>
+            {!loading && !error && filteredCandidates.length > 0 && (
+              <div className="flex flex-wrap gap-2">
+                <button
+                  type="button"
+                  className="btn rounded-xl border border-slate-200 bg-white text-slate-600 shadow-sm hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-200 dark:hover:bg-slate-800"
+                  onClick={() => setAllGroupsExpanded(true)}
+                >
+                  <ChevronDown className="h-4 w-4" />
+                  Buka Semua
+                </button>
+                <button
+                  type="button"
+                  className="btn rounded-xl border border-slate-200 bg-white text-slate-600 shadow-sm hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-200 dark:hover:bg-slate-800"
+                  onClick={() => setAllGroupsExpanded(false)}
+                >
+                  <ChevronUp className="h-4 w-4" />
+                  Tutup Semua
+                </button>
+              </div>
+            )}
+          </div>
+
+          {/* Filter */}
+          <div className="mb-6 rounded-2xl border border-slate-200 bg-slate-50/70 p-4 dark:border-slate-700 dark:bg-slate-950/50">
+            <div className="mb-3 flex items-center gap-2 text-sm font-bold text-slate-700 dark:text-slate-200">
+              <Filter className="h-4 w-4 text-orange-500" />
+              Filter Kandidat
+            </div>
+            <div className="grid grid-cols-1 gap-3 lg:grid-cols-12">
+              <label className="input input-bordered flex w-full items-center gap-2 rounded-xl bg-white text-slate-900 lg:col-span-4 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100">
+                <Search className="h-4 w-4 text-slate-400 dark:text-slate-500" />
+                <input
+                  type="text"
+                  placeholder="Cari nama, posisi, rekomendasi..."
+                  className="grow bg-transparent text-sm outline-none placeholder:text-slate-400 dark:placeholder:text-slate-500"
+                  value={search}
+                  onChange={(e) => setSearch(e.target.value)}
+                />
               </label>
+
               <select
-                className="select select-bordered select-sm w-full"
+                className="select select-bordered w-full rounded-xl bg-white text-slate-900 lg:col-span-3 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100"
                 value={positionFilter}
                 onChange={(e) => setPositionFilter(e.target.value)}
               >
@@ -343,33 +547,19 @@ const HREvaluatedCandidates = () => {
                   </option>
                 ))}
               </select>
-            </div>
 
-            <div>
-              <label className="label py-1">
-                <span className="label-text text-xs font-semibold">Status</span>
-              </label>
               <select
-                className="select select-bordered select-sm w-full"
+                className="select select-bordered w-full rounded-xl bg-white text-slate-900 lg:col-span-2 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100"
                 value={statusFilter}
                 onChange={(e) => setStatusFilter(e.target.value)}
               >
                 <option value="">Semua Status</option>
                 <option value="completed">Selesai</option>
-                <option value="canceled_by_company">
-                  Dibatalkan Perusahaan
-                </option>
+                <option value="canceled_by_company">Dibatalkan Perusahaan</option>
               </select>
-            </div>
 
-            <div>
-              <label className="label py-1">
-                <span className="label-text text-xs font-semibold">
-                  Sorotan
-                </span>
-              </label>
               <select
-                className="select select-bordered select-sm w-full"
+                className="select select-bordered w-full rounded-xl bg-white text-slate-900 lg:col-span-2 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100"
                 value={ratingFilter}
                 onChange={(e) => setRatingFilter(e.target.value)}
               >
@@ -377,344 +567,349 @@ const HREvaluatedCandidates = () => {
                 <option value="good">Rating Bagus</option>
                 <option value="top">Rating 5</option>
               </select>
-            </div>
-          </div>
-        </div>
 
-        {/* ACTION GROUP */}
-        {!loading && !error && filteredCandidates.length > 0 && (
-          <div className="flex flex-col gap-3 rounded-2xl border border-base-300 bg-base-100 px-4 py-3 shadow-sm md:flex-row md:items-center md:justify-between">
-            <div>
-              <p className="text-sm font-semibold text-base-content">
-                Review per Lowongan
-              </p>
-              <p className="text-xs text-base-content/60">
-                Buka grup lowongan untuk melihat kandidat yang sudah dinilai.
-              </p>
-            </div>
-
-            <div className="flex flex-wrap gap-2">
               <button
-                className="btn btn-outline btn-sm rounded-xl"
-                onClick={() => setAllGroupsExpanded(true)}
+                type="button"
+                className="btn rounded-xl border-none bg-emerald-500 text-white shadow-sm hover:bg-emerald-600 lg:col-span-1"
+                onClick={resetFilters}
+                title="Reset filter"
               >
-                Buka Semua
-              </button>
-              <button
-                className="btn btn-outline btn-sm rounded-xl"
-                onClick={() => setAllGroupsExpanded(false)}
-              >
-                Tutup Semua
+                <RotateCcw className="h-4 w-4" />
               </button>
             </div>
           </div>
-        )}
 
-        {/* LOADING */}
-        {loading && (
-          <div className="flex min-h-[260px] flex-col items-center justify-center rounded-2xl border border-base-300 bg-base-100">
-            <span className="loading loading-spinner loading-lg text-primary" />
-            <p className="mt-3 text-sm font-semibold">
-              Memuat data kandidat...
-            </p>
-          </div>
-        )}
+          {/* Loading */}
+          {loading && (
+            <div className="flex flex-col items-center justify-center rounded-2xl border border-dashed border-slate-200 py-12 text-slate-500 dark:border-slate-700 dark:text-slate-400">
+              <span className="loading loading-spinner loading-lg text-orange-500" />
+              <p className="mt-3 text-sm font-medium">Memuat data kandidat...</p>
+            </div>
+          )}
 
-        {/* ERROR */}
-        {error && (
-          <div className="alert alert-error rounded-2xl">
-            <span>{error}</span>
-          </div>
-        )}
+          {/* Error */}
+          {!loading && error && (
+            <div className="rounded-2xl border border-red-200 bg-red-50 p-5 text-red-600 dark:border-red-900/60 dark:bg-red-950/30 dark:text-red-300">
+              <div className="flex items-start gap-3">
+                <XCircle className="mt-0.5 h-5 w-5" />
+                <div>
+                  <p className="font-bold">Data gagal dimuat</p>
+                  <p className="text-sm">{error}</p>
+                </div>
+              </div>
+            </div>
+          )}
 
-        {/* EMPTY */}
-        {!loading && !error && filteredCandidates.length === 0 && (
-          <div className="rounded-2xl border border-dashed border-base-300 bg-base-100 px-4 py-12 text-center shadow-sm">
-            <p className="font-semibold">Belum ada data kandidat</p>
-            <p className="mt-1 text-sm text-base-content/60">
-              Tidak ada kandidat yang sesuai filter atau belum ada interview
-              yang dinilai.
-            </p>
-          </div>
-        )}
+          {/* Empty */}
+          {!loading && !error && filteredCandidates.length === 0 && (
+            <div className="rounded-2xl border border-dashed border-slate-200 py-12 text-center dark:border-slate-700">
+              <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-slate-100 text-slate-400 dark:bg-slate-800 dark:text-slate-500">
+                <ListChecks className="h-7 w-7" />
+              </div>
+              <p className="mt-3 font-bold text-slate-700 dark:text-slate-200">
+                Belum ada data kandidat.
+              </p>
+              <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
+                Tidak ada kandidat yang sesuai filter atau belum ada interview yang dinilai.
+              </p>
+            </div>
+          )}
 
-        {/* GROUP LIST */}
-        {!loading && !error && filteredCandidates.length > 0 && (
-          <div className="space-y-4">
-            {groupedEntries.map((group) => {
-              const isExpanded = Boolean(expandedGroups[group.key]);
+          {/* Group list */}
+          {!loading && !error && filteredCandidates.length > 0 && (
+            <div className="space-y-5">
+              {groupedEntries.map((group) => {
+                const isExpanded = Boolean(expandedGroups[group.key]);
 
-              // sort items by rating, recommendation, result, date
-              const sortedItems = (group.items || []).slice().sort((a, b) => {
-                const ra = getRatingNumber(a.rating);
-                const rb = getRatingNumber(b.rating);
-                if (rb !== ra) return rb - ra;
-                const recWeight = (r) =>
-                  r === "hire"
-                    ? 3
-                    : r === "consider"
-                      ? 2
-                      : r === "reject"
-                        ? 1
-                        : 0;
-                const raw =
-                  recWeight(b.recommendation) - recWeight(a.recommendation);
-                if (raw !== 0) return raw;
-                const resWeight = (r) =>
-                  r === "passed" ? 2 : r === "failed" ? 1 : 0;
-                const resw = resWeight(b.result) - resWeight(a.result);
-                if (resw !== 0) return resw;
-                const da = new Date(a.scheduled_date || 0).getTime();
-                const db = new Date(b.scheduled_date || 0).getTime();
-                return db - da;
-              });
+                const sortedItems = (group.items || []).slice().sort((a, b) => {
+                  const ra = getRatingNumber(a.rating);
+                  const rb = getRatingNumber(b.rating);
+                  if (rb !== ra) return rb - ra;
+                  const recWeight = (r) =>
+                    r === "hire" ? 3 : r === "consider" ? 2 : r === "reject" ? 1 : 0;
+                  const raw = recWeight(b.recommendation) - recWeight(a.recommendation);
+                  if (raw !== 0) return raw;
+                  const resWeight = (r) => (r === "passed" ? 2 : r === "failed" ? 1 : 0);
+                  const resw = resWeight(b.result) - resWeight(a.result);
+                  if (resw !== 0) return resw;
+                  const da = new Date(a.scheduled_date || 0).getTime();
+                  const db = new Date(b.scheduled_date || 0).getTime();
+                  return db - da;
+                });
 
-              const avgRating = (
-                sortedItems.reduce(
-                  (sum, item) => sum + getRatingNumber(item.rating),
-                  0,
-                ) / (sortedItems.length || 1) || 0
-              ).toFixed(2);
+                const avgRating = (
+                  sortedItems.reduce(
+                    (sum, item) => sum + getRatingNumber(item.rating),
+                    0,
+                  ) / (sortedItems.length || 1) || 0
+                ).toFixed(2);
 
-              const metrics = {
-                total: group.items.length,
-                rated: group.items.filter(
-                  (item) =>
-                    item.status === "completed" &&
-                    (getRatingNumber(item.rating) > 0 ||
-                      item.recommendation ||
-                      item.result),
-                ).length,
-                allReevaluated:
-                  group.items.length > 0 &&
-                  group.items.every(
+                const metrics = {
+                  total: group.items.length,
+                  rated: group.items.filter(
                     (item) =>
                       item.status === "completed" &&
-                      item.result !== "pending" &&
-                      (getRatingNumber(item.rating) > 0 || item.recommendation),
-                  ),
-              };
+                      (getRatingNumber(item.rating) > 0 ||
+                        item.recommendation ||
+                        item.result),
+                  ).length,
+                  allReevaluated:
+                    group.items.length > 0 &&
+                    group.items.every(
+                      (item) =>
+                        item.status === "completed" &&
+                        item.result !== "pending" &&
+                        (getRatingNumber(item.rating) > 0 || item.recommendation),
+                    ),
+                };
 
-              const firstItem = sortedItems[0];
+                const firstItem = sortedItems[0];
+                const displayItems = showTop3Only
+                  ? sortedItems.slice(0, 3)
+                  : sortedItems;
 
-              const displayItems = showTop3Only
-                ? sortedItems.slice(0, 3)
-                : sortedItems;
+                return (
+                  <div
+                    key={group.key}
+                    className="overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-sm transition hover:shadow-md dark:border-slate-700 dark:bg-slate-950"
+                  >
+                    <div className="border-b border-slate-200 bg-slate-50/70 px-5 py-5 dark:border-slate-700 dark:bg-slate-900/70">
+                      <div className="flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
+                        <div className="min-w-0">
+                          <div className="flex flex-wrap items-center gap-2">
+                            <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-orange-100 text-orange-600 dark:bg-orange-950/50 dark:text-orange-300">
+                              <BriefcaseBusiness className="h-5 w-5" />
+                            </div>
+                            <div>
+                              <h3 className="truncate text-lg font-extrabold text-slate-900 dark:text-slate-50">
+                                {group.job_title}
+                              </h3>
+                              <p className="text-sm text-slate-500 dark:text-slate-400">
+                                Review kandidat pada lowongan ini.
+                              </p>
+                            </div>
+                            <span
+                              className={`rounded-full border px-3 py-1 text-xs font-bold ${
+                                metrics.allReevaluated
+                                  ? "border-emerald-200 bg-emerald-100 text-emerald-700 dark:border-emerald-900/60 dark:bg-emerald-950/40 dark:text-emerald-300"
+                                  : "border-amber-200 bg-amber-100 text-amber-700 dark:border-amber-900/60 dark:bg-amber-950/40 dark:text-amber-300"
+                              }`}
+                            >
+                              {metrics.allReevaluated ? "Siap Final" : "Belum Final"}
+                            </span>
+                          </div>
 
-              return (
-                <div
-                  key={group.key}
-                  className="overflow-hidden rounded-2xl border border-base-300 bg-base-100 shadow-sm"
-                >
-                  {/* GROUP HEADER */}
-                  <div className="border-b border-base-300 bg-base-200/30 px-4 py-4">
-                    <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
-                      <div className="min-w-0">
-                        <div className="flex flex-wrap items-center gap-2">
-                          <h3 className="truncate text-base font-bold text-base-content">
-                            {group.job_title}
-                          </h3>
-
-                          <span
-                            className={`badge badge-sm ${
-                              metrics.allReevaluated
-                                ? "badge-success"
-                                : "badge-warning"
-                            }`}
-                          >
-                            {metrics.allReevaluated
-                              ? "Siap Final"
-                              : "Belum Final"}
-                          </span>
+                          <div className="mt-4 grid grid-cols-1 gap-2 text-xs sm:grid-cols-3">
+                            <div className="rounded-2xl bg-white px-3 py-2 text-slate-600 shadow-sm dark:bg-slate-950 dark:text-slate-300">
+                              <span className="font-bold text-orange-600 dark:text-orange-300">
+                                {group.items.length}
+                              </span>{" "}
+                              kandidat
+                            </div>
+                            <div className="rounded-2xl bg-white px-3 py-2 text-slate-600 shadow-sm dark:bg-slate-950 dark:text-slate-300">
+                              Nilai rata-rata{" "}
+                              <span className="font-bold text-orange-600 dark:text-orange-300">
+                                {avgRating}
+                              </span>
+                            </div>
+                            <div className="rounded-2xl bg-white px-3 py-2 text-slate-600 shadow-sm dark:bg-slate-950 dark:text-slate-300">
+                              Dinilai{" "}
+                              <span className="font-bold text-orange-600 dark:text-orange-300">
+                                {metrics.rated}/{metrics.total}
+                              </span>
+                            </div>
+                          </div>
                         </div>
 
-                        <div className="mt-2 flex flex-wrap gap-2 text-xs text-base-content/60">
-                          <span className="rounded-lg bg-base-100 px-2 py-1 border border-base-300">
-                            {group.items.length} kandidat
-                          </span>
-                          <span className="rounded-lg bg-base-100 px-2 py-1 border border-base-300">
-                            Rating rata-rata {avgRating}
-                          </span>
-                          <span className="rounded-lg bg-base-100 px-2 py-1 border border-base-300">
-                            Dinilai {metrics.rated}/{metrics.total}
-                          </span>
-                        </div>
-                      </div>
-
-                      <div className="flex flex-wrap gap-2">
-                        <button
-                          className="btn btn-outline btn-sm rounded-xl"
-                          onClick={() => toggleGroup(group.key)}
-                        >
-                          {isExpanded ? "Tutup" : "Buka"}
-                        </button>
-                        <button
+                        <div className="flex flex-wrap gap-2">
+                          <button
                             type="button"
-                            className={
-                              showTop3Only
-                                ? "btn btn-primary btn-sm rounded-xl"
-                                : "btn btn-outline btn-primary btn-sm rounded-xl"
-                            }
-                          onClick={() => setShowTop3Only((s) => !s)}
-                        >
-                          {showTop3Only ? "Tampilkan Semua" : "Tampilkan Top 3"}
-                        </button>
-                        <button
-                          className="btn btn-ghost btn-sm rounded-xl"
-                          onClick={() =>
-                            navigate("/app/DetailInterview-process", {
-                              state: {
-                                job: {
-                                  id:
-                                    firstItem?.position_id ||
-                                    firstItem?.job_opening_id,
-                                  title: group.job_title,
-                                },
-                              },
-                            })
-                          }
-                        >
-                          Lihat Lowongan
-                        </button>
+                            className="btn rounded-xl border border-slate-200 bg-white text-slate-600 shadow-sm hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-200 dark:hover:bg-slate-800"
+                            onClick={() => toggleGroup(group.key)}
+                          >
+                            {isExpanded ? (
+                              <ChevronUp className="h-4 w-4" />
+                            ) : (
+                              <ChevronDown className="h-4 w-4" />
+                            )}
+                            {isExpanded ? "Tutup" : "Buka"}
+                          </button>
 
-                        <button
-                          className="btn btn-success btn-sm rounded-xl"
-                          disabled={
-                            !metrics.allReevaluated ||
-                            completingJobs[group.job_opening_id]
-                          }
-                          onClick={() =>
-                            completeJobOpening(
-                              group.job_opening_id,
-                              group.job_title,
-                            )
-                          }
-                        >
-                          {completingJobs[group.job_opening_id]
-                            ? "Memproses..."
-                            : "Selesaikan"}
-                        </button>
+                          <button
+                            type="button"
+                            className={`btn rounded-xl shadow-sm ${
+                              showTop3Only
+                                ? "border-none bg-orange-500 text-white hover:bg-orange-600"
+                                : "border border-orange-200 bg-white text-orange-600 hover:bg-orange-50 dark:border-orange-900/60 dark:bg-slate-950 dark:text-orange-300 dark:hover:bg-orange-950/30"
+                            }`}
+                            onClick={() => setShowTop3Only((s) => !s)}
+                          >
+                            <Sparkles className="h-4 w-4" />
+                            {showTop3Only ? "Semua" : "Top 3"}
+                          </button>
+
+                          <button
+                            type="button"
+                            className="btn rounded-xl border border-slate-200 bg-white text-slate-600 shadow-sm hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-200 dark:hover:bg-slate-800"
+                            onClick={() =>
+                              navigate("/app/DetailInterview-process", {
+                                state: {
+                                  job: {
+                                    id:
+                                      firstItem?.position_id ||
+                                      firstItem?.job_opening_id,
+                                    title: group.job_title,
+                                  },
+                                },
+                              })
+                            }
+                          >
+                            <Eye className="h-4 w-4" />
+                            Lowongan
+                          </button>
+
+                          <button
+                            type="button"
+                            className="btn rounded-xl border-none bg-emerald-500 text-white shadow-md hover:bg-emerald-600 disabled:bg-slate-300 disabled:text-slate-500"
+                            disabled={
+                              !metrics.allReevaluated ||
+                              completingJobs[group.job_opening_id]
+                            }
+                            onClick={() =>
+                              completeJobOpening(
+                                group.job_opening_id,
+                                group.job_title,
+                              )
+                            }
+                          >
+                            <CheckCircle2 className="h-4 w-4" />
+                            {completingJobs[group.job_opening_id]
+                              ? "Memproses..."
+                              : "Selesaikan"}
+                          </button>
+                        </div>
                       </div>
                     </div>
-                  </div>
 
-                  {/* TABLE */}
-                  {isExpanded && (
-                    <div className="overflow-x-auto">
-                      <table className="table table-sm">
-                        <thead className="bg-base-100 text-xs text-base-content/70">
-                          <tr>
-                            <th className="min-w-[180px]">Kandidat</th>
-                            <th className="min-w-[110px]">Tanggal</th>
-                            <th className="min-w-[120px]">Nilai</th>
-                            <th className="min-w-[180px]">Rekomendasi</th>
-                            <th className="min-w-[130px]">Hasil</th>
-                            <th className="min-w-[220px]">Catatan</th>
-                            <th className="min-w-[150px] text-right">Aksi</th>
-                          </tr>
-                        </thead>
-
-                        <tbody>
-                          {displayItems.map((item) => {
+                    {isExpanded && (
+                      <div className="p-4 sm:p-5">
+                        <div className="grid grid-cols-1 gap-4 xl:grid-cols-2">
+                          {displayItems.map((item, index) => {
                             const ratingNumber = getRatingNumber(item.rating);
-
                             const isGood =
                               ratingNumber >= 4 ||
                               item.recommendation === "hire" ||
                               item.result === "passed";
 
                             return (
-                              <tr
-                                key={item.id}
-                                className={isGood ? "bg-success/5" : ""}
+                              <div
+                                key={item.id || `${item.candidate_name}-${index}`}
+                                className={`rounded-3xl border p-5 shadow-sm transition hover:-translate-y-0.5 hover:shadow-md ${
+                                  isGood
+                                    ? "border-emerald-200 bg-emerald-50/60 dark:border-emerald-900/50 dark:bg-emerald-950/20"
+                                    : "border-slate-200 bg-white dark:border-slate-700 dark:bg-slate-900"
+                                }`}
                               >
-                                <td>
-                                  <div className="font-semibold text-base-content">
-                                    {item.candidate_name}
+                                <div className="flex items-start justify-between gap-4">
+                                  <div className="flex items-start gap-3">
+                                    <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-orange-100 text-orange-600 dark:bg-orange-950/50 dark:text-orange-300">
+                                      <Award className="h-6 w-6" />
+                                    </div>
+                                    <div>
+                                      <h4 className="font-extrabold text-slate-900 dark:text-slate-50">
+                                        {item.candidate_name}
+                                      </h4>
+                                      <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
+                                        Interviewer: {item.interviewer_name || "-"}
+                                      </p>
+                                      <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
+                                        Tanggal: {formatDate(item.scheduled_date)}
+                                      </p>
+                                    </div>
                                   </div>
-                                  <div className="text-xs text-base-content/50">
-                                    {item.interviewer_name || "-"}
-                                  </div>
-                                </td>
 
-                                <td className="whitespace-nowrap text-sm">
-                                  {item.scheduled_date
-                                    ? new Date(
-                                        item.scheduled_date,
-                                      ).toLocaleDateString("id-ID", {
-                                        day: "2-digit",
-                                        month: "short",
-                                        year: "numeric",
-                                      })
-                                    : "-"}
-                                </td>
-
-                                <td>
-                                  <div className="font-bold text-primary">
-                                    {ratingNumber || "-"}
+                                  <div className="rounded-2xl bg-white px-4 py-3 text-center shadow-sm dark:bg-slate-950">
+                                    <p className="text-[11px] font-bold uppercase text-slate-400">
+                                      Nilai
+                                    </p>
+                                    <p className="text-2xl font-extrabold text-orange-600 dark:text-orange-300">
+                                      {ratingNumber || "-"}
+                                    </p>
                                   </div>
-                                  <div className="text-[11px] text-base-content/50">
-                                    {ratingLabelMap[ratingNumber] || "-"}
-                                  </div>
-                                </td>
+                                </div>
 
-                                <td>
+                                <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2">
+                                  <div className="rounded-2xl border border-slate-200 bg-white p-3 dark:border-slate-700 dark:bg-slate-950">
+                                    <p className="text-[11px] font-bold uppercase text-slate-400">
+                                      Keterangan Nilai
+                                    </p>
+                                    <p className="mt-1 text-sm font-semibold text-slate-700 dark:text-slate-200">
+                                      {ratingLabelMap[ratingNumber] || "-"}
+                                    </p>
+                                  </div>
+
+                                  <div className="rounded-2xl border border-slate-200 bg-white p-3 dark:border-slate-700 dark:bg-slate-950">
+                                    <p className="text-[11px] font-bold uppercase text-slate-400">
+                                      Hasil
+                                    </p>
+                                    <span
+                                      className={`mt-1 inline-flex rounded-full border px-3 py-1 text-xs font-bold ${getResultBadgeClass(
+                                        item.result,
+                                      )}`}
+                                    >
+                                      {resultLabelMap[item.result] || item.result || "-"}
+                                    </span>
+                                  </div>
+                                </div>
+
+                                <div className="mt-3 rounded-2xl border border-slate-200 bg-white p-3 dark:border-slate-700 dark:bg-slate-950">
+                                  <p className="text-[11px] font-bold uppercase text-slate-400">
+                                    Rekomendasi
+                                  </p>
                                   <span
-                                    className={`${getRecommendationBadge(
+                                    className={`mt-1 inline-flex rounded-full border px-3 py-1 text-xs font-bold ${getRecommendationBadgeClass(
                                       item.recommendation,
-                                    )} badge-sm`}
+                                    )}`}
                                   >
-                                    {recommendationLabelMap[
-                                      item.recommendation
-                                    ] ||
+                                    {recommendationLabelMap[item.recommendation] ||
                                       item.recommendation ||
                                       "-"}
                                   </span>
-                                </td>
+                                </div>
 
-                                <td>
-                                  <span
-                                    className={`${getResultBadge(
-                                      item.result,
-                                    )} badge-sm`}
-                                  >
-                                    {resultLabelMap[item.result] ||
-                                      item.result ||
-                                      "-"}
-                                  </span>
-                                </td>
-
-                                <td className="max-w-[240px]">
-                                  <p className="line-clamp-2 text-xs text-base-content/60">
-                                    {item.interviewer_notes || "-"}
+                                <div className="mt-3 rounded-2xl border border-slate-200 bg-white p-3 dark:border-slate-700 dark:bg-slate-950">
+                                  <p className="text-[11px] font-bold uppercase text-slate-400">
+                                    Catatan Interviewer
                                   </p>
-                                </td>
+                                  <p className="mt-1 line-clamp-3 text-sm text-slate-600 dark:text-slate-300">
+                                    {item.interviewer_notes||
+                                      "-"}
+                                  </p>
+                                </div>
 
-                                <td>
-                                  <div className="flex justify-end gap-2">
-                                    <button
-                                      className="btn btn-warning btn-xs rounded-lg"
-                                      onClick={() => {
-                                        setSelectedCandidate(item);
-                                        setIsDetailOpen(true);
-                                      }}
-                                    >
-                                      Edit Nilai
-                                    </button>
-                                  </div>
-                                </td>
-                              </tr>
+                                <button
+                                  type="button"
+                                  className="btn mt-4 w-full rounded-xl border-none bg-orange-500 text-white shadow-md hover:bg-orange-600"
+                                  onClick={() => {
+                                    setSelectedCandidate(item);
+                                    setIsDetailOpen(true);
+                                  }}
+                                >
+                                  <Eye className="h-4 w-4" />
+                                  Lihat / Edit Nilai
+                                </button>
+                              </div>
                             );
                           })}
-                        </tbody>
-                      </table>
-                    </div>
-                  )}
-                </div>
-              );
-            })}
-          </div>
-        )}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
 
         <HRInterviewDetailLowongan
           isFormOpen={false}
@@ -727,7 +922,7 @@ const HREvaluatedCandidates = () => {
           allowEditingWhenClosed={true}
         />
       </div>
-    </TitleCard>
+    </div>
   );
 };
 

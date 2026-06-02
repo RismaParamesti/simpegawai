@@ -49,7 +49,7 @@ export default function JobDetail() {
     return (
       <TitleCard title="Detail Lowongan">
         <p>{error || "Data lowongan tidak ditemukan"}</p>
-        <button className="btn btn-primary mt-3" onClick={() => navigate(-1)}>
+        <button className="btn btn-sm btn-primary rounded-full mt-3" onClick={() => navigate(-1)}>
           Kembali
         </button>
       </TitleCard>
@@ -100,6 +100,31 @@ export default function JobDetail() {
   const requirementList = formatTextToList(requirements);
   const responsibilityList = formatTextToList(responsibilities);
 
+  const parseAssessmentCriteria = (value) => {
+    if (!value) return [];
+    if (Array.isArray(value)) return value;
+    if (typeof value !== "string") return [];
+
+    try {
+      const parsed = JSON.parse(value);
+      return Array.isArray(parsed) ? parsed : [];
+    } catch {
+      return [];
+    }
+  };
+
+  const formatAssessmentScore = (score) => {
+    if (score === null || score === undefined || score === "") return "-";
+
+    const raw = String(score).trim();
+    if (raw.endsWith("%")) return raw;
+
+    const numeric = Number(raw);
+    return Number.isFinite(numeric) ? `${numeric}%` : raw;
+  };
+
+  const assessmentCriteria = parseAssessmentCriteria(job.assessment_criteria);
+
   const deadlineDate = job.deadline ? new Date(job.deadline) : null;
   const today = new Date();
 
@@ -128,7 +153,7 @@ export default function JobDetail() {
     <TitleCard
       title="Detail Lowongan"
       TopSideButtons={
-        <button className="btn btn-outline" onClick={() => navigate(-1)}>
+        <button className="btn btn-sm btn-primary rounded-full" onClick={() => navigate(-1)}>
           Kembali
         </button>
       }
@@ -392,6 +417,58 @@ export default function JobDetail() {
                 <p className="text-base-content/60 text-sm">Tidak ada data</p>
               )}
             </div>
+          </div>
+        </div>
+
+        {/* KRITERIA PENILAIAN */}
+        <div className="rounded-3xl border border-base-300 bg-base-100 shadow-sm overflow-hidden">
+          <div className="px-5 py-4 bg-gradient-to-r from-info/10 via-info/5 to-transparent border-b border-base-300">
+            <div className="flex items-center gap-3">
+              <div className="w-11 h-11 rounded-2xl bg-info text-info-content flex items-center justify-center font-bold">
+                %
+              </div>
+
+              <div>
+                <h3 className="font-bold text-base-content text-lg">
+                  Kriteria Penilaian
+                </h3>
+                <p className="text-xs text-base-content/60">
+                  Dasar evaluasi kandidat pada lowongan ini
+                </p>
+              </div>
+            </div>
+          </div>
+
+          <div className="p-5">
+            {assessmentCriteria.length > 0 ? (
+              <div className="overflow-x-auto rounded-2xl border border-base-300">
+                <table className="table table-sm w-full">
+                  <thead className="bg-base-200">
+                    <tr>
+                      <th>No</th>
+                      <th>Kriteria</th>
+                      <th>Nilai/Bobot</th>
+                    </tr>
+                  </thead>
+
+                  <tbody>
+                    {assessmentCriteria.map((item, index) => (
+                      <tr key={`${item?.criterion || "criteria"}-${index}`}>
+                        <td>{index + 1}</td>
+                        <td className="font-medium">
+                          {item?.criterion || "-"}
+                        </td>
+                        <td>{formatAssessmentScore(item?.score)}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            ) : (
+              <p className="text-sm text-base-content/60">
+                Belum ada kriteria penilaian.
+              </p>
+            )}
           </div>
         </div>
       </div>

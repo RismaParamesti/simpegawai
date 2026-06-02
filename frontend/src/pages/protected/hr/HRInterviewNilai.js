@@ -27,9 +27,22 @@ const normalizeAssessmentCriteria = (value) =>
   parseAssessmentCriteria(value)
     .map((item) => ({
       criterion: String(item?.criterion || "").trim(),
-      score: Math.max(0, Number(item?.score) || 0),
+      score: Math.max(
+        0,
+        Number(String(item?.score || "").replace(/%/g, "")) || 0
+      ),
     }))
     .filter((item) => item.criterion && item.score > 0);
+
+const formatAssessmentScore = (score) => {
+  if (score === null || score === undefined || score === "") return "-";
+
+  const raw = String(score).trim();
+  if (raw.endsWith("%")) return raw;
+
+  const numeric = Number(raw);
+  return Number.isFinite(numeric) ? `${numeric}%` : raw;
+};
 
 const parseStoredAssessment = (notes) => {
   const rawNotes = String(notes || "");
@@ -187,19 +200,23 @@ export default function InterviewModal({
           selectedCandidate?.assessment_criteria
       );
   const getAssessmentSummary = (criteriaScores = evaluation.criteria_scores) => {
-    const maximum = assessmentCriteria.reduce(
+    const totalWeight = assessmentCriteria.reduce(
       (total, item) => total + item.score,
       0
     );
-    const achieved = assessmentCriteria.reduce((total, item, index) => {
+    const weightedTotal = assessmentCriteria.reduce((total, item, index) => {
       const value = Number(criteriaScores?.[index]);
-      return total + (Number.isFinite(value) ? Math.min(item.score, value) : 0);
+      const candidateScore = Number.isFinite(value)
+        ? Math.max(0, Math.min(100, value))
+        : 0;
+      return total + candidateScore * item.score;
     }, 0);
-    const percentage = maximum > 0 ? (achieved / maximum) * 100 : 0;
-    const rating =
-      maximum > 0 ? Math.max(1, Math.min(5, Math.round(percentage / 20))) : "";
 
-    return { achieved, maximum, percentage, rating };
+    const averageScore = totalWeight > 0 ? weightedTotal / totalWeight : 0;
+    const weightedAverage =
+      totalWeight > 0 ? Number(averageScore.toFixed(2)) : "";
+
+    return { totalWeight, weightedTotal, averageScore, rating: weightedAverage };
   };
   const getEvaluationFromData = (data = {}) => {
     const parsedNotes = parseStoredAssessment(data.interviewer_notes);
@@ -212,16 +229,17 @@ export default function InterviewModal({
     }, {});
 
     return {
-      rating: data.rating || "",
+      rating: data.average_rating ?? data.rating ?? "",
+      average_rating: data.average_rating ?? data.rating ?? "",
       recommendation: data.recommendation || "",
       interviewer_notes: parsedNotes.notes,
       result: data.result || "",
       criteria_scores: criteriaScores,
     };
   };
-  const updateCriteriaScore = (index, maximum, value) => {
+  const updateCriteriaScore = (index, value) => {
     const numericValue =
-      value === "" ? "" : Math.max(0, Math.min(maximum, Number(value) || 0));
+      value === "" ? "" : Math.max(0, Math.min(100, Number(value) || 0));
     setEvaluation((current) => ({
       ...current,
       criteria_scores: {
@@ -237,12 +255,14 @@ export default function InterviewModal({
     const assessment = {
       criteria: assessmentCriteria.map((item, index) => ({
         criterion: item.criterion,
-        maximum_score: item.score,
+        weight_percentage: item.score,
+        maximum_score: 100,
         achieved_score: Number(evaluation.criteria_scores?.[index]) || 0,
       })),
-      total_score: summary.achieved,
-      maximum_score: summary.maximum,
-      percentage: Number(summary.percentage.toFixed(2)),
+      total_score: Number(summary.averageScore.toFixed(2)),
+      maximum_score: 100,
+      total_weight: Number(summary.totalWeight.toFixed(2)),
+      percentage: Number(summary.averageScore.toFixed(2)),
       rating: summary.rating,
     };
 
@@ -271,9 +291,21 @@ ${ASSESSMENT_END}`.trim();
 
     const summary = getAssessmentSummary();
 
+    if (assessmentCriteria.length && Math.abs(summary.totalWeight - 100) > 0.01) {
+      NotificationManager.error(
+        `Total bobot kriteria harus 100%. Saat ini ${summary.totalWeight.toFixed(2)}%`,
+        "Bobot kriteria belum valid",
+        4000
+      );
+      return;
+    }
+
     try {
       await axios.put(`/api/hr/interviews/${selectedCandidate.id}/result`, {
         rating: assessmentCriteria.length ? summary.rating : evaluation.rating,
+        average_rating: assessmentCriteria.length
+          ? summary.rating
+          : evaluation.rating,
         recommendation: evaluation.recommendation,
         interviewer_notes: buildInterviewerNotes(),
         result: evaluation.result,
@@ -399,11 +431,11 @@ ${ASSESSMENT_END}`.trim();
               Penilaian Berdasarkan Kriteria Lowongan
             </h4>
             <p className="text-xs text-base-content/70">
-              Isi nilai kandidat untuk setiap kriteria sesuai nilai maksimum.
+              Isi nilai kandidat 0-100 untuk setiap kriteria berbobot.
             </p>
           </div>
           <div className="badge badge-primary gap-1 px-3 py-3">
-            Total {summary.achieved}/{summary.maximum}
+            Total Bobot {summary.totalWeight.toFixed(2)}%
           </div>
         </div>
 
@@ -418,22 +450,22 @@ ${ASSESSMENT_END}`.trim();
                   {item.criterion}
                 </p>
                 <p className="mt-1 text-xs text-base-content/70">
-                  Nilai maksimum: {item.score}
+                  Bobot: {formatAssessmentScore(item.score)}
                 </p>
               </div>
               <label className="form-control">
                 <span className="label-text mb-1 text-xs font-semibold">
-                  Nilai Kandidat
+                  Nilai Kandidat (0-100)
                 </span>
                 <input
                   type="number"
                   min="0"
-                  max={item.score}
+                  max="100"
                   className="input input-bordered input-sm w-full"
-                  placeholder={`0 - ${item.score}`}
+                  placeholder="0 - 100"
                   value={evaluation.criteria_scores?.[index] ?? ""}
                   onChange={(event) =>
-                    updateCriteriaScore(index, item.score, event.target.value)
+                    updateCriteriaScore(index, event.target.value)
                   }
                 />
               </label>
@@ -441,14 +473,10 @@ ${ASSESSMENT_END}`.trim();
           ))}
         </div>
 
-        <div className="mt-3 grid gap-2 text-sm sm:grid-cols-3">
+        <div className="mt-3 grid gap-2 text-sm sm:grid-cols-2">
           <div className="rounded-xl bg-base-100 px-3 py-2">
-            <p className="text-xs text-base-content/70">Persentase</p>
-            <p className="font-bold">{summary.percentage.toFixed(2)}%</p>
-          </div>
-          <div className="rounded-xl bg-base-100 px-3 py-2">
-            <p className="text-xs text-base-content/70">Rating Sistem</p>
-            <p className="font-bold">{summary.rating || "-"}/5</p>
+            <p className="text-xs text-base-content/70">Rata-rata Berbobot</p>
+            <p className="font-bold">{summary.averageScore.toFixed(2)}</p>
           </div>
           <div className="rounded-xl bg-base-100 px-3 py-2">
             <p className="text-xs text-base-content/70">Jumlah Kriteria</p>
@@ -472,12 +500,11 @@ ${ASSESSMENT_END}`.trim();
               Rincian Kriteria Penilaian
             </p>
             <p className="text-sm font-bold">
-              Total {summary.achieved}/{summary.maximum} (
-              {summary.percentage.toFixed(2)}%)
+              Rata-rata Berbobot: {summary.averageScore.toFixed(2)} (Bobot {summary.totalWeight.toFixed(2)}%)
             </p>
           </div>
           <span className="badge badge-primary">
-            Rating {summary.rating || evaluation.rating || "-"}/5
+            Rata-rata Berbobot {summary.rating || evaluation.average_rating || evaluation.rating || "-"}
           </span>
         </div>
         <div className="space-y-2">
@@ -488,7 +515,7 @@ ${ASSESSMENT_END}`.trim();
             >
               <span>{item.criterion}</span>
               <span className="shrink-0 font-bold">
-                {evaluation.criteria_scores?.[index] ?? 0}/{item.score}
+                {evaluation.criteria_scores?.[index] ?? 0}/100 (bobot {formatAssessmentScore(item.score)})
               </span>
             </div>
           ))}
@@ -901,20 +928,20 @@ ${ASSESSMENT_END}`.trim();
                         <div>
                           <label className="label">
                             <span className="label-text text-xs font-semibold">
-                              Rating
+                              Rata-rata Berbobot
                             </span>
                           </label>
                           {assessmentCriteria.length ? (
                             <div className="input input-bordered flex w-full items-center font-bold">
-                              {getAssessmentSummary().rating || "-"}/5
+                              {getAssessmentSummary().rating || "-"}
                             </div>
                           ) : (
                             <input
                               type="number"
-                              min="1"
-                              max="5"
+                              min="0"
+                              max="100"
                               className="input input-bordered w-full"
-                              placeholder="1 - 5"
+                              placeholder="0 - 100"
                               value={evaluation.rating}
                               onChange={(e) =>
                                 setEvaluation({
@@ -1021,20 +1048,20 @@ ${ASSESSMENT_END}`.trim();
                         <div>
                           <label className="label">
                             <span className="label-text text-xs font-semibold">
-                              Rating
+                              Rata-rata Berbobot
                             </span>
                           </label>
                           {assessmentCriteria.length ? (
                             <div className="input input-bordered flex w-full items-center font-bold">
-                              {getAssessmentSummary().rating || "-"}/5
+                              {getAssessmentSummary().rating || "-"}
                             </div>
                           ) : (
                             <input
                               type="number"
-                              min="1"
-                              max="5"
+                              min="0"
+                              max="100"
                               className="input input-bordered w-full"
-                              placeholder="1 - 5"
+                              placeholder="0 - 100"
                               value={evaluation.rating}
                               onChange={(e) =>
                                 setEvaluation({
@@ -1135,7 +1162,10 @@ ${ASSESSMENT_END}`.trim();
                     (() => {
                       const evalData = {
                         rating:
-                          evaluation.rating || selectedCandidate?.rating || "-",
+                          evaluation.average_rating ||
+                          evaluation.rating ||
+                          selectedCandidate?.rating ||
+                          "-",
                         recommendation:
                           evaluation.recommendation ||
                           selectedCandidate?.recommendation ||
@@ -1167,7 +1197,7 @@ ${ASSESSMENT_END}`.trim();
                           <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
                             <div className="rounded-xl border border-base-300 bg-base-200/40 px-4 py-3">
                               <p className="text-xs text-base-content/60">
-                                Penilaian
+                                Rata-rata Berbobot
                               </p>
                               <p className="mt-1 text-lg font-bold">
                                 {evalData.rating || "-"}

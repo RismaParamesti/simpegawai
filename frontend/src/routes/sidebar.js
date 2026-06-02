@@ -60,20 +60,13 @@ const pegawaiRoutes = [
   },
   {
     path: "/app/attendance",
-    icon: <CalendarDaysIcon className={iconClasses} />,
-    name: "Kehadiran",
-    submenu: [
-      {
-        path: "/app/attendance",
-        icon: <ClipboardDocumentCheckIcon className={iconClasses} />,
-        name: "Presensi",
-      },
-      {
-        path: "/app/warning-letters",
-        icon: <ExclamationTriangleIcon className={iconClasses} />,
-        name: "Disiplin Kehadiran Saya",
-      },
-    ],
+    icon: <ClipboardDocumentCheckIcon className={iconClasses} />,
+    name: "Presensi",
+  },
+  {
+    path: "/app/warning-letters",
+    icon: <ExclamationTriangleIcon className={iconClasses} />,
+    name: "Disiplin Kehadiran ",
   },
   {
     path: "/app/leave-requests",
