@@ -544,12 +544,7 @@ function EmployeeLeave() {
 
     const submittedForm = normalizeLeaveDates({
       ...form,
-      end_date:
-        getAllowedEndDate(
-          form.start_date,
-          form.leave_type,
-          form.cuti_khusus_option,
-        ) || effectiveEndDate,
+      end_date: effectiveEndDate,
     });
     const requestedDaysForSubmit = calculateRequestedDays(
       submittedForm.start_date,
