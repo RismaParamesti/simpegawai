@@ -221,7 +221,7 @@ router.get("/", verifyToken, async (req, res) => {
             `SELECT id, deleted_at
              FROM candidates
              WHERE user_id = ?
-               AND (deleted_at IS NOT NULL OR status = 'inactive')
+               AND deleted_at IS NOT NULL
              ORDER BY COALESCE(deleted_at, updated_at, created_at) DESC
              LIMIT 1`,
             [userId]
