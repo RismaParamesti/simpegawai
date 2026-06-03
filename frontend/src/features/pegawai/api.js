@@ -157,6 +157,15 @@ export const pegawaiApi = {
         }
     },
 
+    async cancelLeaveRequest(leaveRequestId) {
+        try {
+            const response = await axios.put(`/api/attendance/leave-request/${leaveRequestId}/cancel`)
+            return response.data
+        } catch (error) {
+            throw new Error(parseApiError(error, 'Gagal membatalkan pengajuan cuti/izin'))
+        }
+    },
+
     async getMyLeaveRequests(params = {}) {
         try {
             const response = await axios.get('/api/attendance/my-leave-requests', { params })
