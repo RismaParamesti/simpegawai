@@ -3003,6 +3003,106 @@ router.get(
 );
 
 // ============================
+// CANCEL MY LEAVE REQUEST (Pegawai)
+// ============================
+router.put(
+    "/leave-request/:id/cancel",
+    verifyToken,
+    verifyRole(["pegawai", "admin", "direktur"]),
+    async (req, res) => {
+        try {
+            const userId = req.user.id;
+            const leaveRequestId = Number(req.params.id);
+
+            if (!Number.isFinite(leaveRequestId) || leaveRequestId <= 0) {
+                return res.status(400).json({
+                    message: "Invalid leave request id",
+                });
+            }
+
+            const [employeeResult] = await db
+                .promise()
+                .query("SELECT id FROM employees WHERE user_id = ? LIMIT 1", [
+                    userId,
+                ]);
+
+            if (!employeeResult.length) {
+                return res.status(404).json({
+                    message: "Employee record not found. Please contact HR.",
+                });
+            }
+
+            const employeeId = employeeResult[0].id;
+
+            const [leaveRequestRows] = await db.promise().query(
+                `SELECT *
+                 FROM leave_requests
+                 WHERE id = ? AND employee_id = ?
+                 LIMIT 1`,
+                [leaveRequestId, employeeId]
+            );
+
+            if (!leaveRequestRows.length) {
+                return res.status(404).json({
+                    message: "Leave request not found",
+                });
+            }
+
+            const leaveRequest = leaveRequestRows[0];
+
+            if (String(leaveRequest.status || "").toLowerCase() !== "pending") {
+                return res.status(400).json({
+                    message:
+                        "Only pending leave requests can be cancelled by the requester",
+                });
+            }
+
+            await db.promise().query(
+                `UPDATE leave_requests
+                 SET status = 'cancelled', updated_at = NOW()
+                 WHERE id = ? AND employee_id = ?`,
+                [leaveRequestId, employeeId]
+            );
+
+            try {
+                const username = req.user.username || req.user.name || null;
+                const role = Array.isArray(req.user.roles)
+                    ? req.user.roles[0]
+                    : req.user.role || null;
+
+                await logActivity({
+                    userId,
+                    username,
+                    role,
+                    action: "UPDATE",
+                    module: "leave_requests",
+                    description: "Leave request cancelled by employee",
+                    oldValues: leaveRequest,
+                    newValues: {
+                        request_id: leaveRequestId,
+                        status: "cancelled",
+                    },
+                    ipAddress: getIpAddress(req),
+                    userAgent: getUserAgent(req),
+                    status: "success",
+                });
+            } catch (e) {
+                console.error("Failed to log leave request cancellation:", e);
+            }
+
+            return res.status(200).json({
+                message: "Leave request cancelled successfully",
+                request_id: leaveRequestId,
+                status: "cancelled",
+            });
+        } catch (error) {
+            console.error(error);
+            return res.status(500).json({ message: "Server error" });
+        }
+    }
+);
+
+// ============================
 // GET ALL LEAVE REQUESTS (HR/Atasan/Admin)
 // ============================
 
