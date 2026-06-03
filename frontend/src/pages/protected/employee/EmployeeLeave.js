@@ -53,6 +53,7 @@ const STATUS_BADGE_CLASS = {
   pending: "badge-warning",
   approved: "badge-success",
   rejected: "badge-error",
+  cancelled: "badge-neutral",
 };
 
 const formatDate = (value) => {
@@ -283,6 +284,7 @@ function EmployeeLeave() {
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 10;
   const [leaveTypeOptions, setLeaveTypeOptions] = useState({});
+  const [cancellingId, setCancellingId] = useState(null);
 
   useEffect(() => {
     let mounted = true;
@@ -471,6 +473,26 @@ function EmployeeLeave() {
     setSubmittedDateFilter("");
     setCurrentPage(1);
     await loadData("", "", "");
+  };
+
+  const handleCancelLeaveRequest = async (leaveRequest) => {
+    if (!leaveRequest?.id) return;
+
+    const confirmed = window.confirm(
+      "Batalkan pengajuan ini? Pengajuan yang sudah dibatalkan tidak bisa diproses atasan.",
+    );
+    if (!confirmed) return;
+
+    try {
+      setCancellingId(leaveRequest.id);
+      await pegawaiApi.cancelLeaveRequest(leaveRequest.id);
+      setSuccessMessage("Pengajuan berhasil dibatalkan");
+      await loadData(statusFilter, typeFilter, submittedDateFilter);
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setCancellingId(null);
+    }
   };
 
   useEffect(() => {
@@ -1212,6 +1234,7 @@ function EmployeeLeave() {
             <option value="pending">Pending</option>
             <option value="approved">Approved</option>
             <option value="rejected">Rejected</option>
+            <option value="cancelled">Cancelled</option>
           </select>
 
           <button type="button" className="btn btn-secondary btn-sm rounded-full" onClick={resetFilters}>
@@ -1236,6 +1259,7 @@ function EmployeeLeave() {
                     <th>Waktu Persetujuan</th>
                     <th>Bukti</th>
                     <th>Alasan</th>
+                    <th>Aksi</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -1286,11 +1310,25 @@ function EmployeeLeave() {
                       <td className="max-w-xs whitespace-normal">
                         {item.reason || "-"}
                       </td>
+                      <td>
+                        {item.status === "pending" ? (
+                          <button
+                            type="button"
+                            className="btn btn-xs btn-error text-white"
+                            onClick={() => handleCancelLeaveRequest(item)}
+                            disabled={cancellingId === item.id}
+                          >
+                            {cancellingId === item.id ? "Membatalkan..." : "Batal"}
+                          </button>
+                        ) : (
+                          "-"
+                        )}
+                      </td>
                     </tr>
                   ))
                 ) : (
                   <tr>
-                    <td colSpan={10} className="text-center opacity-70">
+                    <td colSpan={11} className="text-center opacity-70">
                       Belum ada data pengajuan cuti/izin
                     </td>
                   </tr>
