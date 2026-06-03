@@ -99,7 +99,9 @@ const getApprovedReviewItemsFromAppeal = (appealDetail) => {
     .filter((item) => item && typeof item === "object")
     .map((item) => ({
       reason_key: String(item.appeal_reason_item || "").trim(),
-      label: String(item.appeal_reason_label || item.appeal_reason_item || "").trim(),
+      label: String(
+        item.appeal_reason_label || item.appeal_reason_item || "",
+      ).trim(),
     }));
 
   const normalizeLabel = (value) =>
@@ -117,9 +119,10 @@ const getApprovedReviewItemsFromAppeal = (appealDetail) => {
     );
     if (exactMatch?.reason_key) return exactMatch.reason_key;
 
-    const partialMatch = appealReasonItems.find((item) =>
-      normalizeLabel(item.label).includes(normalizedTarget) ||
-      normalizedTarget.includes(normalizeLabel(item.label)),
+    const partialMatch = appealReasonItems.find(
+      (item) =>
+        normalizeLabel(item.label).includes(normalizedTarget) ||
+        normalizedTarget.includes(normalizeLabel(item.label)),
     );
     return partialMatch?.reason_key || "";
   };
@@ -130,7 +133,9 @@ const getApprovedReviewItemsFromAppeal = (appealDetail) => {
       label: String(
         item.label || item.appeal_reason_label || item.appeal_reason_item || "",
       ).trim(),
-      reason_key: String(item.reason_key || item.appeal_reason_item || "").trim(),
+      reason_key: String(
+        item.reason_key || item.appeal_reason_item || "",
+      ).trim(),
       decision: String(item.decision || item.status || "").toLowerCase(),
       adjustment_amount: Number(item.adjustment_amount || 0),
     }))
@@ -138,7 +143,9 @@ const getApprovedReviewItemsFromAppeal = (appealDetail) => {
       ...item,
       reason_key: item.reason_key || findReasonKeyByLabel(item.label),
     }))
-    .filter((item) => ["approve", "approved", "disetujui"].includes(item.decision));
+    .filter((item) =>
+      ["approve", "approved", "disetujui"].includes(item.decision),
+    );
 
   if (approvedFromItems.length > 0) {
     return approvedFromItems;
@@ -183,8 +190,9 @@ const getApprovedReviewItemsFromAppeal = (appealDetail) => {
         reason_key: findReasonKeyByLabel(label),
         decision: "approve",
         adjustment_amount: amountMatch
-          ? Number(String(amountMatch[1]).replace(/\./g, "").replace(/,/g, ".")) ||
-            0
+          ? Number(
+              String(amountMatch[1]).replace(/\./g, "").replace(/,/g, "."),
+            ) || 0
           : 0,
       };
     });
@@ -198,7 +206,8 @@ const resolveCorrectedValueByLabel = (
 ) => {
   const normalizedReasonKey = String(reasonKey || "").toLowerCase();
 
-  if (normalizedReasonKey === "bonus") return Number(payrollPreview?.bonus || 0);
+  if (normalizedReasonKey === "bonus")
+    return Number(payrollPreview?.bonus || 0);
   if (normalizedReasonKey === "other_allowance") {
     return Number(payrollPreview?.otherAllowance || 0);
   }
@@ -275,8 +284,10 @@ function FinancePayroll({ isRevisionPage = false }) {
     const totalUnpaidLeaveDays = Number(row.total_unpaid_leave_days || 0);
     const permissionDays = Number(row.total_izin_days || 0);
     const sickDays = Number(row.total_sakit_days || 0);
-    const alphaDays = totalAlphaDays || Math.max(0, totalAbsentDays - totalUnpaidLeaveDays);
-    const unpaidLeaveDays = totalUnpaidLeaveDays || Math.max(0, totalAbsentDays - alphaDays);
+    const alphaDays =
+      totalAlphaDays || Math.max(0, totalAbsentDays - totalUnpaidLeaveDays);
+    const unpaidLeaveDays =
+      totalUnpaidLeaveDays || Math.max(0, totalAbsentDays - alphaDays);
 
     return {
       mode: "actual",
@@ -374,7 +385,9 @@ function FinancePayroll({ isRevisionPage = false }) {
       }
 
       try {
-        const result = await financeApi.getSalaryAppeals({ status: "approved" });
+        const result = await financeApi.getSalaryAppeals({
+          status: "approved",
+        });
         const target = (result?.data || []).find(
           (item) => String(item.id) === String(appealRevisionId),
         );
@@ -416,12 +429,7 @@ function FinancePayroll({ isRevisionPage = false }) {
     };
 
     loadRevisionPayrollById();
-  }, [
-    isAppealRevisionMode,
-    revisionAppealDetail,
-    periodMonth,
-    periodYear,
-  ]);
+  }, [isAppealRevisionMode, revisionAppealDetail, periodMonth, periodYear]);
 
   useEffect(() => {
     const payrollForAutofill =
@@ -444,13 +452,15 @@ function FinancePayroll({ isRevisionPage = false }) {
       return;
     }
 
-    const approvedItemsForAutofill = getApprovedReviewItemsFromAppeal(
-      revisionAppealDetail,
-    );
+    const approvedItemsForAutofill =
+      getApprovedReviewItemsFromAppeal(revisionAppealDetail);
 
     const approvedFieldAmountMap = approvedItemsForAutofill.reduce(
       (accumulator, item) => {
-        const fieldName = resolveManualFieldByLabel(item.label, item.reason_key);
+        const fieldName = resolveManualFieldByLabel(
+          item.label,
+          item.reason_key,
+        );
         if (!fieldName) {
           return accumulator;
         }
@@ -474,15 +484,16 @@ function FinancePayroll({ isRevisionPage = false }) {
       draft: 3,
       rejected: 4,
     };
-    const selectedAdjustment = [...adjustmentCandidates].sort((a, b) => {
-      const scoreA = priority[String(a.status || "").toLowerCase()] || 99;
-      const scoreB = priority[String(b.status || "").toLowerCase()] || 99;
-      if (scoreA !== scoreB) return scoreA - scoreB;
+    const selectedAdjustment =
+      [...adjustmentCandidates].sort((a, b) => {
+        const scoreA = priority[String(a.status || "").toLowerCase()] || 99;
+        const scoreB = priority[String(b.status || "").toLowerCase()] || 99;
+        if (scoreA !== scoreB) return scoreA - scoreB;
 
-      const dateA = new Date(a.submitted_at || a.updated_at || 0).getTime();
-      const dateB = new Date(b.submitted_at || b.updated_at || 0).getTime();
-      return dateB - dateA;
-    })[0] || null;
+        const dateA = new Date(a.submitted_at || a.updated_at || 0).getTime();
+        const dateB = new Date(b.submitted_at || b.updated_at || 0).getTime();
+        return dateB - dateA;
+      })[0] || null;
 
     const fallbackBonus = Number(
       selectedAdjustment?.bonus ?? payrollForAutofill.bonus ?? 0,
@@ -500,9 +511,7 @@ function FinancePayroll({ isRevisionPage = false }) {
     );
 
     setManualInput({
-      bonus: String(
-        approvedFieldAmountMap.bonus ?? fallbackBonus,
-      ),
+      bonus: String(approvedFieldAmountMap.bonus ?? fallbackBonus),
       other_allowance: String(fallbackOtherAllowance),
       other_deduction: String(
         approvedFieldAmountMap.other_deduction ?? fallbackOtherDeduction,
@@ -611,8 +620,8 @@ function FinancePayroll({ isRevisionPage = false }) {
         });
 
         if (!isAppealRevisionMode && employeeRows.length > 0) {
-          setSelectedEmployeeId((prev) =>
-            prev || String(employeeRows[0].employee_id),
+          setSelectedEmployeeId(
+            (prev) => prev || String(employeeRows[0].employee_id),
           );
         }
 
@@ -808,7 +817,10 @@ function FinancePayroll({ isRevisionPage = false }) {
     return filteredEmployeeReimbursements.reduce(
       (accumulator, item) => {
         const amount = Number(item.amount || 0);
-        if (item.status === "approved" || item.status === "included_in_payroll") {
+        if (
+          item.status === "approved" ||
+          item.status === "included_in_payroll"
+        ) {
           accumulator.total += amount;
           accumulator.included += amount;
         }
@@ -845,7 +857,11 @@ function FinancePayroll({ isRevisionPage = false }) {
       setManualInput({
         bonus: String(Number(selectedManagerAdjustment.bonus || 0)),
         other_allowance: String(
-          Number(selectedManagerAdjustment.other_allowance ?? fixedOtherAllowance ?? 0),
+          Number(
+            selectedManagerAdjustment.other_allowance ??
+              fixedOtherAllowance ??
+              0,
+          ),
         ),
         other_deduction: String(
           Number(selectedManagerAdjustment.other_deduction || 0),
@@ -889,7 +905,11 @@ function FinancePayroll({ isRevisionPage = false }) {
 
   const payrollPreview = useMemo(() => {
     const resolveInputValue = (inputValue, fallbackValue) => {
-      if (inputValue === "" || inputValue === null || inputValue === undefined) {
+      if (
+        inputValue === "" ||
+        inputValue === null ||
+        inputValue === undefined
+      ) {
         return Number(fallbackValue || 0);
       }
 
@@ -932,9 +952,11 @@ function FinancePayroll({ isRevisionPage = false }) {
           Number(dbPreview.bonus || 0) -
           Number(dbPreview.otherAllowance || 0);
         const allowanceTotal = Number(
-          (allowanceWithoutEditable + editedBonus + editedOtherAllowance).toFixed(
-            2,
-          ),
+          (
+            allowanceWithoutEditable +
+            editedBonus +
+            editedOtherAllowance
+          ).toFixed(2),
         );
         const grossSalary = Number(
           (Number(dbPreview.basicSalary || 0) + allowanceTotal).toFixed(2),
@@ -969,7 +991,9 @@ function FinancePayroll({ isRevisionPage = false }) {
     if (latestGeneratedForSelected?.details) {
       return {
         mode: "actual",
-        basicSalary: Number(latestGeneratedForSelected.details.basic_salary || 0),
+        basicSalary: Number(
+          latestGeneratedForSelected.details.basic_salary || 0,
+        ),
         transportAllowance: Number(
           latestGeneratedForSelected.details?.allowances?.transport || 0,
         ),
@@ -979,7 +1003,9 @@ function FinancePayroll({ isRevisionPage = false }) {
         healthAllowance: Number(
           latestGeneratedForSelected.details?.allowances?.health || 0,
         ),
-        bonus: Number(latestGeneratedForSelected.details?.allowances?.bonus || 0),
+        bonus: Number(
+          latestGeneratedForSelected.details?.allowances?.bonus || 0,
+        ),
         otherAllowance: Number(
           latestGeneratedForSelected.details?.allowances?.other || 0,
         ),
@@ -1014,7 +1040,9 @@ function FinancePayroll({ isRevisionPage = false }) {
           latestGeneratedForSelected.details?.total_deduction || 0,
         ),
         netSalary: Number(latestGeneratedForSelected.details?.net_salary || 0),
-        presentDays: Number(latestGeneratedForSelected.details?.present_days || 0),
+        presentDays: Number(
+          latestGeneratedForSelected.details?.present_days || 0,
+        ),
         alphaDays: Number(
           latestGeneratedForSelected.details?.attendance_summary
             ?.total_alpha_days || 0,
@@ -1030,7 +1058,7 @@ function FinancePayroll({ isRevisionPage = false }) {
         deductibleAbsentDays: Number(
           latestGeneratedForSelected.details?.attendance_summary
             ?.total_deductible_absent_days ||
-            (Number(
+            Number(
               latestGeneratedForSelected.details?.attendance_summary
                 ?.total_alpha_days || 0,
             ) +
@@ -1041,7 +1069,7 @@ function FinancePayroll({ isRevisionPage = false }) {
               Number(
                 latestGeneratedForSelected.details?.attendance_summary
                   ?.total_sakit_days || 0,
-              )),
+              ),
         ),
         totalLateMinutes: Number(
           latestGeneratedForSelected.details?.attendance_summary
@@ -1052,8 +1080,12 @@ function FinancePayroll({ isRevisionPage = false }) {
 
     const presentDays = Number(selectedEmployeeSummary?.present_days || 0);
     const alphaDays = Number(selectedEmployeeSummary?.alpha_days || 0);
-    const unpaidLeaveDays = Number(selectedEmployeeSummary?.unpaid_leave_days || 0);
-    const permissionDays = Number(selectedEmployeeSummary?.permission_days || 0);
+    const unpaidLeaveDays = Number(
+      selectedEmployeeSummary?.unpaid_leave_days || 0,
+    );
+    const permissionDays = Number(
+      selectedEmployeeSummary?.permission_days || 0,
+    );
     const sickDays = Number(selectedEmployeeSummary?.sick_days || 0);
     const deductibleAbsentDays = alphaDays + unpaidLeaveDays;
     const totalLateMinutes = Number(
@@ -1068,9 +1100,7 @@ function FinancePayroll({ isRevisionPage = false }) {
       (presentDays * Number(payrollSettings.meal_per_day || 0)).toFixed(2),
     );
     const healthAllowance = Number(
-      (
-        basicSalary * Number(payrollSettings.health_percentage || 0)
-      ).toFixed(2),
+      (basicSalary * Number(payrollSettings.health_percentage || 0)).toFixed(2),
     );
     const allowanceTotal = Number(
       (
@@ -1157,10 +1187,12 @@ function FinancePayroll({ isRevisionPage = false }) {
   ]);
 
   const approvedRevisionItems = useMemo(() => {
-    return getApprovedReviewItemsFromAppeal(revisionAppealDetail).map((item) => ({
-      ...item,
-      payroll_value: Number(item.adjustment_amount || 0),
-    }));
+    return getApprovedReviewItemsFromAppeal(revisionAppealDetail).map(
+      (item) => ({
+        ...item,
+        payroll_value: Number(item.adjustment_amount || 0),
+      }),
+    );
   }, [revisionAppealDetail]);
 
   const isManualFieldDisabled = () => {
@@ -1249,7 +1281,9 @@ function FinancePayroll({ isRevisionPage = false }) {
 
       const result = await financeApi.generatePayroll(payload);
       setLatestGenerated(result);
-      setSuccessMessage("Slip gaji berhasil dibuat, perhitungan payroll tampil di bawah");
+      setSuccessMessage(
+        "Slip gaji berhasil dibuat, perhitungan payroll tampil di bawah",
+      );
     } catch (err) {
       setError(err.message);
     } finally {
@@ -1349,14 +1383,19 @@ function FinancePayroll({ isRevisionPage = false }) {
       await financeApi.deletePayroll(row.id);
       setSuccessMessage("Slip draft berhasil dihapus");
 
-      const updatedRows = monthlyPayrollRows.filter((item) => item.id !== row.id);
+      const updatedRows = monthlyPayrollRows.filter(
+        (item) => item.id !== row.id,
+      );
       setMonthlyPayrollRows(updatedRows);
 
       if (String(selectedEmployeeId) === String(row.employee_id)) {
-        const employeeRows = await financeApi.getPayrollByEmployee(row.employee_id, {
-          month: Number(periodMonth),
-          year: Number(periodYear),
-        });
+        const employeeRows = await financeApi.getPayrollByEmployee(
+          row.employee_id,
+          {
+            month: Number(periodMonth),
+            year: Number(periodYear),
+          },
+        );
         setCurrentEmployeePayrollRows(employeeRows || []);
       }
 
@@ -1400,12 +1439,16 @@ function FinancePayroll({ isRevisionPage = false }) {
       )}
 
       <div className="space-y-6">
-        <TitleCard title={isRevisionPage ? "Revisi Slip Gaji" : "Payroll"} topMargin="mt-0">
+        <TitleCard
+          title={isRevisionPage ? "Revisi Slip Gaji" : "Payroll"}
+          topMargin="mt-0"
+        >
           <form onSubmit={handleGenerate} className="grid grid-cols-1 gap-4">
             {isAppealRevisionMode ? (
               <div className="alert alert-info">
                 <span>
-                  Revisi banding gaji (Appeal ID: {appealRevisionId || "-"}) untuk periode {periodMonth}/{periodYear}.
+                  Revisi banding gaji (Appeal ID: {appealRevisionId || "-"})
+                  untuk periode {periodMonth}/{periodYear}.
                 </span>
               </div>
             ) : (
@@ -1415,7 +1458,9 @@ function FinancePayroll({ isRevisionPage = false }) {
                   <select
                     className="select select-bordered w-full"
                     value={selectedEmployeeId}
-                    onChange={(event) => setSelectedEmployeeId(event.target.value)}
+                    onChange={(event) =>
+                      setSelectedEmployeeId(event.target.value)
+                    }
                     disabled={loadingReferenceData}
                   >
                     {!employeeReferenceData.length && (
@@ -1507,11 +1552,14 @@ function FinancePayroll({ isRevisionPage = false }) {
                           </td>
                         </tr>
                       )}
-                      {!selectedEmployeeCurrentPayroll && approvedRevisionItems.length > 0 && (
-                        <tr>
-                          <td colSpan={2} className="text-center opacity-70">Data slip payroll belum tersedia untuk periode ini</td>
-                        </tr>
-                      )}
+                      {!selectedEmployeeCurrentPayroll &&
+                        approvedRevisionItems.length > 0 && (
+                          <tr>
+                            <td colSpan={2} className="text-center opacity-70">
+                              Data slip payroll belum tersedia untuk periode ini
+                            </td>
+                          </tr>
+                        )}
                     </tbody>
                   </table>
                 </div>
@@ -1657,7 +1705,10 @@ function FinancePayroll({ isRevisionPage = false }) {
             {!isAppealRevisionMode && (
               <div className="alert alert-info text-sm">
                 <span>
-                  Nilai bonus dan potongan lain terisi otomatis dari adjustment atasan (atau slip terakhir jika belum ada adjustment). Nilai tunjangan lain dipatok otomatis sesuai jabatan dan bersifat read-only.
+                  Nilai bonus dan potongan lain terisi otomatis dari adjustment
+                  atasan (atau slip terakhir jika belum ada adjustment). Nilai
+                  tunjangan lain dipatok otomatis sesuai jabatan dan bersifat
+                  read-only.
                 </span>
               </div>
             )}
@@ -1724,7 +1775,7 @@ function FinancePayroll({ isRevisionPage = false }) {
                       </td>
                     </tr>
                     <tr>
-                      <td>Tunjangan Lain</td>
+                      <td>Tunjangan Jabatan</td>
                       <td className="text-right">
                         {formatCurrency(payrollPreview.otherAllowance)}
                       </td>
@@ -1802,11 +1853,7 @@ function FinancePayroll({ isRevisionPage = false }) {
 
             <input
               className="input input-bordered w-full"
-              value={
-                autoPayrollId
-                  ? `Payroll ID: ${autoPayrollId}`
-                  : ""
-              }
+              value={autoPayrollId ? `Payroll ID: ${autoPayrollId}` : ""}
               disabled
             />
 
@@ -1878,7 +1925,7 @@ function FinancePayroll({ isRevisionPage = false }) {
                         </td>
                       </tr>
                       <tr>
-                        <td>Transport + Makan + Kesehatan + Bonus + Lain</td>
+                        <td>Transport + Makan + Kesehatan + Bonus + Jabatan</td>
                         <td className="text-right">
                           {formatCurrency(
                             latestGenerated?.details?.allowances?.total,
@@ -1904,7 +1951,9 @@ function FinancePayroll({ isRevisionPage = false }) {
                       <tr>
                         <td>Potongan Alpha</td>
                         <td className="text-right">
-                          {formatCurrency(latestGenerated?.details?.alpha_deduction)}
+                          {formatCurrency(
+                            latestGenerated?.details?.alpha_deduction,
+                          )}
                         </td>
                       </tr>
                       <tr>
@@ -1953,140 +2002,149 @@ function FinancePayroll({ isRevisionPage = false }) {
         </TitleCard>
 
         {!isAppealRevisionMode && !isRevisionPage && (
-        <TitleCard title="Rekap Slip Gaji Bulan Ini & Publish" topMargin="mt-0">
-          <div className="flex flex-wrap items-center gap-2 mb-3">
-            <span className="badge badge-outline">
-              Pegawai aktif: {employeeReferenceData.length}
-            </span>
-            <span
-              className={`badge ${
-                employeeReferenceData.length > 0 &&
-                doneEmployeeIds.size === employeeReferenceData.length
-                  ? "badge-success"
-                  : "badge-warning"
-              }`}
-            >
-              Slip dibuat: {doneEmployeeIds.size}/{employeeReferenceData.length}
-            </span>
-            <span className="badge badge-info">
-              Draft:{" "}
-              {
-                monthlyPayrollRows.filter((item) => item.status === "draft")
-                  .length
-              }
-            </span>
-          </div>
-
-          <div className="grid grid-cols-2 gap-3 mb-3">
-            <label className="form-control">
-              <span className="label-text mb-1">Filter Bulan Rekap</span>
-              <select
-                className="select select-bordered w-full"
-                value={recapMonth}
-                onChange={(event) => setRecapMonth(event.target.value)}
-              >
-                {monthOptions.map((month) => (
-                  <option key={month.value} value={month.value}>
-                    {month.label}
-                  </option>
-                ))}
-              </select>
-            </label>
-            <label className="form-control">
-              <span className="label-text mb-1">Tahun Rekap</span>
-              <input
-                className="input input-bordered w-full"
-                value={periodYear}
-                onChange={(event) => setPeriodYear(event.target.value)}
-              />
-            </label>
-          </div>
-
-          <div className="overflow-x-auto">
-            <table className="table table-zebra table-sm">
-              <thead>
-                <tr>
-                  <th>Payroll ID</th>
-                  <th>Pegawai</th>
-                  <th>Gaji Pokok</th>
-                  <th>Reimbursement</th>
-                  <th>Net Salary</th>
-                  <th>Status</th>
-                  <th>Aksi</th>
-                </tr>
-              </thead>
-              <tbody>
-                {recapPagination.paginatedItems.map((item) => (
-                  <tr key={item.id}>
-                    <td>{item.id}</td>
-                    <td>{item.employee_name}</td>
-                    <td>{formatCurrency(item.basic_salary)}</td>
-                    <td>{formatCurrency(item.reimbursement_total)}</td>
-                    <td>
-                      {formatCurrency(item.final_amount || item.net_salary)}
-                    </td>
-                    <td>
-                      <span
-                        className={`badge ${statusBadgeClass[item.status] || "badge-outline"}`}
-                      >
-                        {item.status}
-                      </span>
-                    </td>
-                    <td>
-                      <div className="flex gap-2">
-                        <button
-                          type="button"
-                          className="btn btn-xs btn-outline"
-                          onClick={() => handleViewRow(item)}
-                        >
-                          View
-                        </button>
-                        <button
-                          type="button"
-                          className="btn btn-xs btn-outline btn-info"
-                          onClick={() => handleEditRow(item)}
-                        >
-                          Edit
-                        </button>
-                        <button
-                          type="button"
-                          className="btn btn-xs btn-outline btn-error"
-                          onClick={() => handleDeleteRow(item)}
-                          disabled={item.status !== "draft"}
-                        >
-                          Delete
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
-                ))}
-                {!recapPayrollRows.length && !loadingMonthlyRows && (
-                  <tr>
-                    <td colSpan={7} className="text-center opacity-70">
-                      Belum ada slip gaji bulan ini
-                    </td>
-                  </tr>
-                )}
-                {loadingMonthlyRows && (
-                  <tr>
-                    <td colSpan={7} className="text-center opacity-70">
-                      Memuat rekap payroll bulan ini...
-                    </td>
-                  </tr>
-                )}
-              </tbody>
-            </table>
-            <Pagination page={recapPagination.page} totalPages={recapPagination.totalPages} onChangePage={recapPagination.setPage} itemsPerPage={recapPagination.itemsPerPage} />
-          </div>
-
-          <button
-            className={`btn btn-secondary w-full mt-4 ${loadingPublishAll ? "loading" : ""}`}
-            onClick={handlePublishAll}
-            disabled={!hasDraftToPublish || loadingPublishAll}
+          <TitleCard
+            title="Rekap Slip Gaji Bulan Ini & Publish"
+            topMargin="mt-0"
           >
-            Publish Semua Slip Bulan Ini
-          </button>
-        </TitleCard>
+            <div className="flex flex-wrap items-center gap-2 mb-3">
+              <span className="badge badge-outline">
+                Pegawai aktif: {employeeReferenceData.length}
+              </span>
+              <span
+                className={`badge ${
+                  employeeReferenceData.length > 0 &&
+                  doneEmployeeIds.size === employeeReferenceData.length
+                    ? "badge-success"
+                    : "badge-warning"
+                }`}
+              >
+                Slip dibuat: {doneEmployeeIds.size}/
+                {employeeReferenceData.length}
+              </span>
+              <span className="badge badge-info">
+                Draft:{" "}
+                {
+                  monthlyPayrollRows.filter((item) => item.status === "draft")
+                    .length
+                }
+              </span>
+            </div>
+
+            <div className="grid grid-cols-2 gap-3 mb-3">
+              <label className="form-control">
+                <span className="label-text mb-1">Filter Bulan Rekap</span>
+                <select
+                  className="select select-bordered w-full"
+                  value={recapMonth}
+                  onChange={(event) => setRecapMonth(event.target.value)}
+                >
+                  {monthOptions.map((month) => (
+                    <option key={month.value} value={month.value}>
+                      {month.label}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <label className="form-control">
+                <span className="label-text mb-1">Tahun Rekap</span>
+                <input
+                  className="input input-bordered w-full"
+                  value={periodYear}
+                  onChange={(event) => setPeriodYear(event.target.value)}
+                />
+              </label>
+            </div>
+
+            <div className="overflow-x-auto">
+              <table className="table table-zebra table-sm">
+                <thead>
+                  <tr>
+                    <th>Payroll ID</th>
+                    <th>Pegawai</th>
+                    <th>Gaji Pokok</th>
+                    <th>Reimbursement</th>
+                    <th>Net Salary</th>
+                    <th>Status</th>
+                    <th>Aksi</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {recapPagination.paginatedItems.map((item) => (
+                    <tr key={item.id}>
+                      <td>{item.id}</td>
+                      <td>{item.employee_name}</td>
+                      <td>{formatCurrency(item.basic_salary)}</td>
+                      <td>{formatCurrency(item.reimbursement_total)}</td>
+                      <td>
+                        {formatCurrency(item.final_amount || item.net_salary)}
+                      </td>
+                      <td>
+                        <span
+                          className={`badge ${statusBadgeClass[item.status] || "badge-outline"}`}
+                        >
+                          {item.status}
+                        </span>
+                      </td>
+                      <td>
+                        <div className="flex gap-2">
+                          <button
+                            type="button"
+                            className="btn btn-xs btn-outline"
+                            onClick={() => handleViewRow(item)}
+                          >
+                            View
+                          </button>
+                          <button
+                            type="button"
+                            className="btn btn-xs btn-outline btn-info"
+                            onClick={() => handleEditRow(item)}
+                          >
+                            Edit
+                          </button>
+                          <button
+                            type="button"
+                            className="btn btn-xs btn-outline btn-error"
+                            onClick={() => handleDeleteRow(item)}
+                            disabled={item.status !== "draft"}
+                          >
+                            Delete
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                  {!recapPayrollRows.length && !loadingMonthlyRows && (
+                    <tr>
+                      <td colSpan={7} className="text-center opacity-70">
+                        Belum ada slip gaji bulan ini
+                      </td>
+                    </tr>
+                  )}
+                  {loadingMonthlyRows && (
+                    <tr>
+                      <td colSpan={7} className="text-center opacity-70">
+                        Memuat rekap payroll bulan ini...
+                      </td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
+              <Pagination
+                page={recapPagination.page}
+                totalPages={recapPagination.totalPages}
+                onChangePage={recapPagination.setPage}
+                itemsPerPage={recapPagination.itemsPerPage}
+              />
+            </div>
+
+            <button
+              className={`btn btn-secondary w-full mt-4 ${loadingPublishAll ? "loading" : ""}`}
+              onClick={handlePublishAll}
+              disabled={!hasDraftToPublish || loadingPublishAll}
+            >
+              Publish Semua Slip Bulan Ini
+            </button>
+          </TitleCard>
         )}
       </div>
 
@@ -2210,4 +2268,3 @@ function FinancePayroll({ isRevisionPage = false }) {
 }
 
 export default FinancePayroll;
-

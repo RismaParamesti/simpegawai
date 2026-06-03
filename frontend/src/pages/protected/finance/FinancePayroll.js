@@ -135,8 +135,10 @@ function FinancePayroll() {
     const totalUnpaidLeaveDays = Number(row.total_unpaid_leave_days || 0);
     const permissionDays = Number(row.total_izin_days || 0);
     const sickDays = Number(row.total_sakit_days || 0);
-    const alphaDays = totalAlphaDays || Math.max(0, totalAbsentDays - totalUnpaidLeaveDays);
-    const unpaidLeaveDays = totalUnpaidLeaveDays || Math.max(0, totalAbsentDays - alphaDays);
+    const alphaDays =
+      totalAlphaDays || Math.max(0, totalAbsentDays - totalUnpaidLeaveDays);
+    const unpaidLeaveDays =
+      totalUnpaidLeaveDays || Math.max(0, totalAbsentDays - alphaDays);
 
     return {
       mode: "actual",
@@ -152,9 +154,7 @@ function FinancePayroll() {
       totalIncome: Number(row.total_income || 0),
       lateDeduction: Number(row.late_deduction || 0),
       absentDeduction: Number(row.absent_deduction || 0),
-      alphaDeduction: Number(
-        row.alpha_deduction ?? row.absent_deduction ?? 0,
-      ),
+      alphaDeduction: Number(row.alpha_deduction ?? row.absent_deduction ?? 0),
       unpaidLeaveDeduction: Number(row.unpaid_leave_deduction || 0),
       bpjsDeduction: Number(row.bpjs_deduction || 0),
       taxDeduction: Number(row.tax_deduction || 0),
@@ -282,21 +282,37 @@ function FinancePayroll() {
         const commissionerPositionIds = new Set(
           (employeeRows || [])
             .filter((r) =>
-              String(r.position_name || "").toLowerCase().includes("commissioner"),
+              String(r.position_name || "")
+                .toLowerCase()
+                .includes("commissioner"),
             )
             .map((r) => String(r.position_id || r.position_id)),
         );
 
-        const rawMissingBase = Number(payrollSetupValidation.missing_base_salary_count || 0);
-        const rawMissingAllowance = Number(payrollSetupValidation.missing_position_allowance_count || 0);
+        const rawMissingBase = Number(
+          payrollSetupValidation.missing_base_salary_count || 0,
+        );
+        const rawMissingAllowance = Number(
+          payrollSetupValidation.missing_position_allowance_count || 0,
+        );
 
-        const adjustedMissingBaseCount = Math.max(0, rawMissingBase - commissionerPositionIds.size);
-        const adjustedMissingAllowanceCount = Math.max(0, rawMissingAllowance - commissionerPositionIds.size);
+        const adjustedMissingBaseCount = Math.max(
+          0,
+          rawMissingBase - commissionerPositionIds.size,
+        );
+        const adjustedMissingAllowanceCount = Math.max(
+          0,
+          rawMissingAllowance - commissionerPositionIds.size,
+        );
 
         const missingPositionBaseSalary = adjustedMissingBaseCount > 0;
         const missingPositionAllowance = adjustedMissingAllowanceCount > 0;
 
-        if (missingPayrollSettings || missingPositionBaseSalary || missingPositionAllowance) {
+        if (
+          missingPayrollSettings ||
+          missingPositionBaseSalary ||
+          missingPositionAllowance
+        ) {
           const warningParts = [];
 
           if (missingPayrollSettings) {
@@ -494,7 +510,9 @@ function FinancePayroll() {
   ]);
 
   const autoTaxDeduction = useMemo(() => {
-    return Number((selectedBasicSalary * Number(payrollSettings.tax || 0.03)).toFixed(2));
+    return Number(
+      (selectedBasicSalary * Number(payrollSettings.tax || 0.03)).toFixed(2),
+    );
   }, [selectedBasicSalary, payrollSettings.tax]);
 
   const autoLateDeductionPercentage = useMemo(() => {
@@ -1201,64 +1219,99 @@ function FinancePayroll() {
             )}
 
             {hasPayrollFiltersSelected && selectedEmployeeSummary && (
-              <div className="rounded-xl border border-base-300 p-6 bg-base-100">
-                {/* HEADER PROFILE */}
-                <div className="flex flex-col items-center mb-6">
-                  <div className="avatar mb-3">
-                    <div className="w-24 rounded-full ring ring-primary ring-offset-base-100 ring-offset-2">
-                      <img
-                        src={selectedEmployeeAvatarUrl}
-                        alt={selectedEmployeeSummary.employee_name}
-                      />
+              <div className="rounded-2xl border border-base-300 bg-base-100 shadow-sm overflow-hidden">
+                <div className="border-b border-base-300 bg-gradient-to-r from-primary/10 via-base-100 to-base-100 px-4 py-3">
+                  <div className="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
+                    <div>
+                      <p className="text-base font-semibold">Pegawai</p>
+                    </div>
+                    <span className="badge badge-outline badge-sm">
+                      {selectedEmployeeReference?.employment_status || "Aktif"}
+                    </span>
+                  </div>
+                </div>
+
+                <div className="p-4">
+                  <div className="flex flex-col gap-4 xl:flex-row xl:items-stretch">
+                    <div className="flex items-center gap-4 rounded-2xl border border-base-300 bg-base-200/40 px-4 py-4 xl:flex-[1.2]">
+                      <div className="avatar">
+                        <div className="w-20 rounded-full ring ring-primary ring-offset-base-100 ring-offset-2">
+                          <img
+                            src={selectedEmployeeAvatarUrl}
+                            alt={selectedEmployeeSummary.employee_name}
+                          />
+                        </div>
+                      </div>
+
+                      <div className="min-w-0">
+                        <h2 className="text-lg font-bold leading-tight">
+                          {selectedEmployeeReference?.employee_name ||
+                            selectedEmployeeSummary?.employee_name ||
+                            "-"}
+                        </h2>
+                        <p className="text-sm opacity-70">
+                          {selectedEmployeeReference?.position_name || "-"}
+                        </p>
+                        <div className="mt-3 flex flex-wrap items-center gap-2 text-xs">
+                          <span className="inline-flex items-center rounded-full border border-primary/20 bg-primary/10 px-3 py-1 font-medium text-primary">
+                            {selectedEmployeeReference?.employee_code || "-"}
+                          </span>
+                          <span className="inline-flex items-center rounded-full border border-base-300 bg-base-100 px-3 py-1 text-base-content/70">
+                            {selectedEmployeeReference?.department_name || "-"}
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="flex flex-wrap gap-3 text-sm xl:flex-[1]">
+                      {[
+                        [
+                          "Level",
+                          selectedEmployeeReference?.position_level || "-",
+                        ],
+                        [
+                          "Status",
+                          selectedEmployeeReference?.user_status || "-",
+                        ],
+                        [
+                          "Posisi",
+                          selectedEmployeeReference?.position_name || "-",
+                        ],
+                        [
+                          "Departemen",
+                          selectedEmployeeReference?.department_name || "-",
+                        ],
+                      ].map(([label, value]) => (
+                        <div
+                          key={label}
+                          className="min-w-[160px] flex-1 rounded-2xl border border-base-300 bg-base-100 px-4 py-3 shadow-[0_1px_0_rgba(0,0,0,0.02)]"
+                        >
+                          <div className="flex items-center justify-between gap-3">
+                            <span className="text-[10px] uppercase tracking-[0.22em] opacity-50 whitespace-nowrap">
+                              {label}
+                            </span>
+                            <span className="h-2 w-2 rounded-full bg-primary/70 shrink-0" />
+                          </div>
+                          <p className="mt-2 break-words text-sm font-semibold leading-snug text-base-content/90">
+                            {value}
+                          </p>
+                        </div>
+                      ))}
                     </div>
                   </div>
 
-                  <h2 className="text-lg font-bold">
-                    {selectedEmployeeReference?.employee_name ||
-                      selectedEmployeeSummary?.employee_name ||
-                      "-"}
-                  </h2>
-
-                  <p className="text-sm text-gray-500">
-                    {selectedEmployeeReference?.position_name || "-"}
-                  </p>
-                </div>
-
-                {/* DATA GRID */}
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-x-10 gap-y-3 text-sm max-w-3xl mx-auto">
-                  <p>
-                    <span className="font-semibold">Kode:</span>{" "}
-                    {selectedEmployeeReference?.employee_code || "-"}
-                  </p>
-                  <p>
-                    <span className="font-semibold">Departemen:</span>{" "}
-                    {selectedEmployeeReference?.department_name || "-"}
-                  </p>
-
-                  <p>
-                    <span className="font-semibold">Level:</span>{" "}
-                    {selectedEmployeeReference?.position_level || "-"}
-                  </p>
-                  <p>
-                    <span className="font-semibold">Peran:</span>{" "}
-                    {selectedEmployeeReference?.roles || "-"}
-                  </p>
-
-                  <p>
-                    <span className="font-semibold">Status Kepegawaian:</span>{" "}
-                    {selectedEmployeeReference?.employment_status || "-"}
-                  </p>
-                  <p>
-                    <span className="font-semibold">Status User:</span>{" "}
-                    {selectedEmployeeReference?.user_status || "-"}
-                  </p>
-
-                  <p className="md:col-span-2">
-                    <span className="font-semibold">Gaji Pokok:</span>{" "}
-                    {selectedBasicSalary
-                      ? formatCurrency(selectedBasicSalary)
-                      : "Belum tersedia"}
-                  </p>
+                  <div className="mt-4 rounded-2xl border border-primary/15 bg-primary/10 px-4 py-3">
+                    <div className="flex items-center justify-between gap-3">
+                      <span className="text-xs uppercase tracking-[0.18em] opacity-60">
+                        Gaji Pokok
+                      </span>
+                      <span className="text-lg font-black text-primary tabular-nums">
+                        {selectedBasicSalary
+                          ? formatCurrency(selectedBasicSalary)
+                          : "Belum tersedia"}
+                      </span>
+                    </div>
+                  </div>
                 </div>
               </div>
             )}
@@ -1274,229 +1327,274 @@ function FinancePayroll() {
                   </div>
                 )}
 
-                <div className="grid grid-cols-2 gap-3 text-sm">
-                  <input
-                    className="input input-bordered w-full"
-                    value={`Hadir: ${payrollPreview.presentDays || 0} hari`}
-                    disabled
-                  />
-                  <input
-                    className="input input-bordered w-full"
-                    value={`Alpha: ${payrollPreview.alphaDays || 0} hari`}
-                    disabled
-                  />
-                  <input
-                    className="input input-bordered w-full"
-                    value={`Terlambat: ${formatLateDuration(payrollPreview.totalLateMinutes)}`}
-                    disabled
-                  />
-                  <input
-                    className="input input-bordered w-full"
-                    value={`Izin/Cuti: ${payrollPreview.permissionDays || 0} hari`}
-                    disabled
-                  />
-                  <input
-                    className="input input-bordered w-full"
-                    value={`Sakit: ${payrollPreview.sickDays || 0} hari`}
-                    disabled
-                  />
-                  <input
-                    className="input input-bordered w-full"
-                    value={`Penggantian Dana: ${formatCurrency(payrollPreview.reimbursement)}`}
-                    disabled
-                  />
-                  <input
-                    className="input input-bordered w-full"
-                    value={`Pajak ${formatPercent(payrollSettings.tax || 0.03)}: ${formatCurrency(autoTaxDeduction)}`}
-                    disabled
-                  />
-                  <input
-                    className="input input-bordered w-full"
-                    value={`Tunjangan Transport per-hari: ${formatCurrency(payrollSettings.transport_per_day)}`}
-                    disabled
-                  />
-                  <input
-                    className="input input-bordered w-full"
-                    value={`Tunjangan Makan per-hari: ${formatCurrency(payrollSettings.meal_per_day)}`}
-                    disabled
-                  />
-                  <input
-                    className="input input-bordered w-full"
-                    value={`Tunjangan Kesehatan: ${formatPercent(payrollSettings.health_percentage || 0)}`}
-                    disabled
-                  />
-                  <input
-                    className="input input-bordered w-full"
-                    value={`Potongan BPJS: ${formatPercent(payrollSettings.bpjs_percentage || 0)}`}
-                    disabled
-                  />
-                  <input
-                    className="input input-bordered w-full"
-                    value={`Bonus: ${manualInput.bonus || 0}`}
-                    disabled={isManualFieldDisabled("bonus")}
-                  />
-                </div>
+                <div className="grid gap-3 text-sm lg:grid-cols-2">
+                  <div className="rounded-2xl border border-base-300 bg-base-100 p-4">
+                    <div className="mb-3 flex items-center justify-between">
+                      <p className="font-semibold">Kehadiran</p>
+                      <span className="text-xs opacity-60">Bulanan</span>
+                    </div>
+                    <div className="grid grid-cols-2 gap-3 md:grid-cols-3">
+                      {[
+                        ["Hadir", `${payrollPreview.presentDays || 0} hari`],
+                        ["Alpha", `${payrollPreview.alphaDays || 0} hari`],
+                        [
+                          "Terlambat",
+                          formatLateDuration(payrollPreview.totalLateMinutes),
+                        ],
+                        ["Izin", `${payrollPreview.permissionDays || 0} hari`],
+                        ["Sakit", `${payrollPreview.sickDays || 0} hari`],
+                        [
+                          "Reimbursement",
+                          formatCurrency(payrollPreview.reimbursement),
+                        ],
+                      ].map(([label, value]) => (
+                        <div
+                          key={label}
+                          className="rounded-2xl border border-base-300 bg-base-200/60 px-3 py-3"
+                        >
+                          <p className="text-[10px] uppercase tracking-[0.18em] opacity-50">
+                            {label}
+                          </p>
+                          <p className="mt-1 font-semibold leading-tight tabular-nums">
+                            {value}
+                          </p>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
 
-                <div className="grid grid-cols-2 gap-3">
-                  <input
-                    className="input input-bordered w-full"
-                    value={`Tunjangan Lainnya: ${manualInput.other_allowance || 0}`}
-                    disabled={isManualFieldDisabled("other_allowance")}
-                  />
-                  <input
-                    className="input input-bordered w-full"
-                    value={`Potongan Lainnya: ${manualInput.other_deduction || 0}`}
-                    disabled={isManualFieldDisabled("other_deduction")}
-                  />
+                  <div className="rounded-2xl border border-base-300 bg-base-100 p-4">
+                    <div className="mb-3 flex items-center justify-between">
+                      <p className="font-semibold">Parameter</p>
+                      <span className="text-xs opacity-60">Otomatis</span>
+                    </div>
+                    <div className="grid grid-cols-2 gap-3">
+                      {[
+                        ["Pajak", formatCurrency(autoTaxDeduction)],
+                        [
+                          "Transport",
+                          formatCurrency(payrollSettings.transport_per_day),
+                        ],
+                        ["Makan", formatCurrency(payrollSettings.meal_per_day)],
+                        [
+                          "Kesehatan",
+                          formatPercent(payrollSettings.health_percentage || 0),
+                        ],
+                        [
+                          "BPJS",
+                          formatPercent(payrollSettings.bpjs_percentage || 0),
+                        ],
+                        ["Bonus", formatCurrency(manualInput.bonus || 0)],
+                      ].map(([label, value]) => (
+                        <div
+                          key={label}
+                          className="rounded-2xl border border-base-300 bg-base-200/60 px-3 py-3"
+                        >
+                          <p className="text-[10px] uppercase tracking-[0.18em] opacity-50">
+                            {label}
+                          </p>
+                          <p className="mt-1 font-semibold leading-tight tabular-nums">
+                            {value}
+                          </p>
+                        </div>
+                      ))}
+                    </div>
+                    <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-2">
+                      <div
+                        className={`rounded-2xl border px-3 py-3 ${
+                          isManualFieldDisabled("other_allowance")
+                            ? "border-base-300 bg-base-200/60"
+                            : "border-primary/20 bg-primary/10"
+                        }`}
+                      >
+                        <p className="text-[10px] uppercase tracking-[0.18em] opacity-50">
+                          Tunjangan Jabatan
+                        </p>
+                        <p className="mt-1 font-semibold leading-tight tabular-nums">
+                          {formatCurrency(manualInput.other_allowance || 0)}
+                        </p>
+                      </div>
+                      <div
+                        className={`rounded-2xl border px-3 py-3 ${
+                          isManualFieldDisabled("other_deduction")
+                            ? "border-base-300 bg-base-200/60"
+                            : "border-error/20 bg-error/10"
+                        }`}
+                      >
+                        <p className="text-[10px] uppercase tracking-[0.18em] opacity-50">
+                          Potongan Lain
+                        </p>
+                        <p className="mt-1 font-semibold leading-tight tabular-nums">
+                          {formatCurrency(manualInput.other_deduction || 0)}
+                        </p>
+                      </div>
+                    </div>
+                  </div>
                 </div>
 
                 <div className="alert alert-info text-sm">
                   <span>
-                    Nilai bonus dan potongan lain terisi otomatis dari
-                    penyesuaian manajer (atau slip terakhir jika belum ada
-                    penyesuaian).
-                    Nilai tunjangan lain dipatok otomatis sesuai jabatan dan
-                    bersifat hanya-baca.
+                    Bonus dan potongan lain mengikuti penyesuaian manajer.
+                    Tunjangan jabatan tetap otomatis dan hanya-baca.
                   </span>
                 </div>
 
-                <div className="rounded-lg border border-base-300 p-4">
-                  <div className="flex items-center justify-between mb-3">
-                    <p className="font-semibold">Pratinjau Perhitungan Payroll</p>
-                  </div>
-                  <div className="grid md:grid-cols-2 grid-cols-1 gap-3 text-sm">
-                    <div className="rounded-lg bg-base-200 p-3">
-                      <p className="text-lg font-bold">
-                        <span className="font-semibold">Gaji Bersih:</span>{" "}
-                        {formatCurrency(payrollPreview.netSalary)}
-                      </p>
-                      <p>
-                        <span className="font-semibold">Total Pendapatan:</span>{" "}
-                        {formatCurrency(payrollPreview.totalIncome)}
-                      </p>
-                      <p>
-                        <span className="font-semibold">Total Potongan:</span>{" "}
-                        {formatCurrency(payrollPreview.totalDeduction)}
-                      </p>
-                    </div>
-                    <div className="rounded-lg bg-base-200 p-3">
-                      <p>
-                        <span className="font-semibold">Gaji Pokok:</span>{" "}
-                        {formatCurrency(payrollPreview.basicSalary)}
-                      </p>
-                      <p>
-                        <span className="font-semibold">Total Tunjangan:</span>{" "}
-                        {formatCurrency(payrollPreview.allowanceTotal)}
-                      </p>
-                      <p>
-                        <span className="font-semibold">Total Reimbursement:</span>{" "}
-                        {formatCurrency(payrollPreview.reimbursement)}
-                      </p>
+                <div className="rounded-2xl border border-base-300 bg-base-100 shadow-sm overflow-hidden">
+                  <div className="border-b border-base-300 bg-gradient-to-r from-primary/10 via-base-100 to-base-100 px-4 py-3">
+                    <div className="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
+                      <div>
+                        <p className="text-base font-semibold">
+                          Pratinjau Perhitungan Payroll
+                        </p>
+                        <p className="text-xs opacity-70">
+                          Ringkasan otomatis sebelum slip dibuat.
+                        </p>
+                      </div>
                     </div>
                   </div>
-                  <div className="overflow-x-auto mt-3">
-                    <table className="table table-zebra table-sm">
-                      <tbody>
-                        <tr>
-                          <td>Tunjangan Transport</td>
-                          <td className="text-right">
-                            {formatCurrency(payrollPreview.transportAllowance)}
-                          </td>
-                        </tr>
-                        <tr>
-                          <td>Makan</td>
-                          <td className="text-right">
-                            {formatCurrency(payrollPreview.mealAllowance)}
-                          </td>
-                        </tr>
-                        <tr>
-                          <td>Tunjangan Kesehatan</td>
-                          <td className="text-right">
-                            {formatCurrency(payrollPreview.healthAllowance)}
-                          </td>
-                        </tr>
-                        <tr>
-                          <td>Bonus</td>
-                          <td className="text-right">
-                            {formatCurrency(payrollPreview.bonus)}
-                          </td>
-                        </tr>
-                        <tr>
-                          <td>Tunjangan Lain</td>
-                          <td className="text-right">
-                            {formatCurrency(payrollPreview.otherAllowance)}
-                          </td>
-                        </tr>
-                        <tr className="font-semibold">
-                          <td>Total Tunjangan</td>
-                          <td className="text-right">
-                            {formatCurrency(payrollPreview.allowanceTotal)}
-                          </td>
-                        </tr>
-                        <tr className="font-semibold">
-                          <td>Gaji Kotor</td>
-                          <td className="text-right">
-                            {formatCurrency(payrollPreview.grossSalary)}
-                          </td>
-                        </tr>
-                        <tr className="font-semibold">
-                          <td>Total Pendapatan</td>
-                          <td className="text-right">
-                            {formatCurrency(payrollPreview.totalIncome)}
-                          </td>
-                        </tr>
-                        <tr>
-                          <td>Potongan Keterlambatan</td>
-                          <td className="text-right">
-                            {formatCurrency(payrollPreview.lateDeduction)}
-                          </td>
-                        </tr>
-                        <tr>
-                          <td>Potongan Alpha</td>
-                          <td className="text-right">
-                            {formatCurrency(payrollPreview.alphaDeduction)}
-                          </td>
-                        </tr>
-                        <tr>
-                          <td>Potongan Cuti Tidak Dibayar</td>
-                          <td className="text-right">
-                            {formatCurrency(
+
+                  <div className="p-4 space-y-4">
+                    <div className="grid gap-3 md:grid-cols-3">
+                      <div className="rounded-2xl bg-primary/10 p-4 border border-primary/15">
+                        <p className="text-xs uppercase tracking-wide opacity-70">
+                          Gaji Bersih
+                        </p>
+                        <p className="mt-1 text-2xl font-black leading-tight text-primary">
+                          {formatCurrency(payrollPreview.netSalary)}
+                        </p>
+                        <p className="mt-1 text-xs opacity-70">
+                          Nominal akhir yang diterima pegawai.
+                        </p>
+                      </div>
+
+                      <div className="rounded-2xl bg-base-200 p-4 border border-base-300">
+                        <p className="text-xs uppercase tracking-wide opacity-70">
+                          Total Pendapatan
+                        </p>
+                        <p className="mt-1 text-xl font-bold leading-tight">
+                          {formatCurrency(payrollPreview.totalIncome)}
+                        </p>
+                        <p className="mt-2 text-xs opacity-70">
+                          Gaji pokok, tunjangan, bonus, dan reimbursement.
+                        </p>
+                      </div>
+
+                      <div className="rounded-2xl bg-base-200 p-4 border border-base-300">
+                        <p className="text-xs uppercase tracking-wide opacity-70">
+                          Total Potongan
+                        </p>
+                        <p className="mt-1 text-xl font-bold leading-tight">
+                          {formatCurrency(payrollPreview.totalDeduction)}
+                        </p>
+                        <p className="mt-2 text-xs opacity-70">
+                          Keterlambatan, alpha, pajak, dan potongan lain.
+                        </p>
+                      </div>
+                    </div>
+
+                    <div className="grid gap-3 lg:grid-cols-2">
+                      <div className="rounded-2xl border border-base-300 bg-base-200/60 p-4">
+                        <div className="mb-3 flex items-center justify-between">
+                          <p className="font-semibold">Pendapatan</p>
+                          <span className="text-xs opacity-60">
+                            Detail komponen
+                          </span>
+                        </div>
+                        <div className="space-y-2 text-sm">
+                          {[
+                            ["Gaji Pokok", payrollPreview.basicSalary],
+                            [
+                              "Tunjangan Transport",
+                              payrollPreview.transportAllowance,
+                            ],
+                            ["Makan", payrollPreview.mealAllowance],
+                            [
+                              "Tunjangan Kesehatan",
+                              payrollPreview.healthAllowance,
+                            ],
+                            ["Bonus", payrollPreview.bonus],
+                            [
+                              "Tunjangan Jabatan",
+                              payrollPreview.otherAllowance,
+                            ],
+                            ["Total Tunjangan", payrollPreview.allowanceTotal],
+                            ["Gaji Kotor", payrollPreview.grossSalary],
+                            [
+                              "Total Reimbursement",
+                              payrollPreview.reimbursement,
+                            ],
+                          ].map(([label, value], index) => (
+                            <div
+                              key={`${label}-${index}`}
+                              className={`flex items-center justify-between gap-3 rounded-xl px-3 py-2 ${
+                                label === "Total Tunjangan" ||
+                                label === "Gaji Kotor" ||
+                                label === "Total Reimbursement"
+                                  ? "bg-base-100 font-semibold"
+                                  : "bg-base-100/70"
+                              }`}
+                            >
+                              <span className="text-sm opacity-80">
+                                {label}
+                              </span>
+                              <span className="text-sm font-medium text-right tabular-nums">
+                                {formatCurrency(value)}
+                              </span>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+
+                      <div className="rounded-2xl border border-base-300 bg-base-200/60 p-4">
+                        <div className="mb-3 flex items-center justify-between">
+                          <p className="font-semibold">Potongan</p>
+                          <span className="text-xs opacity-60">
+                            Detail komponen
+                          </span>
+                        </div>
+                        <div className="space-y-2 text-sm">
+                          {[
+                            [
+                              "Potongan Keterlambatan",
+                              payrollPreview.lateDeduction,
+                            ],
+                            ["Potongan Alpha", payrollPreview.alphaDeduction],
+                            [
+                              "Potongan Cuti Tidak Dibayar",
                               payrollPreview.unpaidLeaveDeduction,
-                            )}
-                          </td>
-                        </tr>
-                        <tr>
-                          <td>Potongan BPJS</td>
-                          <td className="text-right">
-                            {formatCurrency(payrollPreview.bpjsDeduction)}
-                          </td>
-                        </tr>
-                        <tr>
-                          <td>Potongan Pajak</td>
-                          <td className="text-right">
-                            {formatCurrency(payrollPreview.taxDeduction)}
-                          </td>
-                        </tr>
-                        <tr>
-                          <td>Potongan Lain</td>
-                          <td className="text-right">
-                            {formatCurrency(payrollPreview.otherDeduction)}
-                          </td>
-                        </tr>
-                        <tr className="font-semibold">
-                          <td>Total Potongan</td>
-                          <td className="text-right">
-                            {formatCurrency(payrollPreview.totalDeduction)}
-                          </td>
-                        </tr>
-                        <tr className="font-semibold text-lg">
-                          <td>Gaji yang Diterima</td>
-                          <td className="text-right font-bold">
-                            {formatCurrency(payrollPreview.netSalary)}
-                          </td>
-                        </tr>
-                      </tbody>
-                    </table>
+                            ],
+                            ["Potongan BPJS", payrollPreview.bpjsDeduction],
+                            ["Potongan Pajak", payrollPreview.taxDeduction],
+                            ["Potongan Lain", payrollPreview.otherDeduction],
+                            ["Total Potongan", payrollPreview.totalDeduction],
+                            ["Gaji yang Diterima", payrollPreview.netSalary],
+                          ].map(([label, value], index) => (
+                            <div
+                              key={`${label}-${index}`}
+                              className={`flex items-center justify-between gap-3 rounded-xl px-3 py-2 ${
+                                label === "Total Potongan" ||
+                                label === "Gaji yang Diterima"
+                                  ? "bg-base-100 font-semibold"
+                                  : "bg-base-100/70"
+                              }`}
+                            >
+                              <span className="text-sm opacity-80">
+                                {label}
+                              </span>
+                              <span
+                                className={`text-sm font-medium text-right tabular-nums ${
+                                  label === "Gaji yang Diterima"
+                                    ? "text-primary text-base font-bold"
+                                    : ""
+                                }`}
+                              >
+                                {formatCurrency(value)}
+                              </span>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    </div>
                   </div>
                 </div>
 
@@ -1509,13 +1607,17 @@ function FinancePayroll() {
                 <button
                   className={`btn btn-primary w-full ${loadingGenerate ? "loading" : ""}`}
                   type="submit"
-                  disabled={loadingGenerate || hasExistingPayrollForPeriod || Boolean(setupWarning)}
+                  disabled={
+                    loadingGenerate ||
+                    hasExistingPayrollForPeriod ||
+                    Boolean(setupWarning)
+                  }
                 >
                   {hasExistingPayrollForPeriod
                     ? "Slip Sudah Dibuat"
                     : setupWarning
                       ? "Lengkapi Komponen Gaji"
-                    : "Buat Slip Gaji"}
+                      : "Buat Slip Gaji"}
                 </button>
 
                 <button
@@ -1533,132 +1635,135 @@ function FinancePayroll() {
             latestGenerated?.payroll_id &&
             String(latestGenerated?.employee?.id) ===
               String(selectedEmployeeId) && (
-              <div className="mt-5 border-t border-base-300 pt-4">
-                <p className="font-semibold mb-3">Detail Slip Gaji</p>
-                <div className="mb-3">
-                  <button
-                    type="button"
-                    className="btn btn-sm btn-outline"
-                    onClick={() => openPayrollPdf(latestGenerated.payroll_id)}
-                  >
-                    Lihat PDF Slip
-                  </button>
-                </div>
-                <div className="grid md:grid-cols-2 grid-cols-1 gap-4 text-sm">
-                  <div className="rounded-lg bg-base-200 p-4">
-                    <p>
-                      <span className="font-semibold">ID Payroll:</span>{" "}
-                      {latestGenerated.payroll_id}
-                    </p>
-                    <p>
-                      <span className="font-semibold">Pegawai:</span>{" "}
-                      {latestGenerated?.employee?.name}
-                    </p>
-                    <p>
-                      <span className="font-semibold">Periode:</span>{" "}
-                      {latestGenerated?.period}
-                    </p>
-                  </div>
-                  <div className="rounded-lg bg-base-200 p-4">
-                    <p className="text-lg font-bold">
-                      <span className="font-semibold">Gaji Bersih:</span>{" "}
-                      {formatCurrency(latestGenerated?.details?.net_salary)}
-                    </p>
-                    <p>
-                      <span className="font-semibold">Total Pendapatan:</span>{" "}
-                      {formatCurrency(
-                        latestGenerated?.details?.income?.total_income,
-                      )}
-                    </p>
-                    <p>
-                      <span className="font-semibold">Total Potongan:</span>{" "}
-                      {formatCurrency(
-                        latestGenerated?.details?.total_deduction,
-                      )}
-                    </p>
+              <div className="mt-5 rounded-2xl border border-base-300 bg-base-100 shadow-sm overflow-hidden">
+                <div className="border-b border-base-300 bg-gradient-to-r from-primary/10 via-base-100 to-base-100 px-4 py-3">
+                  <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                    <div>
+                      <p className="text-base font-semibold">Detail Slip Gaji</p>
+                      <p className="text-xs opacity-70">
+                        Ringkasan slip yang baru dibuat.
+                      </p>
+                    </div>
+                    <button
+                      type="button"
+                      className="btn btn-sm btn-primary shadow-md transition-all duration-200 hover:shadow-lg active:scale-[0.98]"
+                      onClick={() => openPayrollPdf(latestGenerated.payroll_id)}
+                    >
+                      Lihat PDF Slip
+                    </button>
                   </div>
                 </div>
-                <div className="overflow-x-auto mt-3">
-                  <table className="table table-zebra table-sm">
-                    <tbody>
-                      <tr>
-                        <td>Gaji Pokok</td>
-                        <td className="text-right">
-                          {formatCurrency(
-                            latestGenerated?.details?.basic_salary,
-                          )}
-                        </td>
-                      </tr>
-                      <tr>
-                        <td>Transport + Makan + Kesehatan + Bonus + Lain</td>
-                        <td className="text-right">
-                          {formatCurrency(
-                            latestGenerated?.details?.allowances?.total,
-                          )}
-                        </td>
-                      </tr>
-                      <tr>
-                        <td>Penggantian Dana</td>
-                        <td className="text-right">
-                          {formatCurrency(
-                            latestGenerated?.details?.reimbursement_total,
-                          )}
-                        </td>
-                      </tr>
-                      <tr>
-                        <td>Potongan Keterlambatan</td>
-                        <td className="text-right">
-                          {formatCurrency(
-                            latestGenerated?.details?.late_deduction,
-                          )}
-                        </td>
-                      </tr>
-                      <tr>
-                        <td>Potongan Alpha</td>
-                        <td className="text-right">
-                            {formatCurrency(latestGenerated?.details?.alpha_deduction)}
-                          </td>
-                        </tr>
-                        <tr>
-                          <td>Potongan Cuti Tidak Dibayar</td>
-                          <td className="text-right">
-                            {formatCurrency(
-                              latestGenerated?.details?.unpaid_leave_deduction,
-                            )}
-                        </td>
-                      </tr>
-                      <tr>
-                        <td>Potongan BPJS</td>
-                        <td className="text-right">
-                          {formatCurrency(
-                            latestGenerated?.details?.bpjs_deduction,
-                          )}
-                        </td>
-                      </tr>
-                      <tr>
-                        <td>Potongan Pajak</td>
-                        <td className="text-right">
-                          {formatCurrency(
-                            latestGenerated?.details?.tax_deduction,
-                          )}
-                        </td>
-                      </tr>
-                      <tr>
-                        <td>Potongan Lain</td>
-                        <td className="text-right">
-                          {formatCurrency(
-                            latestGenerated?.details?.other_deduction,
-                          )}
-                        </td>
-                      </tr>
-                      <tr className="font-semibold text-lg">
-                        <td>Gaji Diterima</td>
-                        <td className="text-right font-bold">
+
+                <div className="p-4 space-y-4">
+                  <div className="grid gap-3 lg:grid-cols-[1fr_1.1fr]">
+                    <div className="rounded-2xl border border-base-300 bg-base-200/40 p-4">
+                      <div className="flex items-start justify-between gap-3">
+                        <div>
+                          <p className="text-[10px] uppercase tracking-[0.22em] opacity-50">
+                            Slip
+                          </p>
+                          <p className="mt-1 text-lg font-bold leading-tight">
+                            {latestGenerated?.employee?.name || "-"}
+                          </p>
+                          <p className="mt-1 text-sm opacity-70">
+                            {latestGenerated?.period || "-"}
+                          </p>
+                        </div>
+                        <span className="rounded-full border border-primary/20 bg-primary/10 px-3 py-1 text-xs font-medium text-primary">
+                          {latestGenerated.payroll_id}
+                        </span>
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-3">
+                      {[
+                        ["Gaji Bersih", formatCurrency(latestGenerated?.details?.net_salary)],
+                        [
+                          "Pendapatan",
+                          formatCurrency(latestGenerated?.details?.income?.total_income),
+                        ],
+                        [
+                          "Potongan",
+                          formatCurrency(latestGenerated?.details?.total_deduction),
+                        ],
+                        [
+                          "Reimbursement",
+                          formatCurrency(latestGenerated?.details?.reimbursement_total),
+                        ],
+                      ].map(([label, value], index) => (
+                        <div
+                          key={label}
+                          className={`rounded-2xl border px-4 py-3 ${
+                            index === 0
+                              ? "border-primary/15 bg-primary/10"
+                              : "border-base-300 bg-base-200/50"
+                          }`}
+                        >
+                          <p className="text-[10px] uppercase tracking-[0.22em] opacity-50">
+                            {label}
+                          </p>
+                          <p
+                            className={`mt-2 text-sm font-semibold leading-tight tabular-nums ${
+                              index === 0 ? "text-primary text-base" : ""
+                            }`}
+                          >
+                            {value}
+                          </p>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+
+                  <div className="rounded-2xl border border-base-300 bg-base-100 p-4">
+                    <div className="mb-3 flex items-center justify-between">
+                      <p className="font-semibold">Rincian Komponen</p>
+                      <span className="text-xs opacity-60">Perhitungan final</span>
+                    </div>
+                    <div className="space-y-2">
+                      {[
+                        ["Gaji Pokok", latestGenerated?.details?.basic_salary],
+                        [
+                          "Tunjangan",
+                          latestGenerated?.details?.allowances?.total,
+                        ],
+                        [
+                          "Penggantian Dana",
+                          latestGenerated?.details?.reimbursement_total,
+                        ],
+                        [
+                          "Potongan Keterlambatan",
+                          latestGenerated?.details?.late_deduction,
+                        ],
+                        [
+                          "Potongan Alpha",
+                          latestGenerated?.details?.alpha_deduction,
+                        ],
+                        [
+                          "Potongan Cuti Tidak Dibayar",
+                          latestGenerated?.details?.unpaid_leave_deduction,
+                        ],
+                        ["Potongan BPJS", latestGenerated?.details?.bpjs_deduction],
+                        ["Potongan Pajak", latestGenerated?.details?.tax_deduction],
+                        ["Potongan Lain", latestGenerated?.details?.other_deduction],
+                      ].map(([label, value]) => (
+                        <div
+                          key={label}
+                          className="flex items-center justify-between gap-4 rounded-2xl border border-base-300 bg-base-200/50 px-4 py-3"
+                        >
+                          <span className="text-sm opacity-80">{label}</span>
+                          <span className="text-sm font-semibold tabular-nums">
+                            {formatCurrency(value)}
+                          </span>
+                        </div>
+                      ))}
+                      <div className="flex items-center justify-between gap-4 rounded-2xl border border-primary/15 bg-primary/10 px-4 py-3">
+                        <span className="text-sm font-semibold">Gaji Diterima</span>
+                        <span className="text-base font-black text-primary tabular-nums">
                           {formatCurrency(latestGenerated?.details?.net_salary)}
-                        </td>
-                      </tr>
-                    </tbody>
-                  </table>
+                        </span>
+                      </div>
+                    </div>
+                  </div>
                 </div>
               </div>
             )}
@@ -1811,7 +1916,12 @@ function FinancePayroll() {
                 )}
               </tbody>
             </table>
-            <Pagination page={recapPagination.page} totalPages={recapPagination.totalPages} onChangePage={recapPagination.setPage} itemsPerPage={recapPagination.itemsPerPage} />
+            <Pagination
+              page={recapPagination.page}
+              totalPages={recapPagination.totalPages}
+              onChangePage={recapPagination.setPage}
+              itemsPerPage={recapPagination.itemsPerPage}
+            />
           </div>
 
           <button

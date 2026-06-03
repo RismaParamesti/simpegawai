@@ -1051,7 +1051,7 @@ function EmployeeSalaryAppeal() {
                     {formatCurrency(selectedAppeal.bonus)}
                   </p>
                   <p>
-                    <span className="font-semibold">Tunjangan Lain:</span>{" "}
+                    <span className="font-semibold">Tunjangan Jabatan:</span>{" "}
                     {formatCurrency(selectedAppeal.other_allowance)}
                   </p>
                   <p>
