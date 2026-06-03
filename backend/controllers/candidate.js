@@ -2036,7 +2036,10 @@ router.post(
       // Mark candidate as converted
       await db
         .promise()
-        .query("UPDATE candidates SET status = 'inactive' WHERE id = ?", [id]);
+        .query(
+          "UPDATE candidates SET deleted_at = NOW(), deleted_by = ? WHERE id = ?",
+          [req.user?.id || null, id],
+        );
 
       res.status(201).json({
         message: "Candidate converted to employee successfully",
