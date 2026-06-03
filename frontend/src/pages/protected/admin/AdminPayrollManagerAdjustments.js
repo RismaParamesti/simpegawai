@@ -329,7 +329,7 @@ function AdminPayrollManagerAdjustments() {
                                     <th>Pegawai</th>
                                     <th>Periode</th>
                                     <th>Bonus</th>
-                                    <th>Tunjangan Lain</th>
+                                    <th>Tunjangan Jabatan</th>
                                     <th>Potongan Lain</th>
                                     <th>Status</th>
                                     <th>Catatan</th>
