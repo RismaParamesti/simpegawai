@@ -7,9 +7,13 @@ function LeftSidebar() {
   const location = useLocation();
   const activeRole = localStorage.getItem("activeRole") || "";
   const routes = getSidebarByRole(activeRole);
-  const isRouteActive = (path) =>
-    location.pathname === path || location.pathname.startsWith(`${path}/`);
-
+  const isRouteActive = (route) => {
+    if (route.exact) return location.pathname === route.path;
+    return (
+      location.pathname === route.path ||
+      location.pathname.startsWith(`${route.path}/`)
+    );
+  };
   const close = (e) => {
     const drawer = document.getElementById("left-sidebar-drawer");
     if (drawer) drawer.checked = false;
@@ -49,7 +53,7 @@ function LeftSidebar() {
                   onClick={() => close()}
                   className={() =>
                     `relative mb-1 rounded-2xl px-4 py-3 font-medium transition-all duration-200 ${
-                      isRouteActive(route.path)
+                      isRouteActive(route)
                         ? "bg-primary/10 text-primary shadow-sm ring-1 ring-primary/15"
                         : "text-base-content/80 hover:bg-base-200/80 hover:text-base-content"
                     }`
@@ -60,7 +64,7 @@ function LeftSidebar() {
                     <span>{route.name}</span>
                   </span>
 
-                  {isRouteActive(route.path) ? (
+                  {isRouteActive(route) ? (
                     <span
                       className="absolute inset-y-2 left-2 w-1 rounded-full bg-primary shadow-[0_0_0_4px_rgba(234,107,47,0.12)]"
                       aria-hidden="true"
