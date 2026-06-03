@@ -265,6 +265,7 @@ const financeRoutes = [
   },
   {
     path: "/app/payroll",
+     exact: true,
     icon: <CalculatorIcon className={iconClasses} />,
     name: "Kelola Payroll",
   },
