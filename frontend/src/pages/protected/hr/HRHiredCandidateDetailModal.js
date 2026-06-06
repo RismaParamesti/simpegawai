@@ -25,6 +25,7 @@ const HRHiredCandidateDetailModal = () => {
   const [invitationExists, setInvitationExists] = useState(false);
   const [checkingInvitation, setCheckingInvitation] = useState(true);
   const [sending, setSending] = useState(false);
+  const [notification, setNotification] = useState(null);
   const [form, setForm] = useState({
     date: "",
     time: "",
@@ -124,15 +125,23 @@ const HRHiredCandidateDetailModal = () => {
   };
   const handleSendInvitation = async () => {
     if (invitationExists || sending) return;
+    setNotification(null);
 
     if (!form.date || !form.time || !form.location) {
-      alert("Tanggal, jam, dan lokasi wajib diisi.");
+      setNotification({
+        type: "error",
+        message: "Tanggal, jam, dan lokasi wajib diisi.",
+      });
       return;
     }
 
     const candidateId = candidate.candidate_id;
     if (!candidateId) {
-      alert("ID kandidat tidak ditemukan. Silakan kembali dan buka ulang detail kandidat.");
+      setNotification({
+        type: "error",
+        message:
+          "ID kandidat tidak ditemukan. Silakan kembali dan buka ulang detail kandidat.",
+      });
       return;
     }
 
@@ -198,11 +207,17 @@ const HRHiredCandidateDetailModal = () => {
       });
 
       setInvitationExists(true);
-      alert("Undangan berhasil dikirim!");
-      navigate(-1);
+      setNotification({
+        type: "success",
+        message: "Undangan berhasil dikirim.",
+      });
+      setTimeout(() => navigate(-1), 900);
     } catch (err) {
       console.error(err);
-      alert(err.response?.data?.message || "Gagal mengirim undangan.");
+      setNotification({
+        type: "error",
+        message: err.response?.data?.message || "Gagal mengirim undangan.",
+      });
     } finally {
       setSending(false);
     }
@@ -230,6 +245,18 @@ const HRHiredCandidateDetailModal = () => {
       }
     >
       <div className="p-6 space-y-6">
+        {notification && (
+          <div
+            className={`rounded-xl border px-4 py-3 text-sm font-semibold ${
+              notification.type === "success"
+                ? "border-emerald-200 bg-emerald-50 text-emerald-700"
+                : "border-red-200 bg-red-50 text-red-700"
+            }`}
+          >
+            {notification.message}
+          </div>
+        )}
+
         {/* INFO */}
         <div className="alert alert-info">
           Silakan isi jadwal kehadiran kandidat untuk proses onboarding.

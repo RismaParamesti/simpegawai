@@ -1457,7 +1457,7 @@ function FinancePayroll() {
                     <div className="grid gap-3 md:grid-cols-3">
                       <div className="rounded-2xl bg-primary/10 p-4 border border-primary/15">
                         <p className="text-xs uppercase tracking-wide opacity-70">
-                          Gaji Bersih
+                          Gaji Yang Diterima
                         </p>
                         <p className="mt-1 text-2xl font-black leading-tight text-primary">
                           {formatCurrency(payrollPreview.netSalary)}
@@ -1567,7 +1567,6 @@ function FinancePayroll() {
                             ["Potongan Pajak", payrollPreview.taxDeduction],
                             ["Potongan Lain", payrollPreview.otherDeduction],
                             ["Total Potongan", payrollPreview.totalDeduction],
-                            ["Gaji yang Diterima", payrollPreview.netSalary],
                           ].map(([label, value], index) => (
                             <div
                               key={`${label}-${index}`}

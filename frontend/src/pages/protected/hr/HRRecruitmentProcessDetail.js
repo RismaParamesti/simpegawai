@@ -22,10 +22,16 @@ import {
 } from "../../../utils/documentRequirements";
 import { useDispatch } from "react-redux";
 import Pagination from "../../../components/Pagination/Pagination";
+import HiredCandidateWarning from "../../../components/HiredCandidateWarning";
 import { setPageTitle } from "../../../features/common/headerSlice";
 import api from "../../../lib/api";
 import CheckBadgeIcon from "@heroicons/react/24/outline/UserPlusIcon";
 import { getStatusLabel } from "../../../utils/statusLabels";
+import {
+  buildHiredCandidateLookup,
+  findHiredCandidateInfo,
+  isUnmanagedApplicationWarningCandidate,
+} from "../../../utils/hiredCandidateStatus";
 
 const normalizeStatus = (value) => String(value || "").toLowerCase().trim();
 const rejectedStatuses = new Set(["ditolak", "rejected"]);
@@ -202,6 +208,7 @@ export default function HRRecruitmentProcessDetail() {
     history: { name: "", education: "", year: "" },
   });
   const [applications, setApplications] = useState([]);
+  const [hiredCandidates, setHiredCandidates] = useState([]);
   const [loading, setLoading] = useState(true);
   const [submittedPage, setSubmittedPage] = useState(1);
   const [screeningPage, setScreeningPage] = useState(1);
@@ -209,6 +216,10 @@ export default function HRRecruitmentProcessDetail() {
   const submittedItemsPerPage = 10;
   const screeningItemsPerPage = 10;
   const historyItemsPerPage = 10;
+  const hiredCandidateLookup = useMemo(
+    () => buildHiredCandidateLookup(hiredCandidates),
+    [hiredCandidates],
+  );
 
   // ================= INIT =================
   useEffect(() => {
@@ -282,6 +293,10 @@ export default function HRRecruitmentProcessDetail() {
         );
       }
       setApplications(res.data.applications || []);
+      const hiredRes = await api
+        .get("/interviews?status=passed")
+        .catch(() => ({ data: [] }));
+      setHiredCandidates(Array.isArray(hiredRes.data) ? hiredRes.data : []);
     } catch (err) {
       setApplications([]);
     } finally {
@@ -346,6 +361,50 @@ export default function HRRecruitmentProcessDetail() {
       setView("list");
     } catch (err) {
       alert("Gagal menyimpan penolakan");
+    }
+  };
+
+  const rejectBecauseAlreadyHired = async (candidate, hiredInfo) => {
+    if (!candidate || !hiredInfo) return;
+
+    const appId = candidate?.application_id || candidate?.id;
+    if (!appId) {
+      alert("ID pelamar tidak ditemukan");
+      return;
+    }
+
+    const notes = `Tidak lolos karena kandidat sudah lolos pada lowongan ${
+      hiredInfo.hiredJobLabel || "-"
+    }.`;
+
+    try {
+      await api.put(
+        `/candidates/admin/applications/${appId}/status`,
+        {
+          status: "ditolak",
+          admin_notes: notes,
+        },
+        { headers: getAuthHeaders() },
+      );
+
+      setApplications((prev) =>
+        prev.map((app) =>
+          (app.application_id || app.id) === appId
+            ? { ...app, status: "ditolak", admin_notes: notes }
+            : app,
+        ),
+      );
+
+      if ((selected?.application_id || selected?.id) === appId) {
+        setSelected((prev) =>
+          prev ? { ...prev, status: "ditolak", admin_notes: notes } : prev,
+        );
+      }
+
+      setActiveTab("history");
+      setView("list");
+    } catch (err) {
+      alert("Gagal menjadikan kandidat tidak lolos");
     }
   };
 
@@ -601,12 +660,36 @@ export default function HRRecruitmentProcessDetail() {
       : activeTab === "screening"
         ? paginatedShortlistedApplications
         : paginatedHistoryApplications;
+  const hiredCandidateWarnings = useMemo(
+    () =>
+      activeRows
+        .filter(isUnmanagedApplicationWarningCandidate)
+        .map((item) => {
+          const hiredInfo = findHiredCandidateInfo(hiredCandidateLookup, item);
+          if (!hiredInfo) return null;
+
+          return {
+            ...hiredInfo,
+            candidateName:
+              item.candidate_name ||
+              item.name ||
+              hiredInfo.candidate_name ||
+              hiredInfo.name,
+          };
+        })
+        .filter(Boolean),
+    [activeRows, hiredCandidateLookup],
+  );
   const activeTotal =
     activeTab === "submitted"
       ? filteredApplications.length
       : activeTab === "screening"
         ? filteredShortlistedApplications.length
         : filteredHistoryApplications.length;
+  const selectedHiredInfo = findHiredCandidateInfo(
+    hiredCandidateLookup,
+    selected,
+  );
 
   const menu = [
     {
@@ -708,7 +791,13 @@ export default function HRRecruitmentProcessDetail() {
                 </td>
               </tr>
             ) : (
-              activeRows.map((item) => (
+              activeRows.map((item) => {
+                const hiredInfo = findHiredCandidateInfo(
+                  hiredCandidateLookup,
+                  item,
+                );
+
+                return (
                 <tr
                   key={item?.application_id || item?.id}
                   className="hover:bg-orange-50/40 dark:hover:bg-slate-800/70"
@@ -722,6 +811,19 @@ export default function HRRecruitmentProcessDetail() {
                         <p className="font-extrabold text-slate-900 dark:text-slate-50">
                           {item.candidate_name || item.name || "-"}
                         </p>
+                        {hiredInfo && (
+                          <div className="mt-2 flex max-w-[320px] items-start gap-2 rounded-2xl border border-emerald-300 bg-emerald-50 px-3 py-2 text-emerald-800 shadow-sm dark:border-emerald-800 dark:bg-emerald-950/50 dark:text-emerald-200">
+                            <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0" />
+                            <div>
+                              <p className="text-xs font-extrabold">
+                                Kandidat sudah lolos
+                              </p>
+                              <p className="text-[11px] font-semibold">
+                                Lowongan: {hiredInfo.hiredJobLabel || "-"}
+                              </p>
+                            </div>
+                          </div>
+                        )}
                       </div>
                     </div>
                   </td>
@@ -749,22 +851,35 @@ export default function HRRecruitmentProcessDetail() {
                     </td>
                   )}
                   <td className="text-center">
-                    <button
-                      className={`${gradientBlueButtonClass} px-3 py-1 text-xs`}
-                      onClick={() => {
-                        setSelected({
-                          ...item,
-                          isHistory: activeTab === "history",
-                        });
-                        setView("detail");
-                      }}
-                    >
-                      <Eye className="h-3 w-3" />
-                      Detail
-                    </button>
+                    <div className="flex flex-col items-center gap-2">
+                      {hiredInfo && (
+                        <button
+                          type="button"
+                          className="inline-flex items-center gap-1.5 rounded-2xl border border-red-300 bg-red-50 px-3 py-2 text-[11px] font-bold text-red-700 shadow-sm hover:bg-red-100 dark:border-red-800 dark:bg-red-950/50 dark:text-red-200 dark:hover:bg-red-950/70"
+                          onClick={() => rejectBecauseAlreadyHired(item, hiredInfo)}
+                        >
+                          <X className="h-4 w-4" />
+                          Jadikan Tidak Lolos
+                        </button>
+                      )}
+                      <button
+                        className={`${gradientBlueButtonClass} px-3 py-1 text-xs`}
+                        onClick={() => {
+                          setSelected({
+                            ...item,
+                            isHistory: activeTab === "history",
+                          });
+                          setView("detail");
+                        }}
+                      >
+                        <Eye className="h-3 w-3" />
+                        Detail
+                      </button>
+                    </div>
                   </td>
                 </tr>
-              ))
+                );
+              })
             )}
           </tbody>
         </table>
@@ -886,6 +1001,12 @@ export default function HRRecruitmentProcessDetail() {
     );
   })}
 </div>
+
+            <HiredCandidateWarning
+              items={hiredCandidateWarnings}
+              title="Kandidat sudah lolos"
+              description="Ada kandidat pada tab ini yang sudah tercatat lolos pada lowongan tertentu. Gunakan aksi Jadikan Tidak Lolos agar kandidat tidak diproses ulang di lowongan ini."
+            />
 
             <div className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-700 dark:bg-slate-900 sm:p-6">
               <div className="mb-5 flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
@@ -1035,19 +1156,45 @@ export default function HRRecruitmentProcessDetail() {
                 {!selected?.isHistory && (
                   <div className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-700 dark:bg-slate-900">
                     <h2 className="mb-4 text-lg font-extrabold text-slate-900 dark:text-slate-50">Aksi Screening</h2>
+                    {selectedHiredInfo && (
+                      <div className="mb-4 flex items-start gap-3 rounded-3xl border border-emerald-300 bg-emerald-50 p-5 text-emerald-800 shadow-sm dark:border-emerald-800 dark:bg-emerald-950/50 dark:text-emerald-200">
+                        <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-emerald-500 text-white shadow-sm">
+                          <CheckCircle2 className="h-6 w-6" />
+                        </div>
+                        <div>
+                          <p className="text-base font-extrabold">
+                            Kandidat sudah lolos
+                          </p>
+                          <p className="mt-1 text-sm font-semibold">
+                            Kandidat ini sudah lolos pada lowongan{" "}
+                            <span className="font-black">
+                              {selectedHiredInfo.hiredJobLabel || "-"}
+                            </span>
+                            . Jadikan kandidat tidak lolos pada proses ini agar tidak diproses ulang.
+                          </p>
+                        </div>
+                      </div>
+                    )}
                     <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                       <button
                         className={`${gradientRedButtonClass} disabled:cursor-not-allowed disabled:opacity-60`}
-                        onClick={() => setShowRejectPopup(true)}
-                        disabled={rejectedStatuses.has(normalizeStatus(selected?.status))}
+                        onClick={() =>
+                          selectedHiredInfo
+                            ? rejectBecauseAlreadyHired(selected, selectedHiredInfo)
+                            : setShowRejectPopup(true)
+                        }
+                        disabled={
+                          rejectedStatuses.has(normalizeStatus(selected?.status))
+                        }
                       >
                         <X className="h-4 w-4" />
-                        Tolak
+                        {selectedHiredInfo ? "Jadikan Tidak Lolos" : "Tolak"}
                       </button>
                       <button
                         className={`${gradientBlueButtonClass} disabled:cursor-not-allowed disabled:opacity-60`}
                         onClick={handleAccept}
                         disabled={
+                          Boolean(selectedHiredInfo) ||
                           passedApplicants.some((p) => p.application_id === selected?.application_id) ||
                           rejectedStatuses.has(normalizeStatus(selected?.status))
                         }

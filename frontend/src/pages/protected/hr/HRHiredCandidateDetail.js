@@ -4,6 +4,7 @@ import { setPageTitle } from "../../../features/common/headerSlice";
 import axios from "axios";
 import { useParams, useNavigate } from "react-router-dom";
 import TitleCard from "../../../components/Cards/TitleCard";
+import { formatInterviewAssessmentNotes } from "../../../utils/interviewAssessmentNotes";
 
 const HRHiredCandidateDetail = () => {
   const dispatch = useDispatch();
@@ -210,7 +211,9 @@ const HRHiredCandidateDetail = () => {
           </div>
           <div className="grid grid-cols-3">
             <p className="text-gray-500">Catatan Interviewer</p>
-            <p>{candidate.interviewer_notes || "-"}</p>
+            <p className="whitespace-pre-line">
+              {formatInterviewAssessmentNotes(candidate.interviewer_notes)}
+            </p>
           </div>
         </div>
         <div className="alert alert-info">

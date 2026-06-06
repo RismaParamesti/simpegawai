@@ -727,7 +727,7 @@ export default function HRJobOpenings() {
                         <tr>
                           <th>No</th>
                           <th>Kriteria</th>
-                          <th>Nilai/Bobot</th>
+                          <th>Bobot</th>
                         </tr>
                       </thead>
                       <tbody>
@@ -1276,17 +1276,14 @@ export default function HRJobOpenings() {
                     <h3 className="font-bold text-base-content">
                       Kriteria Penilaian
                     </h3>
-                    <p className="text-xs text-base-content/60 mt-1">
-                      Kriteria ini akan tampil otomatis pada halaman interview.
-                    </p>
                     <p
-                      className={`text-xs mt-1 font-semibold ${
+                      className={`text-s mt-1 font-semibold ${
                         Math.abs(assessmentWeightTotal - 100) <= 0.01
                           ? "text-success"
                           : "text-warning"
                       }`}
                     >
-                      Total Bobot: {assessmentWeightTotal.toFixed(2)}% (harus 100%)
+                      Total Bobot saat ini: {assessmentWeightTotal.toFixed(2)}% (harus 100%)
                     </p>
                   </div>
 
@@ -1325,7 +1322,7 @@ export default function HRJobOpenings() {
 
                     <div className="md:col-span-4">
                       <label className="label label-text text-base-content">
-                        Nilai / Bobot
+                         Bobot
                       </label>
                       <input
                         type="text"

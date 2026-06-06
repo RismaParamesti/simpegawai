@@ -3,48 +3,37 @@ import React, { useCallback, useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import HRModalInterview from "./HRInterviewModal";
 import HRInterviewDetailLowongan from "./HRInterviewNilai";
+import HiredCandidateWarning from "../../../components/HiredCandidateWarning";
 import axios from "axios";
 import { useRef } from "react";
 import { NotificationManager } from "react-notifications";
 import {
-  BriefcaseBusiness,
   CalendarDays,
-  Clock3,
+  CheckCircle2,
   History,
   Mic,
-  RotateCcw,
-  Search,
-  UserCheck,
   Users,
+  XCircle,
 } from "lucide-react";
+import {
+  buildHiredCandidateLookup,
+  findHiredCandidateInfo,
+  isPendingInterviewWarningCandidate,
+  isUnscheduledInterviewWarningCandidate,
+} from "../../../utils/hiredCandidateStatus";
 
-const InterviewHeroIllustration = () => (
-  <div className="pointer-events-none absolute right-10 top-2 hidden h-32 w-80 lg:block">
-    <div className="absolute bottom-2 right-0 h-20 w-72 rounded-full bg-orange-100/80 blur-[1px] dark:bg-orange-900/30" />
-    <div className="absolute right-36 top-1 h-24 w-20 rotate-[-3deg] rounded-2xl border border-slate-200 bg-white shadow-lg dark:border-slate-700 dark:bg-slate-900">
-      <div className="flex items-center gap-2 border-b border-orange-100 px-2 py-2 dark:border-slate-700">
-        <div className="flex h-7 w-7 items-center justify-center rounded-full bg-orange-100 text-orange-500 dark:bg-orange-900/40 dark:text-orange-300">
-          <Mic className="h-4 w-4" />
-        </div>
-        <div className="space-y-1">
-          <div className="h-1.5 w-8 rounded-full bg-orange-400 dark:bg-orange-300" />
-          <div className="h-1.5 w-6 rounded-full bg-slate-200 dark:bg-slate-600" />
-        </div>
-      </div>
-      <div className="space-y-1.5 px-3 py-2">
-        <div className="h-1.5 w-12 rounded-full bg-orange-300 dark:bg-orange-400" />
-        <div className="h-1.5 w-10 rounded-full bg-emerald-200 dark:bg-emerald-400" />
-        <div className="h-1.5 w-12 rounded-full bg-slate-200 dark:bg-slate-600" />
-        <div className="h-1.5 w-8 rounded-full bg-orange-200 dark:bg-orange-800" />
-      </div>
-    </div>
-    <div className="absolute right-24 top-16 h-14 w-14 rounded-2xl bg-orange-400 shadow-md dark:bg-orange-500" />
-    <div className="absolute right-8 top-8 h-14 w-14 rounded-2xl bg-emerald-200 shadow-sm dark:bg-emerald-500/70" />
-    <div className="absolute right-12 top-20 h-2 w-20 rounded-full bg-slate-300 dark:bg-slate-600" />
-    <div className="absolute right-14 top-24 h-8 w-2 rounded-full bg-slate-400 dark:bg-slate-500" />
-    <div className="absolute right-28 top-24 h-8 w-2 rounded-full bg-slate-400 dark:bg-slate-500" />
-  </div>
-);
+const normalizeInterviewRows = (rows = []) =>
+  (rows || []).map((i) => ({
+    ...i,
+    status: i.status ?? i.interview_status ?? "scheduled",
+    job_title: i.job_title || i.position_name || i.base_position || "Lainnya",
+    id: i.id || i.interview_id,
+    candidate_name: i.candidate_name || i.name || "-",
+    scheduled_date: i.scheduled_date || i.date,
+    interview_type: i.interview_type || i.type || "-",
+    interviewer_name:
+      i.interviewer_name || i.interviewer || i.full_name || "-",
+  }));
 
 export default function HRInterview() {
   const [activeMenu, setActiveMenu] = useState("schedule");
@@ -67,7 +56,8 @@ export default function HRInterview() {
         axios
           .get("/api/hr/interviews/history-combined")
           .then((res) => {
-            const historyRows = res.data.history || [];
+            const historyRows = normalizeInterviewRows(res.data.history || []);
+            setHistoryRows(historyRows);
             setData((prev) => mergeHistoryRows(prev, historyRows));
           })
           .catch(() => {
@@ -85,25 +75,11 @@ export default function HRInterview() {
               );
             }
             // Pastikan status interview sesuai
-            setData(
-              (res.data.interviews || []).map((i) => ({
-                ...i,
-                status: i.status || i.interview_status || "scheduled",
-                job_title:
-                  i.position_name ||
-                  i.base_position ||
-                  i.job_title ||
-                  "Lainnya",
-                id: i.id || i.interview_id,
-                candidate_name: i.candidate_name || i.name || "-",
-                scheduled_date: i.scheduled_date || i.date,
-                interview_type: i.interview_type || i.type || "-",
-                interviewer_name:
-                  i.interviewer_name || i.interviewer || i.full_name || "-",
-              })),
-            );
+            const rows = normalizeInterviewRows(res.data.interviews || []);
+            setInterviewRows(rows);
+            setData((prev) => mergeHistoryRows(prev, rows));
           })
-          .catch(() => setData([]));
+          .catch(() => setInterviewRows([]));
       }
     };
     window.addEventListener("refreshInterviewData", handler);
@@ -111,7 +87,10 @@ export default function HRInterview() {
   }, [activeMenu, mergeHistoryRows]);
 
   const [data, setData] = useState([]); // interview data
+  const [interviewRows, setInterviewRows] = useState([]);
+  const [historyRows, setHistoryRows] = useState([]);
   const [candidates, setCandidates] = useState([]); // kandidat lolos dokumen
+  const [hiredCandidates, setHiredCandidates] = useState([]);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isDetailOpen, setIsDetailOpen] = useState(false);
   const [selectedCandidate, setSelectedCandidate] = useState(null);
@@ -123,6 +102,143 @@ export default function HRInterview() {
   const [isCancelLowonganModalOpen, setIsCancelLowonganModalOpen] =
     useState(false);
   const [pendingCancelLowongan, setPendingCancelLowongan] = useState(null);
+  const hiredCandidateLookup = React.useMemo(
+    () => buildHiredCandidateLookup(hiredCandidates),
+    [hiredCandidates],
+  );
+  const hiredCandidateWarnings = React.useMemo(() => {
+    const sourceRows =
+      activeMenu === "schedule"
+        ? candidates
+        : activeMenu === "list"
+          ? interviewRows
+          : historyRows;
+
+    const warningFilter =
+      activeMenu === "schedule"
+        ? isUnscheduledInterviewWarningCandidate
+        : activeMenu === "list"
+          ? isPendingInterviewWarningCandidate
+          : () => false;
+
+    return (sourceRows || [])
+      .filter(warningFilter)
+      .map((item) => {
+        const hiredInfo = findHiredCandidateInfo(hiredCandidateLookup, item);
+        if (!hiredInfo) return null;
+
+        return {
+          ...hiredInfo,
+          candidateName:
+            item.candidate_name ||
+            item.name ||
+            hiredInfo.candidate_name ||
+            hiredInfo.name,
+        };
+      })
+      .filter(Boolean);
+  }, [activeMenu, candidates, hiredCandidateLookup, historyRows, interviewRows]);
+
+  const markInterviewCandidateNotPassed = async (candidate, hiredInfo) => {
+    if (!candidate || !hiredInfo) return;
+
+    const notes = `Tidak lolos karena kandidat sudah lolos pada lowongan ${
+      hiredInfo.hiredJobLabel || "-"
+    }.`;
+    const interviewId = candidate.id || candidate.interview_id;
+    const applicationId = candidate.application_id || candidate.id;
+
+    try {
+      if (candidate.scheduled_date || candidate.date || candidate.interview_id) {
+        if (!interviewId) {
+          NotificationManager.error("ID interview tidak ditemukan.", "Gagal", 3000);
+          return;
+        }
+
+        await axios.put(`/api/admin/interviews/${interviewId}/result`, {
+          interviewer_notes: notes,
+          status: "disqualified",
+          result: "disqualified",
+        });
+
+        const disqualifiedItem = {
+          ...candidate,
+          status: "disqualified",
+          result: "disqualified",
+          interviewer_notes: notes,
+        };
+
+        setInterviewRows((prev) =>
+          prev.filter(
+            (item) =>
+              String(item.id || item.interview_id) !== String(interviewId),
+          ),
+        );
+        setHistoryRows((prev) => mergeHistoryRows(prev, [disqualifiedItem]));
+        setData((prev) => {
+          const filtered = prev.filter(
+            (item) => String(item.id || item.interview_id) !== String(interviewId),
+          );
+          return [disqualifiedItem, ...filtered];
+        });
+        setActiveMenu("history");
+      } else {
+        if (!applicationId) {
+          NotificationManager.error("ID pelamar tidak ditemukan.", "Gagal", 3000);
+          return;
+        }
+
+        await axios.put(`/api/candidates/admin/applications/${applicationId}/status`, {
+          status: "ditolak",
+          admin_notes: notes,
+        });
+
+        setCandidates((prev) =>
+          prev.filter(
+            (item) =>
+              String(item.application_id || item.id) !== String(applicationId),
+          ),
+        );
+      }
+
+      NotificationManager.success(
+        "Kandidat dijadikan tidak lolos karena sudah lolos di lowongan lain.",
+        "Berhasil",
+        3000,
+      );
+    } catch (err) {
+      NotificationManager.error(
+        err?.response?.data?.message || "Gagal menjadikan kandidat tidak lolos.",
+        "Gagal",
+        4000,
+      );
+    }
+  };
+
+  useEffect(() => {
+    axios
+      .get("/api/hr/interviews")
+      .then((res) => {
+        const rows = normalizeInterviewRows(res.data.interviews || []);
+        setInterviewRows(rows);
+        setData((prev) => mergeHistoryRows(prev, rows));
+      })
+      .catch(() => setInterviewRows([]));
+
+    axios
+      .get("/api/hr/interviews/history-combined")
+      .then((res) => {
+        const rows = normalizeInterviewRows(res.data.history || []);
+        setHistoryRows(rows);
+        setData((prev) => mergeHistoryRows(prev, rows));
+      })
+      .catch(() => setHistoryRows([]));
+
+    axios
+      .get("/api/interviews?status=passed")
+      .then((res) => setHiredCandidates(Array.isArray(res.data) ? res.data : []))
+      .catch(() => setHiredCandidates([]));
+  }, [mergeHistoryRows]);
 
   useEffect(() => {
     if (activeMenu === "schedule") {
@@ -160,30 +276,20 @@ export default function HRInterview() {
               
             );
           }
-                setData(
-                  (res.data.interviews || []).map((i) => ({
-                    ...i,
-                    status: i.status || i.interview_status || "scheduled",
-                    job_title:
-                      i.job_title || i.position_name || i.base_position || "Lainnya",
-                    id: i.id || i.interview_id,
-                    candidate_name: i.candidate_name || i.name || "-",
-                    scheduled_date: i.scheduled_date || i.date,
-                    interview_type: i.interview_type || i.type || "-",
-                    interviewer_name:
-                      i.interviewer_name || i.interviewer || i.full_name || "-",
-                  })),
-                );
+                const rows = normalizeInterviewRows(res.data.interviews || []);
+                setInterviewRows(rows);
+                setData((prev) => mergeHistoryRows(prev, rows));
         })
         .catch((err) => {
           console.error("[DEBUG] Error ambil data interviews:", err);
-          setData([]);
+          setInterviewRows([]);
         });
     } else if (activeMenu === "history") {
       axios
         .get("/api/hr/interviews/history-combined")
         .then((res) => {
-          const historyRows = res.data.history || [];
+          const historyRows = normalizeInterviewRows(res.data.history || []);
+          setHistoryRows(historyRows);
           setData((prev) => mergeHistoryRows(prev, historyRows));
         })
         .catch(() => {
@@ -727,6 +833,27 @@ export default function HRInterview() {
       return dateB - dateA;
     });
 
+  const activeInterviewCount = React.useMemo(
+    () =>
+      (interviewRows || []).filter((d) =>
+        ["scheduled", "rescheduled"].includes(d.status),
+      ).length,
+    [interviewRows],
+  );
+
+  const historyCount = React.useMemo(
+    () =>
+      (historyRows || []).filter(
+        (d) =>
+          d.status === "completed" ||
+          d.status === "disqualified" ||
+          d.status === "cancelled" ||
+          (d.status === "" && d.interviewer_notes) ||
+          d.status === "canceled_by_company",
+      ).length,
+    [historyRows],
+  );
+
   // Group by job_title
   const groupedHistory = sortedHistory.reduce((acc, curr) => {
     const job = curr.job_title || "Lainnya";
@@ -775,8 +902,8 @@ export default function HRInterview() {
       m.key === "schedule"
         ? unscheduledCandidates.length
         : m.key === "list"
-          ? scheduleItems.length
-          : sortedHistory.length,
+          ? activeInterviewCount
+          : historyCount,
   }));
 
   return (
@@ -856,6 +983,12 @@ export default function HRInterview() {
             );
           })}
         </div>
+
+        <HiredCandidateWarning
+          items={hiredCandidateWarnings}
+          title="Kandidat sudah lolos"
+          description="Ada kandidat pada halaman interview yang sudah tercatat lolos pada lowongan tertentu. Gunakan aksi Jadikan Tidak Lolos agar kandidat tidak diproses ulang di lowongan ini."
+        />
 
         <div className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-700 dark:bg-slate-900 sm:p-6">
         {/* CONTENT */}
@@ -1022,12 +1155,17 @@ export default function HRInterview() {
                       (candidate, i) => {
                         const isReschedule =
                           canceledMap[candidate.application_id];
+                        const hiredInfo = findHiredCandidateInfo(
+                          hiredCandidateLookup,
+                          candidate,
+                        );
                         return (
                           <div
                             key={candidate.id || i}
-                            className="flex justify-between items-center p-4"
+                            className="flex flex-col gap-3 p-4 lg:flex-row lg:items-center lg:justify-between"
                           >
-                            <div className="flex items-center gap-3">
+                            <div className="flex flex-col gap-2">
+                              <div className="flex items-center gap-3">
                               <span className="w-2 h-2 bg-primary rounded-full"></span>
                               <span className="flex items-center">
                                 {candidate.name ||
@@ -1039,17 +1177,44 @@ export default function HRInterview() {
                                   </span>
                                 )}
                               </span>
+                              </div>
+                              {hiredInfo && (
+                                <div className="ml-5 flex max-w-xl items-start gap-2 rounded-2xl border border-emerald-300 bg-emerald-50 px-3 py-2 text-emerald-800 shadow-sm">
+                                  <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0" />
+                                  <div>
+                                    <p className="text-xs font-extrabold">
+                                      Kandidat sudah lolos
+                                    </p>
+                                    <p className="text-[11px] font-semibold">
+                                      Lowongan: {hiredInfo.hiredJobLabel || "-"}
+                                    </p>
+                                  </div>
+                                </div>
+                              )}
                             </div>
                             <div className="flex gap-2">
-                              {!isReschedule && (
+                              {hiredInfo ? (
+                                <button
+                                  type="button"
+                                  className="inline-flex items-center gap-2 rounded-2xl border border-red-300 bg-red-50 px-3 py-2 text-xs font-bold text-red-700 shadow-sm hover:bg-red-100"
+                                  onClick={() =>
+                                    markInterviewCandidateNotPassed(
+                                      candidate,
+                                      hiredInfo,
+                                    )
+                                  }
+                                >
+                                  <XCircle className="h-4 w-4" />
+                                  Jadikan Tidak Lolos
+                                </button>
+                              ) : !isReschedule ? (
                                 <button
                                   className="btn border-none bg-orange-500 text-white hover:bg-orange-600 btn-sm"
                                   onClick={() => handleSchedule(candidate)}
                                 >
                                   Buatkan Jadwal Wawancara
                                 </button>
-                              )}
-                              {isReschedule && (
+                              ) : (
                                 <button
                                   className="btn border-none bg-orange-500 text-white hover:bg-orange-600 btn-sm"
                                   onClick={() => {
@@ -1312,7 +1477,13 @@ export default function HRInterview() {
                     {(showAll[job]
                       ? visibleListGroups[job]
                       : visibleListGroups[job].slice(0, 1)
-                    ).map((d) => (
+                    ).map((d) => {
+                      const hiredInfo = findHiredCandidateInfo(
+                        hiredCandidateLookup,
+                        d,
+                      );
+
+                      return (
                       <div
                         key={d.id}
                         id={`interview-row-${d.id}`}
@@ -1321,6 +1492,19 @@ export default function HRInterview() {
                         {/* HEADER */}
                         <div>
                           <h2 className="font-semibold">{d.candidate_name}</h2>
+                          {hiredInfo && (
+                            <div className="mt-2 flex max-w-2xl items-start gap-2 rounded-2xl border border-emerald-300 bg-emerald-50 px-4 py-3 text-emerald-800 shadow-sm">
+                              <CheckCircle2 className="mt-0.5 h-5 w-5 shrink-0" />
+                              <div>
+                                <p className="text-sm font-extrabold">
+                                  Kandidat sudah lolos dan tidak dapat diproses lagi
+                                </p>
+                                <p className="text-xs font-semibold">
+                                  Lowongan: {hiredInfo.hiredJobLabel || "-"}
+                                </p>
+                              </div>
+                            </div>
+                          )}
                         </div>
 
                         {/* DETAIL */}
@@ -1340,6 +1524,19 @@ export default function HRInterview() {
 
                           {/* 🔹 RIGHT: BUTTON */}
                           <div className="flex flex-col gap-1.5 items-end w-[140px]">
+                            {hiredInfo ? (
+                              <button
+                                type="button"
+                                className="flex w-full items-center justify-center gap-1.5 rounded-2xl border border-red-300 bg-red-50 px-3 py-2 text-center text-xs font-bold text-red-700 shadow-sm hover:bg-red-100"
+                                onClick={() =>
+                                  markInterviewCandidateNotPassed(d, hiredInfo)
+                                }
+                              >
+                                <XCircle className="h-4 w-4" />
+                                Tidak Lolos
+                              </button>
+                            ) : (
+                              <>
                             <button></button>
 
                             <button
@@ -1400,10 +1597,13 @@ export default function HRInterview() {
                             >
                               Gugurkan
                             </button>
+                              </>
+                            )}
                           </div>
                         </div>
                       </div>
-                    ))}
+                      );
+                    })}
                   </div>
                   {visibleListGroups[job].length > 1 && (
                     <div className="p-4 text-center">
@@ -1766,26 +1966,9 @@ export default function HRInterview() {
                 );
                 // Fetch data interview terbaru agar langsung update di UI
                 const res = await axios.get("/api/hr/interviews");
-                if (activeMenu === "list") {
-                  setData(
-                    (res.data.interviews || []).map((i) => ({
-                      ...i,
-                      status: i.status || i.interview_status || "scheduled",
-                      job_title:
-                        i.position_name || i.base_position || i.job_title ||
-                        "Lainnya",
-                      id: i.id || i.interview_id,
-                      candidate_name: i.candidate_name || i.name || "-",
-                      scheduled_date: i.scheduled_date || i.date,
-                      interview_type: i.interview_type || i.type || "-",
-                      interviewer_name:
-                        i.interviewer_name ||
-                        i.interviewer ||
-                        i.full_name ||
-                        "-",
-                    })),
-                  );
-                }
+                const rows = normalizeInterviewRows(res.data.interviews || []);
+                setInterviewRows(rows);
+                setData((prev) => mergeHistoryRows(prev, rows));
               } else {
                 // Buat interview baru
                 const res = await axios.post(
@@ -1829,28 +2012,36 @@ export default function HRInterview() {
                     );
                   }
                 }
+                // Fetch data interview terbaru agar langsung update di UI
+                const resList = await axios.get("/api/hr/interviews");
+                // After creating we set active menu to 'list', so update state accordingly
+                const rows = normalizeInterviewRows(resList.data.interviews || []);
+                const createdInterview =
+                  rows.find(
+                    (item) =>
+                      String(item.application_id || "") ===
+                      String(selectedCandidate.application_id || ""),
+                  ) ||
+                  rows.find(
+                    (item) =>
+                      newInterview?.id &&
+                      String(item.id || item.interview_id || "") ===
+                        String(newInterview.id || newInterview.interview_id),
+                  ) ||
+                  (newInterview ? normalizeInterviewRows([newInterview])[0] : null);
+                setInterviewRows(rows);
+                setData((prev) => mergeHistoryRows(prev, rows));
+                setTimelineFilter(null);
                 setActiveMenu("list");
-                // Filter otomatis ke posisi interview baru agar langsung terlihat
-                if (
-                  newInterview &&
-                  (newInterview.position_name ||
-                    newInterview.base_position ||
-                    newInterview.job_title)
-                ) {
-                  const jobTitle =
-                    newInterview.position_name ||
-                    newInterview.base_position ||
-                    newInterview.job_title ||
-                    "Lainnya";
-                  setForm((prev) => ({
-                    ...prev,
-                    positionFilterList: jobTitle,
-                  }));
-                }
-                if (newInterview) {
+                setForm((prev) => ({
+                  ...prev,
+                  positionFilterList: createdInterview?.job_title || "",
+                  searchName: "",
+                }));
+                if (createdInterview?.id) {
                   setTimeout(() => {
                     const el = document.getElementById(
-                      `interview-row-${newInterview.id}`,
+                      `interview-row-${createdInterview.id}`,
                     );
                     if (el) {
                       el.scrollIntoView({
@@ -1868,23 +2059,6 @@ export default function HRInterview() {
                     }
                   }, 500);
                 }
-                // Fetch data interview terbaru agar langsung update di UI
-                const resList = await axios.get("/api/hr/interviews");
-                // After creating we set active menu to 'list', so update state accordingly
-                setData(
-                  (resList.data.interviews || []).map((i) => ({
-                    ...i,
-                    status: i.status || i.interview_status || "scheduled",
-                    job_title:
-                      i.job_title || i.position_name || i.base_position || "Lainnya",
-                    id: i.id || i.interview_id,
-                    candidate_name: i.candidate_name || i.name || "-",
-                    scheduled_date: i.scheduled_date || i.date,
-                    interview_type: i.interview_type || i.type || "-",
-                    interviewer_name:
-                      i.interviewer_name || i.interviewer || i.full_name || "-",
-                  })),
-                );
               }
               setIsModalOpen(false);
               // Data interview sudah di-refresh otomatis
@@ -1927,30 +2101,33 @@ export default function HRInterview() {
                 },
               );
 
+              const disqualifiedItem = {
+                ...selectedCandidate,
+                status: "disqualified",
+                result: "disqualified",
+                interviewer_notes: cancelNotes,
+              };
+
+              setInterviewRows((prev) =>
+                prev.filter((item) => item.id !== selectedCandidate.id),
+              );
+              setHistoryRows((prev) =>
+                mergeHistoryRows(prev, [disqualifiedItem]),
+              );
+
               // Update local state: mark interview as disqualified
               setData((prev) =>
                 prev.map((item) =>
                   item.id === selectedCandidate.id
-                    ? {
-                        ...item,
-                        status: "disqualified",
-                        result: "disqualified",
-                        interviewer_notes: cancelNotes,
-                      }
+                    ? disqualifiedItem
                     : item,
                 ),
               );
 
               // Pastikan item langsung muncul di history walau fetch belum selesai
               setData((prev) => {
-                const nextItem = {
-                  ...selectedCandidate,
-                  status: "disqualified",
-                  result: "disqualified",
-                  interviewer_notes: cancelNotes,
-                };
                 const filtered = prev.filter((item) => item.id !== selectedCandidate.id);
-                return [nextItem, ...filtered];
+                return [disqualifiedItem, ...filtered];
               });
 
               setForm((prev) => ({
@@ -2069,6 +2246,10 @@ export default function HRInterview() {
           }}
           selectedCandidate={selectedCandidate}
           readOnly={activeMenu === "history"}
+          onEvaluationSaved={() => {
+            setIsDetailOpen(false);
+            navigate("/app/Evaluated-candidates");
+          }}
         />
         </div>
       </div>

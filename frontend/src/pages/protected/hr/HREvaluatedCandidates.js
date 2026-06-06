@@ -23,7 +23,14 @@ import {
 
 import { setPageTitle } from "../../../features/common/headerSlice";
 import Pagination from "../../../components/Pagination/Pagination";
+import HiredCandidateWarning from "../../../components/HiredCandidateWarning";
 import HRInterviewDetailLowongan from "./HRInterviewNilai";
+import { formatInterviewAssessmentNotes } from "../../../utils/interviewAssessmentNotes";
+import {
+  buildHiredCandidateLookup,
+  findHiredCandidateInfo,
+  isPendingRecruitmentWarningCandidate,
+} from "../../../utils/hiredCandidateStatus";
 
 const ratingLabelMap = {
   1: "Tidak Memenuhi",
@@ -46,23 +53,7 @@ const resultLabelMap = {
   pending: "Menunggu",
 };
 
-const ASSESSMENT_START = "[ASSESSMENT_CRITERIA]";
-const ASSESSMENT_END = "[/ASSESSMENT_CRITERIA]";
 const ITEMS_PER_PAGE = 10;
-
-const parseInterviewerNotes = (notes) => {
-  const rawNotes = String(notes || "");
-  const startIndex = rawNotes.indexOf(ASSESSMENT_START);
-  const endIndex = rawNotes.indexOf(ASSESSMENT_END);
-
-  if (startIndex === -1 || endIndex === -1 || endIndex < startIndex) {
-    return rawNotes.trim();
-  }
-
-  return `${rawNotes.slice(0, startIndex)}${rawNotes.slice(
-    endIndex + ASSESSMENT_END.length,
-  )}`.trim();
-};
 
 const getRatingNumber = (value) => {
   const number = Number(value);
@@ -122,6 +113,7 @@ const HREvaluatedCandidates = () => {
   const navigate = useNavigate();
 
   const [candidates, setCandidates] = useState([]);
+  const [hiredCandidates, setHiredCandidates] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [search, setSearch] = useState("");
@@ -132,6 +124,8 @@ const HREvaluatedCandidates = () => {
   const [expandedGroups, setExpandedGroups] = useState({});
   const [isDetailOpen, setIsDetailOpen] = useState(false);
   const [selectedCandidate, setSelectedCandidate] = useState(null);
+  const [completionConfirm, setCompletionConfirm] = useState(null);
+  const [successMessage, setSuccessMessage] = useState("");
   const [showTop3Only, setShowTop3Only] = useState(false);
   const [candidateSort, setCandidateSort] = useState("rating_desc");
   const [groupPages, setGroupPages] = useState({});
@@ -144,10 +138,14 @@ const HREvaluatedCandidates = () => {
     try {
       setLoading(true);
       setError("");
-      const res = await axios.get("/api/hr/interviews/history-combined", {
-        params: { include_active: true },
-      });
+      const [res, hiredRes] = await Promise.all([
+        axios.get("/api/hr/interviews/history-combined", {
+          params: { include_active: true },
+        }),
+        axios.get("/api/interviews?status=passed").catch(() => ({ data: [] })),
+      ]);
       const history = Array.isArray(res.data?.history) ? res.data.history : [];
+      setHiredCandidates(Array.isArray(hiredRes.data) ? hiredRes.data : []);
 
       const evaluated = history
         .map((item) => ({
@@ -165,7 +163,11 @@ const HREvaluatedCandidates = () => {
           rating: item.rating ?? item.interview_rating ?? "",
           recommendation: item.recommendation || "",
           result: item.result || item.interview_result || "",
-          interviewer_notes: parseInterviewerNotes(item.interviewer_notes),
+          interviewer_notes: item.interviewer_notes,
+          display_interviewer_notes: formatInterviewAssessmentNotes(
+            item.interviewer_notes,
+            "",
+          ),
         }))
         .filter(
           (item) =>
@@ -211,12 +213,15 @@ const HREvaluatedCandidates = () => {
       ),
     [candidates],
   );
+  const hiredCandidateLookup = useMemo(
+    () => buildHiredCandidateLookup(hiredCandidates),
+    [hiredCandidates],
+  );
 
   const filteredCandidates = useMemo(() => {
     const keyword = search.trim().toLowerCase();
 
     return candidates.filter((item) => {
-      const candidateName = (item.candidate_name || "").toLowerCase();
       const jobTitle = (item.job_title || "").toLowerCase();
       const recommendation = (item.recommendation || "").toLowerCase();
       const result = (item.result || "").toLowerCase();
@@ -225,13 +230,7 @@ const HREvaluatedCandidates = () => {
         ratingNumber >= 4 || recommendation === "hire" || result === "passed";
 
       if (keyword) {
-        const searchable = [
-          candidateName,
-          jobTitle,
-          recommendation,
-          result,
-        ].join(" ");
-        if (!searchable.includes(keyword)) return false;
+        if (!jobTitle.includes(keyword)) return false;
       }
 
       if (positionFilter && item.job_title !== positionFilter) return false;
@@ -269,8 +268,32 @@ const HREvaluatedCandidates = () => {
     });
   }, [filteredCandidates]);
 
+  const hiredCandidateWarnings = useMemo(
+    () =>
+      filteredCandidates
+        .filter(isPendingRecruitmentWarningCandidate)
+        .map((item) => {
+          const hiredInfo = findHiredCandidateInfo(hiredCandidateLookup, item);
+          if (!hiredInfo) return null;
+
+          return {
+            ...hiredInfo,
+            candidateName:
+              item.candidate_name ||
+              item.name ||
+              hiredInfo.candidate_name ||
+              hiredInfo.name,
+          };
+        })
+        .filter(Boolean),
+    [filteredCandidates, hiredCandidateLookup],
+  );
+
   const summary = useMemo(() => {
     const total = candidates.length;
+    const unpublishedJobs = new Set(
+      candidates.map((item) => getJobKey(item)).filter(Boolean),
+    ).size;
     const good = candidates.filter((item) => {
       const ratingNumber = getRatingNumber(item.rating);
       return (
@@ -291,7 +314,7 @@ const HREvaluatedCandidates = () => {
         ).toFixed(2)
       : "0.00";
 
-    return { total, good, top, averageRating };
+    return { total, unpublishedJobs, good, top, averageRating };
   }, [candidates]);
 
   const toggleGroup = (groupKey) => {
@@ -320,19 +343,22 @@ const HREvaluatedCandidates = () => {
 
   const completeJobOpening = async (jobOpeningId, jobTitle) => {
     if (!jobOpeningId) {
-      alert("ID lowongan tidak ditemukan!");
+      setError("ID lowongan tidak ditemukan!");
       return;
     }
 
-    if (!window.confirm(`Yakin ingin menyelesaikan lowongan ${jobTitle}?`)) {
-      return;
-    }
-
+    setError("");
+    setSuccessMessage("");
     setCompletingJobs((prev) => ({ ...prev, [jobOpeningId]: true }));
     try {
-      await axios.post(`/api/hr/job-openings/${jobOpeningId}/publish-interviews`);
+      await axios.post(
+        `/api/hr/job-openings/${jobOpeningId}/publish-interviews`,
+      );
 
-      alert("Lowongan berhasil diselesaikan dan hasil interview dipublish.");
+      setSuccessMessage(
+        `Lowongan ${jobTitle || ""} berhasil diselesaikan dan hasil interview dipublish.`,
+      );
+      setCompletionConfirm(null);
 
       setCandidates((prev) =>
         (prev || []).filter(
@@ -348,7 +374,7 @@ const HREvaluatedCandidates = () => {
 
       await fetchCandidates();
     } catch (err) {
-      alert(
+      setError(
         "Gagal menyelesaikan lowongan: " +
           (err?.response?.data?.message || err?.message || JSON.stringify(err)),
       );
@@ -357,26 +383,80 @@ const HREvaluatedCandidates = () => {
     }
   };
 
+  const markEvaluatedCandidateNotPassed = async (candidate, hiredInfo) => {
+    if (!candidate || !hiredInfo) return;
+
+    const interviewId = candidate.id || candidate.interview_id;
+    if (!interviewId) {
+      setError("ID interview tidak ditemukan.");
+      return;
+    }
+
+    const notes = `Tidak lolos karena kandidat sudah lolos pada lowongan ${
+      hiredInfo.hiredJobLabel || "-"
+    }.`;
+
+    setError("");
+    setSuccessMessage("");
+
+    try {
+      await axios.put(`/api/admin/interviews/${interviewId}/result`, {
+        interviewer_notes: notes,
+        recommendation: "reject",
+        result: "failed",
+        status: "completed",
+      });
+
+      setCandidates((prev) =>
+        prev.map((item) =>
+          String(item.id || item.interview_id) === String(interviewId)
+            ? {
+                ...item,
+                recommendation: "reject",
+                result: "failed",
+                interviewer_notes: notes,
+                display_interviewer_notes: notes,
+              }
+            : item,
+        ),
+      );
+      setSuccessMessage(
+        `Kandidat ${candidate.candidate_name || candidate.name || ""} dijadikan tidak lolos karena sudah lolos di ${hiredInfo.hiredJobLabel || "-"}.`,
+      );
+    } catch (err) {
+      setError(
+        "Gagal menjadikan kandidat tidak lolos: " +
+          (err?.response?.data?.message || err?.message || JSON.stringify(err)),
+      );
+    }
+  };
+
   const getRecommendationBadgeClass = (recommendation) => {
-    if (recommendation === "hire") return "bg-emerald-100 text-emerald-700 border-emerald-200 dark:bg-emerald-950/40 dark:text-emerald-300 dark:border-emerald-900/60";
-    if (recommendation === "consider") return "bg-amber-100 text-amber-700 border-amber-200 dark:bg-amber-950/40 dark:text-amber-300 dark:border-amber-900/60";
-    if (recommendation === "reject") return "bg-red-100 text-red-700 border-red-200 dark:bg-red-950/40 dark:text-red-300 dark:border-red-900/60";
+    if (recommendation === "hire")
+      return "bg-emerald-100 text-emerald-700 border-emerald-200 dark:bg-emerald-950/40 dark:text-emerald-300 dark:border-emerald-900/60";
+    if (recommendation === "consider")
+      return "bg-amber-100 text-amber-700 border-amber-200 dark:bg-amber-950/40 dark:text-amber-300 dark:border-amber-900/60";
+    if (recommendation === "reject")
+      return "bg-red-100 text-red-700 border-red-200 dark:bg-red-950/40 dark:text-red-300 dark:border-red-900/60";
     return "bg-slate-100 text-slate-600 border-slate-200 dark:bg-slate-800 dark:text-slate-300 dark:border-slate-700";
   };
 
   const getResultBadgeClass = (result) => {
-    if (result === "passed") return "bg-emerald-100 text-emerald-700 border-emerald-200 dark:bg-emerald-950/40 dark:text-emerald-300 dark:border-emerald-900/60";
-    if (result === "failed") return "bg-red-100 text-red-700 border-red-200 dark:bg-red-950/40 dark:text-red-300 dark:border-red-900/60";
-    if (result === "no_show") return "bg-amber-100 text-amber-700 border-amber-200 dark:bg-amber-950/40 dark:text-amber-300 dark:border-amber-900/60";
+    if (result === "passed")
+      return "bg-emerald-100 text-emerald-700 border-emerald-200 dark:bg-emerald-950/40 dark:text-emerald-300 dark:border-emerald-900/60";
+    if (result === "failed")
+      return "bg-red-100 text-red-700 border-red-200 dark:bg-red-950/40 dark:text-red-300 dark:border-red-900/60";
+    if (result === "no_show")
+      return "bg-amber-100 text-amber-700 border-amber-200 dark:bg-amber-950/40 dark:text-amber-300 dark:border-amber-900/60";
     return "bg-slate-100 text-slate-600 border-slate-200 dark:bg-slate-800 dark:text-slate-300 dark:border-slate-700";
   };
 
   const summaryCards = [
     {
-      label: "Total Dinilai",
-      value: summary.total,
-      description: "Semua kandidat yang sudah memiliki nilai interview",
-      icon: Users,
+      label: "Lowongan Belum Dipublish",
+      value: summary.unpublishedJobs,
+      description: "Lowongan yang masih menunggu finalisasi hasil interview",
+      icon: BriefcaseBusiness,
       active: false,
     },
     {
@@ -389,7 +469,7 @@ const HREvaluatedCandidates = () => {
     {
       label: "Nilai Sempurna",
       value: summary.top,
-      description: "Kandidat dengan rating 5",
+      description: "Kandidat dengan nilai 100",
       icon: Trophy,
       active: false,
     },
@@ -417,7 +497,8 @@ const HREvaluatedCandidates = () => {
               Tentukan Kandidat Terbaik
             </h1>
             <p className="mt-2 max-w-2xl text-sm font-medium text-slate-500 dark:text-slate-400">
-              Bandingkan hasil wawancara kandidat per lowongan, cek rating dan rekomendasi, lalu selesaikan lowongan saat semua data sudah final.
+              Bandingkan hasil wawancara kandidat per lowongan, cek rating dan
+              rekomendasi, lalu selesaikan lowongan saat semua data sudah final.
             </p>
           </div>
         </div>
@@ -500,14 +581,15 @@ const HREvaluatedCandidates = () => {
                 Review per Lowongan
               </h2>
               <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
-                Gunakan filter agar lebih mudah mencari kandidat atau lowongan tertentu.
+                Gunakan filter agar lebih mudah mencari kandidat atau lowongan
+                tertentu.
               </p>
             </div>
             {!loading && !error && filteredCandidates.length > 0 && (
               <div className="flex flex-wrap gap-2">
                 <button
                   type="button"
-                  className="btn rounded-xl border border-slate-200 bg-white text-slate-600 shadow-sm hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-200 dark:hover:bg-slate-800"
+                  className="btn rounded-xl !border-none !bg-orange-500 !text-white shadow-sm hover:!bg-orange-600"
                   onClick={() => setAllGroupsExpanded(true)}
                 >
                   <ChevronDown className="h-4 w-4" />
@@ -515,7 +597,7 @@ const HREvaluatedCandidates = () => {
                 </button>
                 <button
                   type="button"
-                  className="btn rounded-xl border border-slate-200 bg-white text-slate-600 shadow-sm hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-200 dark:hover:bg-slate-800"
+                  className="btn rounded-xl !border-none !bg-orange-500 !text-white shadow-sm hover:!bg-orange-600"
                   onClick={() => setAllGroupsExpanded(false)}
                 >
                   <ChevronUp className="h-4 w-4" />
@@ -529,14 +611,14 @@ const HREvaluatedCandidates = () => {
           <div className="mb-6 rounded-2xl border border-slate-200 bg-slate-50/70 p-4 dark:border-slate-700 dark:bg-slate-950/50">
             <div className="mb-3 flex items-center gap-2 text-sm font-bold text-slate-700 dark:text-slate-200">
               <Filter className="h-4 w-4 text-orange-500" />
-              Filter Kandidat
+              Filter Lowongan
             </div>
             <div className="grid grid-cols-1 gap-3 lg:grid-cols-12">
               <label className="input input-bordered flex w-full items-center gap-2 rounded-xl bg-white text-slate-900 lg:col-span-4 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100">
                 <Search className="h-4 w-4 text-slate-400 dark:text-slate-500" />
                 <input
                   type="text"
-                  placeholder="Cari nama, posisi, rekomendasi..."
+                  placeholder="Cari berdasarkan judul lowongan..."
                   className="grow bg-transparent text-sm outline-none placeholder:text-slate-400 dark:placeholder:text-slate-500"
                   value={search}
                   onChange={(e) => setSearch(e.target.value)}
@@ -563,7 +645,9 @@ const HREvaluatedCandidates = () => {
               >
                 <option value="">Semua Status</option>
                 <option value="completed">Selesai</option>
-                <option value="canceled_by_company">Dibatalkan Perusahaan</option>
+                <option value="canceled_by_company">
+                  Dibatalkan Perusahaan
+                </option>
               </select>
 
               <select
@@ -578,7 +662,7 @@ const HREvaluatedCandidates = () => {
 
               <button
                 type="button"
-                className="btn rounded-xl border-none bg-emerald-500 text-white shadow-sm hover:bg-emerald-600 lg:col-span-1"
+                className="btn rounded-xl !border-none !bg-emerald-500 !text-white shadow-sm hover:!bg-emerald-600 lg:col-span-1"
                 onClick={resetFilters}
                 title="Reset filter"
               >
@@ -591,8 +675,27 @@ const HREvaluatedCandidates = () => {
           {loading && (
             <div className="flex flex-col items-center justify-center rounded-2xl border border-dashed border-slate-200 py-12 text-slate-500 dark:border-slate-700 dark:text-slate-400">
               <span className="loading loading-spinner loading-lg text-orange-500" />
-              <p className="mt-3 text-sm font-medium">Memuat data kandidat...</p>
+              <p className="mt-3 text-sm font-medium">
+                Memuat data kandidat...
+              </p>
             </div>
+          )}
+
+          {!loading && successMessage && (
+            <div className="mb-5 rounded-2xl border border-emerald-200 bg-emerald-50 p-4 text-emerald-700 dark:border-emerald-900/60 dark:bg-emerald-950/30 dark:text-emerald-300">
+              <div className="flex items-start gap-3">
+                <CheckCircle2 className="mt-0.5 h-5 w-5" />
+                <p className="text-sm font-semibold">{successMessage}</p>
+              </div>
+            </div>
+          )}
+
+          {!loading && !error && hiredCandidateWarnings.length > 0 && (
+            <HiredCandidateWarning
+              items={hiredCandidateWarnings}
+              title="Kandidat ini sudah lolos"
+              description="Ada kandidat pada daftar final review yang sudah tercatat lolos pada lowongan lain. Gunakan aksi Jadikan Tidak Lolos agar hasilnya tidak dipublish sebagai lolos lagi."
+            />
           )}
 
           {/* Error */}
@@ -618,7 +721,8 @@ const HREvaluatedCandidates = () => {
                 Belum ada data kandidat.
               </p>
               <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
-                Tidak ada kandidat yang sesuai filter atau belum ada interview yang dinilai.
+                Tidak ada kandidat yang sesuai filter atau belum ada interview
+                yang dinilai.
               </p>
             </div>
           )}
@@ -630,9 +734,21 @@ const HREvaluatedCandidates = () => {
                 const isExpanded = Boolean(expandedGroups[group.key]);
 
                 const recWeight = (value) =>
-                  value === "hire" ? 3 : value === "consider" ? 2 : value === "reject" ? 1 : 0;
+                  value === "hire"
+                    ? 3
+                    : value === "consider"
+                      ? 2
+                      : value === "reject"
+                        ? 1
+                        : 0;
                 const resultWeight = (value) =>
-                  value === "passed" ? 3 : value === "pending" ? 2 : value === "failed" ? 1 : 0;
+                  value === "passed"
+                    ? 3
+                    : value === "pending"
+                      ? 2
+                      : value === "failed"
+                        ? 1
+                        : 0;
 
                 const sortedItems = (group.items || []).slice().sort((a, b) => {
                   const ra = getRatingNumber(a.rating);
@@ -647,15 +763,19 @@ const HREvaluatedCandidates = () => {
                     return nameA.localeCompare(nameB);
                   }
 
-                  if (candidateSort === "name_asc") return nameA.localeCompare(nameB);
-                  if (candidateSort === "name_desc") return nameB.localeCompare(nameA);
+                  if (candidateSort === "name_asc")
+                    return nameA.localeCompare(nameB);
+                  if (candidateSort === "name_desc")
+                    return nameB.localeCompare(nameA);
                   if (candidateSort === "date_desc") return db - da;
                   if (candidateSort === "date_asc") return da - db;
 
                   if (rb !== ra) return rb - ra;
-                  const recommendationDiff = recWeight(b.recommendation) - recWeight(a.recommendation);
+                  const recommendationDiff =
+                    recWeight(b.recommendation) - recWeight(a.recommendation);
                   if (recommendationDiff !== 0) return recommendationDiff;
-                  const resultDiff = resultWeight(b.result) - resultWeight(a.result);
+                  const resultDiff =
+                    resultWeight(b.result) - resultWeight(a.result);
                   if (resultDiff !== 0) return resultDiff;
                   return db - da;
                 });
@@ -682,7 +802,8 @@ const HREvaluatedCandidates = () => {
                       (item) =>
                         item.status === "completed" &&
                         item.result !== "pending" &&
-                        (getRatingNumber(item.rating) > 0 || item.recommendation),
+                        (getRatingNumber(item.rating) > 0 ||
+                          item.recommendation),
                     ),
                 };
 
@@ -730,7 +851,9 @@ const HREvaluatedCandidates = () => {
                                   : "border-amber-200 bg-amber-100 text-amber-700 dark:border-amber-900/60 dark:bg-amber-950/40 dark:text-amber-300"
                               }`}
                             >
-                              {metrics.allReevaluated ? "Siap Final" : "Belum Final"}
+                              {metrics.allReevaluated
+                                ? "Siap Final"
+                                : "Belum Final"}
                             </span>
                           </div>
 
@@ -759,7 +882,7 @@ const HREvaluatedCandidates = () => {
                         <div className="flex flex-wrap gap-2">
                           <button
                             type="button"
-                            className="btn rounded-xl border border-slate-200 bg-white text-slate-600 shadow-sm hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-200 dark:hover:bg-slate-800"
+                            className="btn rounded-xl !border-none !bg-orange-500 !text-white shadow-sm hover:!bg-orange-600"
                             onClick={() => toggleGroup(group.key)}
                           >
                             {isExpanded ? (
@@ -774,8 +897,8 @@ const HREvaluatedCandidates = () => {
                             type="button"
                             className={`btn rounded-xl shadow-sm ${
                               showTop3Only
-                                ? "border-none bg-orange-500 text-white hover:bg-orange-600"
-                                : "border border-orange-200 bg-white text-orange-600 hover:bg-orange-50 dark:border-orange-900/60 dark:bg-slate-950 dark:text-orange-300 dark:hover:bg-orange-950/30"
+                                ? "!border-none !bg-orange-500 !text-white hover:!bg-orange-600"
+                                : "!border-none !bg-amber-500 !text-white hover:!bg-amber-600"
                             }`}
                             onClick={() => setShowTop3Only((s) => !s)}
                           >
@@ -785,7 +908,7 @@ const HREvaluatedCandidates = () => {
 
                           <button
                             type="button"
-                            className="btn rounded-xl border border-slate-200 bg-white text-slate-600 shadow-sm hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-200 dark:hover:bg-slate-800"
+                            className="btn rounded-xl !border-none !bg-sky-600 !text-white shadow-sm hover:!bg-sky-700"
                             onClick={() =>
                               navigate("/app/DetailInterview-process", {
                                 state: {
@@ -805,17 +928,20 @@ const HREvaluatedCandidates = () => {
 
                           <button
                             type="button"
-                            className="btn rounded-xl border-none bg-emerald-500 text-white shadow-md hover:bg-emerald-600 disabled:bg-slate-300 disabled:text-slate-500"
+                            className="btn rounded-xl !border-none !bg-emerald-500 !text-white shadow-md hover:!bg-emerald-600 disabled:!bg-slate-300 disabled:!text-slate-500"
                             disabled={
                               !metrics.allReevaluated ||
                               completingJobs[group.job_opening_id]
                             }
-                            onClick={() =>
-                              completeJobOpening(
-                                group.job_opening_id,
-                                group.job_title,
-                              )
-                            }
+                            onClick={() => {
+                              setError("");
+                              setSuccessMessage("");
+                              setCompletionConfirm({
+                                jobOpeningId: group.job_opening_id,
+                                jobTitle: group.job_title,
+                                candidateCount: group.items.length,
+                              });
+                            }}
                           >
                             <CheckCircle2 className="h-4 w-4" />
                             {completingJobs[group.job_opening_id]
@@ -834,16 +960,22 @@ const HREvaluatedCandidates = () => {
                               Tabel Ranking Kandidat
                             </p>
                             <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
-                              Data bisa diurutkan dari nilai tertinggi ke terendah, nilai terendah ke tertinggi, nama, atau tanggal interview.
+                              Data bisa diurutkan dari nilai tertinggi ke
+                              terendah, nilai terendah ke tertinggi, nama, atau
+                              tanggal interview.
                             </p>
                           </div>
                           <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
                             <select
                               className="select select-bordered select-sm rounded-xl bg-white text-slate-900 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100"
                               value={candidateSort}
-                              onChange={(event) => setCandidateSort(event.target.value)}
+                              onChange={(event) =>
+                                setCandidateSort(event.target.value)
+                              }
                             >
-                              <option value="rating_desc">Nilai Tertinggi</option>
+                              <option value="rating_desc">
+                                Nilai Tertinggi
+                              </option>
                               <option value="rating_asc">Nilai Terendah</option>
                               <option value="name_asc">Nama A-Z</option>
                               <option value="name_desc">Nama Z-A</option>
@@ -872,7 +1004,13 @@ const HREvaluatedCandidates = () => {
                               {paginatedDisplayItems.map((item, index) => {
                                 const globalIndex =
                                   (candidatePage - 1) * ITEMS_PER_PAGE + index;
-                                const ratingNumber = getRatingNumber(item.rating);
+                                const ratingNumber = getRatingNumber(
+                                  item.rating,
+                                );
+                                const hiredInfo = findHiredCandidateInfo(
+                                  hiredCandidateLookup,
+                                  item,
+                                );
                                 const rankLabel =
                                   globalIndex === 0
                                     ? "🥇 1"
@@ -884,9 +1022,14 @@ const HREvaluatedCandidates = () => {
 
                                 return (
                                   <tr
-                                    key={item.id || `${item.candidate_name}-${globalIndex}`}
+                                    key={
+                                      item.id ||
+                                      `${item.candidate_name}-${globalIndex}`
+                                    }
                                     className={
-                                      ratingNumber >= 4 || item.recommendation === "hire" || item.result === "passed"
+                                      ratingNumber >= 4 ||
+                                      item.recommendation === "hire" ||
+                                      item.result === "passed"
                                         ? "bg-emerald-50/50 dark:bg-emerald-950/10"
                                         : ""
                                     }
@@ -900,8 +1043,23 @@ const HREvaluatedCandidates = () => {
                                       <div className="font-extrabold text-slate-900 dark:text-slate-50">
                                         {item.candidate_name || "-"}
                                       </div>
+                                      {hiredInfo && (
+                                        <div className="mt-2 flex max-w-[320px] items-start gap-2 rounded-2xl border border-emerald-300 bg-red-50 px-3 py-2 texts-emerald-800 shadow-sm dark:border-emerald-800 dark:bg-emerald-950/50 dark:text-emerald-200">
+                                          <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0" />
+                                          <div>
+                                            <p className="text-xs font-extrabold">
+                                              Kandidat sudah lolos
+                                            </p>
+                                            <p className="text-[11px] font-semibold">
+                                              Lowongan:{" "}
+                                              {hiredInfo.hiredJobLabel || "-"}
+                                            </p>
+                                          </div>
+                                        </div>
+                                      )}
                                       <p className="mt-1 max-w-[260px] truncate text-xs text-slate-500 dark:text-slate-400">
-                                        {item.interviewer_notes || "Tidak ada catatan"}
+                                        {item.display_interviewer_notes ||
+                                          "Tidak ada catatan"}
                                       </p>
                                     </td>
                                     <td className="text-center">
@@ -918,7 +1076,9 @@ const HREvaluatedCandidates = () => {
                                           item.recommendation,
                                         )}`}
                                       >
-                                        {recommendationLabelMap[item.recommendation] ||
+                                        {recommendationLabelMap[
+                                          item.recommendation
+                                        ] ||
                                           item.recommendation ||
                                           "-"}
                                       </span>
@@ -929,7 +1089,9 @@ const HREvaluatedCandidates = () => {
                                           item.result,
                                         )}`}
                                       >
-                                        {resultLabelMap[item.result] || item.result || "-"}
+                                        {resultLabelMap[item.result] ||
+                                          item.result ||
+                                          "-"}
                                       </span>
                                     </td>
                                     <td className="text-sm text-slate-600 dark:text-slate-300">
@@ -939,17 +1101,37 @@ const HREvaluatedCandidates = () => {
                                       {formatDate(item.scheduled_date)}
                                     </td>
                                     <td className="text-right">
-                                      <button
-                                        type="button"
-                                        className="btn btn-sm rounded-xl border-none bg-orange-500 text-white shadow-sm hover:bg-orange-600"
-                                        onClick={() => {
-                                          setSelectedCandidate(item);
-                                          setIsDetailOpen(true);
-                                        }}
-                                      >
-                                        <Eye className="h-4 w-4" />
-                                        Detail
-                                      </button>
+                                      {hiredInfo ? (
+                                        <button
+                                          type="button"
+                                          className="inline-flex w-full max-w-[220px] items-start gap-2 rounded-2xl border border-red-300 bg-red-50 px-3 py-2 text-left text-red-700 shadow-sm hover:bg-red-100 dark:border-red-800 dark:bg-red-950/50 dark:text-red-200 dark:hover:bg-red-950/70 sm:w-[220px]"
+                                          onClick={() =>
+                                            markEvaluatedCandidateNotPassed(
+                                              item,
+                                              hiredInfo,
+                                            )
+                                          }
+                                        >
+                                          <XCircle className="mt-0.5 h-4 w-4 shrink-0" />
+                                          <span className="min-w-0">
+                                            <p className="text-sm font-bold text-red-700">
+                                              Jadikan Tidak Lolos
+                                            </p>
+                                          </span>
+                                        </button>
+                                      ) : (
+                                        <button
+                                          type="button"
+                                          className="btn btn-sm rounded-xl !border-none !bg-orange-500 !text-white shadow-sm hover:!bg-orange-600"
+                                          onClick={() => {
+                                            setSelectedCandidate(item);
+                                            setIsDetailOpen(true);
+                                          }}
+                                        >
+                                          <Eye className="h-4 w-4" />
+                                          Detail
+                                        </button>
+                                      )}
                                     </td>
                                   </tr>
                                 );
@@ -982,6 +1164,72 @@ const HREvaluatedCandidates = () => {
           readOnly={false}
           allowEditingWhenClosed={true}
         />
+
+        {completionConfirm && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/55 px-4 backdrop-blur-sm">
+            <div className="w-full max-w-md overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-2xl dark:border-slate-700 dark:bg-slate-900">
+              <div className="border-b border-slate-200 bg-gradient-to-r from-orange-50 via-white to-emerald-50 px-5 py-4 dark:border-slate-700 dark:from-slate-900 dark:via-slate-900 dark:to-slate-800">
+                <div className="flex items-start gap-3">
+                  <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-emerald-100 text-emerald-600 dark:bg-emerald-950/50 dark:text-emerald-300">
+                    <CheckCircle2 className="h-6 w-6" />
+                  </div>
+                  <div>
+                    <h3 className="text-lg font-extrabold text-slate-900 dark:text-slate-50">
+                      Selesaikan Lowongan?
+                    </h3>
+                    <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
+                      Hasil interview akan dipublish dan lowongan ini masuk ke
+                      proses akhir.
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              <div className="space-y-4 px-5 py-5">
+                <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4 dark:border-slate-700 dark:bg-slate-950/50">
+                  <p className="text-xs font-bold uppercase tracking-wide text-slate-500 dark:text-slate-400">
+                    Lowongan
+                  </p>
+                  <p className="mt-1 text-base font-extrabold text-slate-900 dark:text-slate-50">
+                    {completionConfirm.jobTitle || "-"}
+                  </p>
+                  <p className="mt-2 text-sm text-slate-500 dark:text-slate-400">
+                    {completionConfirm.candidateCount || 0} kandidat akan
+                    difinalisasi.
+                  </p>
+                </div>
+
+                <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+                  <button
+                    type="button"
+                    className="btn rounded-xl !border-none !bg-slate-200 !text-slate-700 hover:!bg-slate-300 dark:!bg-slate-700 dark:!text-slate-100 dark:hover:!bg-slate-600"
+                    onClick={() => setCompletionConfirm(null)}
+                    disabled={completingJobs[completionConfirm.jobOpeningId]}
+                  >
+                    Batal
+                  </button>
+                  <button
+                    type="button"
+                    className={`btn rounded-xl !border-none !bg-emerald-500 !text-white shadow-md hover:!bg-emerald-600 ${
+                      completingJobs[completionConfirm.jobOpeningId]
+                        ? "loading"
+                        : ""
+                    }`}
+                    onClick={() =>
+                      completeJobOpening(
+                        completionConfirm.jobOpeningId,
+                        completionConfirm.jobTitle,
+                      )
+                    }
+                    disabled={completingJobs[completionConfirm.jobOpeningId]}
+                  >
+                    Selesaikan
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );
