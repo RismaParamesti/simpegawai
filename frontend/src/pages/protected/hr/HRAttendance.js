@@ -7,6 +7,25 @@ import Pagination from '../../../components/Pagination/Pagination'
 import { hrApi } from '../../../features/hr/api'
 import useTablePagination from '../../../hooks/useTablePagination'
 
+const normalizeAttendanceStatus = (value) => String(value || '').toLowerCase().trim()
+
+const getAttendanceCategory = (item) => {
+    const status = normalizeAttendanceStatus(item?.status)
+
+    if (status === 'alpha' || status === 'absent') return 'alpha'
+    if (status === 'cuti') return 'cuti'
+    if (status === 'izin' || status === 'sakit') return 'izin'
+
+    return 'hadir'
+}
+
+const attendanceStatusLabels = {
+    hadir: 'Hadir',
+    alpha: 'Alpha',
+    cuti: 'Cuti',
+    izin: 'Izin',
+}
+
 function HRAttendance() {
     const dispatch = useDispatch()
     const location = useLocation()
@@ -78,7 +97,7 @@ function HRAttendance() {
         const params = new URLSearchParams(location.search)
         const statusFromQuery = String(params.get('status') || '').toLowerCase()
         const dateFromQuery = String(params.get('date') || '')
-        const allowedStatuses = new Set(['all', 'hadir', 'izin', 'sakit', 'alpha', 'libur', 'late', 'absent'])
+        const allowedStatuses = new Set(['all', 'hadir', 'alpha', 'cuti', 'izin'])
         const nextStatus = allowedStatuses.has(statusFromQuery) ? statusFromQuery : 'all'
 
         setFilters((prev) => {
@@ -108,20 +127,7 @@ function HRAttendance() {
         }
 
         if (filters.status !== 'all') {
-            if (filters.status === 'late') {
-                filtered = filtered.filter((item) => {
-                    const status = String(item.status || '').toLowerCase()
-                    const isWorkdayStatus = !['izin', 'sakit', 'libur', 'alpha', 'absent'].includes(status)
-                    return isWorkdayStatus && Boolean(item.is_late)
-                })
-            } else if (filters.status === 'absent') {
-                filtered = filtered.filter((item) => {
-                    const status = String(item.status || '').toLowerCase()
-                    return status === 'alpha' || status === 'absent'
-                })
-            } else {
-                filtered = filtered.filter((item) => String(item.status).toLowerCase() === filters.status)
-            }
+            filtered = filtered.filter((item) => getAttendanceCategory(item) === filters.status)
         }
 
         setRecords(filtered)
@@ -141,33 +147,32 @@ function HRAttendance() {
     }, [employees])
 
     const summary = records.reduce((acc, item) => {
-        const key = item.status || 'unknown'
+        const key = getAttendanceCategory(item)
         acc[key] = (acc[key] || 0) + 1
         return acc
     }, {})
 
     const getStatusBadgeClass = (status) => {
-    const s = String(status || '').toLowerCase()
+    const s = normalizeAttendanceStatus(status)
 
     switch (s) {
         case 'hadir':
             return 'badge badge-success text-white'
+        case 'alpha':
+            return 'badge badge-error text-white'
+        case 'cuti':
+            return 'badge badge-info text-white'
         case 'izin':
             return 'badge badge-warning text-white'
-        case 'sakit':
-            return 'badge badge-info text-white'
-        case 'alpha':
-        case 'absent':
-            return 'badge badge-error text-white'
-        case 'libur':
-            return 'badge badge-neutral'
-        case 'late':
-        case 'terlambat':
-            return 'badge badge-secondary text-white'
         default:
             return 'badge badge-outline'
     }
 }
+
+    const getDisplayStatus = (item) => {
+        const category = getAttendanceCategory(item)
+        return attendanceStatusLabels[category] || category
+    }
 
     return (
         <TitleCard title="Laporan Kehadiran Pegawai" topMargin="mt-0">
@@ -223,11 +228,9 @@ function HRAttendance() {
                 >
                     <option value="all">Semua Status</option>
                     <option value="hadir">Hadir</option>
-                    <option value="late">Terlambat</option>
-                    <option value="izin">Izin</option>
-                    <option value="sakit">Sakit</option>
                     <option value="alpha">Alpha</option>
-                    <option value="absent">Tidak Hadir</option>
+                    <option value="cuti">Cuti</option>
+                    <option value="izin">Izin</option>
                 </select>
             </div>
 
@@ -237,16 +240,16 @@ function HRAttendance() {
                     <div className="stat-value text-xl">{summary.hadir || 0}</div>
                 </div>
                 <div className="stat rounded-lg bg-base-200">
-                    <div className="stat-title">Izin</div>
-                    <div className="stat-value text-xl">{summary.izin || 0}</div>
-                </div>
-                <div className="stat rounded-lg bg-base-200">
-                    <div className="stat-title">Sakit</div>
-                    <div className="stat-value text-xl">{summary.sakit || 0}</div>
-                </div>
-                <div className="stat rounded-lg bg-base-200">
                     <div className="stat-title">Alpha</div>
                     <div className="stat-value text-xl">{summary.alpha || 0}</div>
+                </div>
+                <div className="stat rounded-lg bg-base-200">
+                    <div className="stat-title">Cuti</div>
+                    <div className="stat-value text-xl">{summary.cuti || 0}</div>
+                </div>
+                <div className="stat rounded-lg bg-base-200">
+                    <div className="stat-title">Izin</div>
+                    <div className="stat-value text-xl">{summary.izin || 0}</div>
                 </div>
             </div>
 
@@ -262,7 +265,6 @@ function HRAttendance() {
                                 <th>Check In</th>
                                 <th>Check Out</th>
                                 <th>Status</th>
-                                <th>Terlambat</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -276,23 +278,15 @@ function HRAttendance() {
                                     <td>{item.check_in || '-'}</td>
                                     <td>{item.check_out || '-'}</td>
                                     <td>
-    <span className={getStatusBadgeClass(item.status)}>
-        {item.status}
+    <span className={getStatusBadgeClass(getAttendanceCategory(item))}>
+        {getDisplayStatus(item)}
     </span>
 </td>
-                                    <td>
-                                        {(() => {
-                                            const status = String(item.status || '').toLowerCase()
-                                            if (status === 'alpha') return '-'
-                                            if (['izin', 'sakit', 'libur'].includes(status)) return '-'
-                                            return item.is_late ? `${item.late_minutes || 0} menit` : 'Tidak'
-                                        })()}
-                                    </td>
                                 </tr>
                             ))}
                             {records.length === 0 && (
                                 <tr>
-                                    <td colSpan={6} className="text-center opacity-70">Tidak ada data kehadiran</td>
+                                    <td colSpan={5} className="text-center opacity-70">Tidak ada data kehadiran</td>
                                 </tr>
                             )}
                         </tbody>

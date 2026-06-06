@@ -67,32 +67,6 @@ const getFinanceStatusBadge = (item) => {
   }
 };
 
-const FinanceHeroIllustration = () => (
-  <div className="pointer-events-none absolute right-10 top-2 hidden h-32 w-80 lg:block">
-    <div className="absolute bottom-2 right-0 h-20 w-72 rounded-full bg-orange-100/80 blur-[1px] dark:bg-orange-900/30" />
-    <div className="absolute right-36 top-1 h-24 w-20 rotate-[-3deg] rounded-2xl border border-slate-200 bg-white shadow-lg dark:border-slate-700 dark:bg-slate-900">
-      <div className="flex items-center gap-2 border-b border-orange-100 px-2 py-2 dark:border-slate-700">
-        <div className="flex h-7 w-7 items-center justify-center rounded-full bg-orange-100 text-orange-500 dark:bg-orange-900/40 dark:text-orange-300">
-          Rp
-        </div>
-        <div className="space-y-1">
-          <div className="h-1.5 w-8 rounded-full bg-orange-400 dark:bg-orange-300" />
-          <div className="h-1.5 w-6 rounded-full bg-slate-200 dark:bg-slate-600" />
-        </div>
-      </div>
-      <div className="space-y-1.5 px-3 py-2">
-        <div className="h-1.5 w-12 rounded-full bg-orange-300 dark:bg-orange-400" />
-        <div className="h-1.5 w-10 rounded-full bg-emerald-200 dark:bg-emerald-400" />
-        <div className="h-1.5 w-12 rounded-full bg-slate-200 dark:bg-slate-600" />
-        <div className="h-1.5 w-8 rounded-full bg-orange-200 dark:bg-orange-800" />
-      </div>
-    </div>
-    <div className="absolute right-24 top-16 h-14 w-14 rounded-2xl bg-orange-400 shadow-md dark:bg-orange-500" />
-    <div className="absolute right-8 top-8 h-14 w-14 rounded-2xl bg-emerald-200 shadow-sm dark:bg-emerald-500/70" />
-    <div className="absolute right-12 top-20 h-2 w-20 rounded-full bg-slate-300 dark:bg-slate-600" />
-  </div>
-);
-
 function FinanceReimbursements() {
   const dispatch = useDispatch();
   const [loading, setLoading] = useState(true);
@@ -186,7 +160,6 @@ function FinanceReimbursements() {
     <div className="mt-4 overflow-hidden rounded-[1.5rem] border border-slate-200/80 bg-white p-4 shadow-[0_20px_70px_rgba(15,23,42,0.07)] dark:border-slate-700 dark:bg-slate-950 dark:shadow-[0_20px_70px_rgba(2,6,23,0.45)] sm:p-7">
       <div className="space-y-6">
         <div className="relative min-h-[120px] overflow-hidden rounded-[1.4rem] bg-gradient-to-r from-white via-white to-orange-50/80 px-5 py-6 dark:from-slate-950 dark:via-slate-950 dark:to-slate-900 sm:px-6">
-          <FinanceHeroIllustration />
           <div className="relative z-10 max-w-3xl">
             <div className="mb-3 inline-flex items-center gap-2 rounded-full border border-orange-200 bg-orange-50 px-3 py-1 text-xs font-bold text-orange-600 dark:border-orange-900/60 dark:bg-orange-950/70 dark:text-orange-300">
               Reimbursement Finance

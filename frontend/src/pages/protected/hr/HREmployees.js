@@ -108,6 +108,101 @@ const getStatusLabel = (status) => {
   };
   return labelConfig[status] || status;
 };
+
+const normalizeEmployeeActiveStatus = (employee = {}) => {
+  const raw = normalizeText(
+    employee.status || employee.user_status || employee.account_status,
+  );
+
+  if (["active", "aktif", "enabled", "1", "true"].includes(raw)) {
+    return "active";
+  }
+  if (["inactive", "nonaktif", "non aktif", "disabled", "0", "false"].includes(raw)) {
+    return "inactive";
+  }
+
+  return raw;
+};
+
+const normalizeEmploymentStatus = (value) => {
+  const raw = normalizeText(value);
+
+  if (
+    [
+      "permanent",
+      "permanen",
+      "tetap",
+      "pegawai tetap",
+      "karyawan tetap",
+      "staff tetap",
+      "fulltime",
+      "full time",
+      "full-time",
+      "full_time",
+      "pkwtt",
+    ].includes(raw)
+  ) {
+    return "permanent";
+  }
+
+  if (
+    [
+      "contract",
+      "kontrak",
+      "pegawai kontrak",
+      "karyawan kontrak",
+      "contractual",
+      "pkwt",
+      "outsourcing",
+    ].includes(raw)
+  ) {
+    return "contract";
+  }
+
+  if (["intern", "magang", "internship", "anak magang"].includes(raw)) {
+    return "intern";
+  }
+
+  return raw;
+};
+
+const getEmployeeEmploymentStatus = (employee = {}) => {
+  const directStatus = normalizeEmploymentStatus(
+    employee.employment_status ||
+      employee.employmentStatus ||
+      employee.employee_status ||
+      employee.status_kepegawaian ||
+      employee.employment_type ||
+      employee.employee_type ||
+      employee.contract_type,
+  );
+
+  if (["permanent", "contract", "intern"].includes(directStatus)) {
+    return directStatus;
+  }
+
+  const positionLevel = normalizeText(
+    employee.level ||
+      employee.position_level ||
+      employee.position?.level ||
+      employee.position_name,
+  );
+
+  if (positionLevel.includes("magang") || positionLevel.includes("intern")) {
+    return "intern";
+  }
+
+  if (
+    employee.contract_start_date ||
+    employee.contract_end_date ||
+    employee.employment_contract_document
+  ) {
+    return "contract";
+  }
+
+  return "permanent";
+};
+
 const getStatusBadge = (status) => {
   const statusConfig = {
     active: "badge-success",
@@ -117,21 +212,23 @@ const getStatusBadge = (status) => {
 };
 
 const getEmploymentStatusLabel = (status) => {
+  const normalized = normalizeEmploymentStatus(status);
   const labelConfig = {
     permanent: "Permanent",
     contract: "Contract",
     intern: "Intern",
   };
-  return labelConfig[status] || status;
+  return labelConfig[normalized] || status || "-";
 };
 
 const getEmploymentStatusBadge = (status) => {
+  const normalized = normalizeEmploymentStatus(status);
   const statusConfig = {
     permanent: "badge-primary",
     contract: "badge-info",
     intern: "badge-secondary",
   };
-  return `badge ${statusConfig[status] || "badge-ghost"}`;
+  return `badge ${statusConfig[normalized] || "badge-ghost"}`;
 };
 
 const buildEmployeeSearchOptions = (items = []) => {
@@ -362,12 +459,11 @@ function HREmployees() {
 
       const employmentStatusMatch =
         !filters.employment_status ||
-        String(employee.employment_status || "") ===
-          String(filters.employment_status);
+        getEmployeeEmploymentStatus(employee) === String(filters.employment_status);
 
       const statusMatch =
         !filters.status ||
-        String(employee.status || "") === String(filters.status);
+        normalizeEmployeeActiveStatus(employee) === String(filters.status);
 
       return (
         searchMatch &&
@@ -379,6 +475,23 @@ function HREmployees() {
     });
   }, [employees, filters]);
   const employeesPagination = useTablePagination(filteredEmployees);
+  const employeeStats = useMemo(
+    () => ({
+      permanent: employees.filter(
+        (employee) => getEmployeeEmploymentStatus(employee) === "permanent",
+      ).length,
+      contract: employees.filter(
+        (employee) => getEmployeeEmploymentStatus(employee) === "contract",
+      ).length,
+      intern: employees.filter(
+        (employee) => getEmployeeEmploymentStatus(employee) === "intern",
+      ).length,
+      active: employees.filter(
+        (employee) => normalizeEmployeeActiveStatus(employee) === "active",
+      ).length,
+    }),
+    [employees],
+  );
 
   const filteredPositions = useMemo(() => {
     if (!createForm.department_name) return positions;
@@ -961,34 +1074,36 @@ function HREmployees() {
         </div>
 
         <div className="grid lg:grid-cols-4 md:grid-cols-2 gap-4 mb-6">
-          <div className="stat bg-primary text-primary-content rounded-lg">
-            <div className="stat-title text-primary-content">Pegawai Tetap</div>
-            <div className="stat-value text-2xl">
-              {
-                employees.filter((e) => e.employment_status === "permanent")
-                  .length
-              }
+          <div className="stat rounded-lg border border-orange-200 bg-orange-50 text-orange-900 dark:border-orange-700 dark:bg-orange-900/30 dark:text-orange-100">
+            <div className="stat-title text-orange-600 dark:text-orange-300">
+              Pegawai Tetap
+            </div>
+            <div className="stat-value text-2xl text-orange-900 dark:text-orange-100">
+              {Number(employeeStats.permanent || 0)}
             </div>
           </div>
-          <div className="stat bg-info text-info-content rounded-lg">
-            <div className="stat-title text-info-content">Pegawai Kontrak</div>
-            <div className="stat-value text-2xl">
-              {
-                employees.filter((e) => e.employment_status === "contract")
-                  .length
-              }
+          <div className="stat rounded-lg border border-blue-200 bg-blue-50 text-blue-900 dark:border-blue-700 dark:bg-blue-900/30 dark:text-blue-100">
+            <div className="stat-title text-blue-600 dark:text-blue-300">
+              Pegawai Kontrak
+            </div>
+            <div className="stat-value text-2xl text-blue-900 dark:text-blue-100">
+              {Number(employeeStats.contract || 0)}
             </div>
           </div>
-          <div className="stat bg-secondary text-secondary-content rounded-lg">
-            <div className="stat-title text-secondary-content">Magang</div>
-            <div className="stat-value text-2xl">
-              {employees.filter((e) => e.employment_status === "intern").length}
+          <div className="stat rounded-lg border border-teal-200 bg-teal-50 text-teal-900 dark:border-teal-700 dark:bg-teal-900/30 dark:text-teal-100">
+            <div className="stat-title text-teal-600 dark:text-teal-300">
+              Magang
+            </div>
+            <div className="stat-value text-2xl text-teal-900 dark:text-teal-100">
+              {Number(employeeStats.intern || 0)}
             </div>
           </div>
-          <div className="stat bg-success text-success-content rounded-lg">
-            <div className="stat-title text-success-content">Total Aktif</div>
-            <div className="stat-value text-2xl">
-              {employees.filter((e) => e.status === "active").length}
+          <div className="stat rounded-lg border border-emerald-200 bg-emerald-50 text-emerald-900 dark:border-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-100">
+            <div className="stat-title text-emerald-600 dark:text-emerald-300">
+              Total Aktif
+            </div>
+            <div className="stat-value text-2xl text-emerald-900 dark:text-emerald-100">
+              {Number(employeeStats.active || 0)}
             </div>
           </div>
         </div>
@@ -1037,10 +1152,12 @@ function HREmployees() {
                     <td>
                       <span
                         className={getEmploymentStatusBadge(
-                          employee.employment_status,
+                          getEmployeeEmploymentStatus(employee),
                         )}
                       >
-                        {getEmploymentStatusLabel(employee.employment_status)}
+                        {getEmploymentStatusLabel(
+                          getEmployeeEmploymentStatus(employee),
+                        )}
                       </span>
                     </td>
                     <td className="text-center">
@@ -1131,13 +1248,6 @@ function HREmployees() {
                 Isi manual atau ambil data dasar dari kandidat yang sudah lolos.
               </p>
             </div>
-            <button
-              type="button"
-              className="btn btn-outline btn-sm"
-              onClick={() => setShowCandidatePicker(true)}
-            >
-              Pilih Kandidat
-            </button>
           </div>
           <form className="space-y-4 mt-4" onSubmit={handleCreateEmployee}>
             <div className="border border-base-300 rounded-lg p-4">

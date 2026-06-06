@@ -116,6 +116,7 @@ const hrRoutes = [
 
       {
         path: "/app/Interview-process",
+        activePaths: ["/app/DetailInterview-process"],
         icon: <DocumentTextIcon className={iconClasses} />,
         name: "Wawancara",
       },
@@ -128,6 +129,7 @@ const hrRoutes = [
 
       {
         path: "/app/Hire-candidates",
+        activePaths: ["/app/Hire-candidates-detailmodal"],
         icon: <ClipboardDocumentListIcon className={iconClasses} />,
         name: "Kandidat yang lolos",
       },

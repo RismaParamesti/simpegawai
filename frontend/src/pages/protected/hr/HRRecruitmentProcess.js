@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import { useDispatch } from "react-redux";
 import { useNavigate } from "react-router-dom";
 import {
@@ -17,6 +17,12 @@ import {
 } from "lucide-react";
 import api from "../../../lib/api";
 import { setPageTitle } from "../../../features/common/headerSlice";
+import HiredCandidateWarning from "../../../components/HiredCandidateWarning";
+import {
+  buildHiredCandidateLookup,
+  findHiredCandidateInfo,
+  isUnmanagedApplicationWarningCandidate,
+} from "../../../utils/hiredCandidateStatus";
 
 const formatDateLabel = (value) => {
   if (!value) return "-";
@@ -71,6 +77,7 @@ export default function CandidateJobList() {
     unchanged: 0,
   });
   const [applicationsList, setApplicationsList] = useState([]);
+  const [hiredCandidates, setHiredCandidates] = useState([]);
   const [activeFilter, setActiveFilter] = useState(null);
 
   const [search, setSearch] = useState("");
@@ -129,12 +136,15 @@ export default function CandidateJobList() {
         : [];
 
       setApplicationsList(applications);
+      const hiredRes = await api
+        .get("/interviews?status=passed")
+        .catch(() => ({ data: [] }));
+      setHiredCandidates(Array.isArray(hiredRes.data) ? hiredRes.data : []);
 
       const totalApplications = applications.length;
-      const unchangedApplications = applications.filter((app) => {
-        const appStatus = String(app.status || "").toLowerCase();
-        return appStatus === "submitted";
-      }).length;
+      const unchangedApplications = applications.filter(
+        isUnmanagedApplicationWarningCandidate,
+      ).length;
 
       setCandidateSummary({
         total: totalApplications,
@@ -211,8 +221,7 @@ export default function CandidateJobList() {
       const jid = app.job_opening_id || app.job_id;
       if (!jid) return;
 
-      const appStatus = String(app.status || "").toLowerCase();
-      const isUnchanged = appStatus === "submitted";
+      const isUnchanged = isUnmanagedApplicationWarningCandidate(app);
 
       let include = false;
       if (mode === "all") include = true;
@@ -286,6 +295,30 @@ export default function CandidateJobList() {
   const visibleJobs = activeFilter
     ? jobsForFilter.map((item) => item.job)
     : filteredJobs;
+  const hiredCandidateLookup = useMemo(
+    () => buildHiredCandidateLookup(hiredCandidates),
+    [hiredCandidates],
+  );
+  const hiredCandidateWarnings = useMemo(
+    () =>
+      applicationsList
+        .filter(isUnmanagedApplicationWarningCandidate)
+        .map((item) => {
+          const hiredInfo = findHiredCandidateInfo(hiredCandidateLookup, item);
+          if (!hiredInfo) return null;
+
+          return {
+            ...hiredInfo,
+            candidateName:
+              item.candidate_name ||
+              item.name ||
+              hiredInfo.candidate_name ||
+              hiredInfo.name,
+          };
+        })
+        .filter(Boolean),
+    [applicationsList, hiredCandidateLookup],
+  );
 
   return (
     <div className="mt-4 overflow-hidden rounded-[1.5rem] border border-slate-200/80 bg-white p-4 shadow-[0_20px_70px_rgba(15,23,42,0.07)] dark:border-slate-700 dark:bg-slate-950 dark:shadow-[0_20px_70px_rgba(2,6,23,0.45)] sm:p-7">
@@ -369,9 +402,15 @@ export default function CandidateJobList() {
                 Gunakan filter untuk mencari lowongan berdasarkan posisi,
                 lokasi, atau status rekrutmen.
               </p>
-            </div>
+        </div>
 
-            {activeFilter && (
+        <HiredCandidateWarning
+          items={hiredCandidateWarnings}
+          title="Ada kandidat yang sudah lolos"
+          description="Beberapa kandidat pada proses rekrutmen sudah tercatat lolos di daftar kandidat lolos. Masuk ke detail lowongan lalu jadikan kandidat tersebut tidak lolos pada proses yang masih berjalan."
+        />
+
+        {activeFilter && (
               <div className="inline-flex w-fit items-center gap-2 rounded-full border border-orange-200 bg-orange-50 px-3 py-2 text-xs font-bold text-orange-600 dark:border-orange-900/60 dark:bg-orange-950/70 dark:text-orange-300">
                 <ClipboardCheck className="h-4 w-4" />
                 Filter ringkasan aktif

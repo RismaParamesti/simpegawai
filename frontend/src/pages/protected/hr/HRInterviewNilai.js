@@ -67,6 +67,44 @@ const parseStoredAssessment = (notes) => {
   }
 };
 
+const formatAssessmentNotes = ({ notes, assessment, fallbackRating }) => {
+  const cleanNotes = String(notes || "").trim();
+  const criteria = Array.isArray(assessment?.criteria)
+    ? assessment.criteria
+    : [];
+  const lines = [];
+
+  if (criteria.length) {
+    lines.push("Nilai kriteria penilaian:");
+    criteria.forEach((item) => {
+      const criterion = String(item?.criterion || "Kriteria").trim();
+      const achievedScore = item?.achieved_score ?? 0;
+      const maximumScore = item?.maximum_score || 100;
+      const weight = item?.weight_percentage ?? item?.score ?? "";
+      lines.push(
+        `- ${criterion}: ${achievedScore}/${maximumScore} (bobot ${formatAssessmentScore(weight)})`
+      );
+    });
+
+    const totalScore =
+      assessment?.total_score ??
+      assessment?.percentage ??
+      assessment?.rating ??
+      fallbackRating;
+    if (totalScore !== undefined && totalScore !== null && totalScore !== "") {
+      lines.push(`Nilai Rata-rata: ${totalScore}/100`);
+    }
+  }
+
+  if (cleanNotes) {
+    if (lines.length) lines.push("");
+    lines.push("Catatan:");
+    lines.push(cleanNotes);
+  }
+
+  return lines.length ? lines.join("\n") : "-";
+};
+
 export default function InterviewModal({
   isFormOpen,
   isCancelOpen,
@@ -83,6 +121,7 @@ export default function InterviewModal({
   onCancelSubmit,
   readOnly = false,
   allowEditingWhenClosed = false,
+  onEvaluationSaved,
 }) {
   const [detailCandidate, setDetailCandidate] = useState(null);
   const [detailError, setDetailError] = useState("");
@@ -218,8 +257,25 @@ export default function InterviewModal({
 
     return { totalWeight, weightedTotal, averageScore, rating: weightedAverage };
   };
-  const getEvaluationFromData = (data = {}) => {
-    const parsedNotes = parseStoredAssessment(data.interviewer_notes);
+  const getEvaluationFromData = (data = {}, fallbackData = {}) => {
+    const interview = Array.isArray(data.interviews)
+      ? data.interviews[0] || {}
+      : data.interview || {};
+    const fallbackInterview = Array.isArray(fallbackData.interviews)
+      ? fallbackData.interviews[0] || {}
+      : fallbackData.interview || {};
+    const pickValue = (...values) =>
+      values.find(
+        (value) => value !== undefined && value !== null && value !== ""
+      ) ?? "";
+
+    const rawNotes = pickValue(
+      data.interviewer_notes,
+      interview.interviewer_notes,
+      fallbackData.interviewer_notes,
+      fallbackInterview.interviewer_notes
+    );
+    const parsedNotes = parseStoredAssessment(rawNotes);
     const storedCriteria = Array.isArray(parsedNotes.assessment?.criteria)
       ? parsedNotes.assessment.criteria
       : [];
@@ -229,11 +285,40 @@ export default function InterviewModal({
     }, {});
 
     return {
-      rating: data.average_rating ?? data.rating ?? "",
-      average_rating: data.average_rating ?? data.rating ?? "",
-      recommendation: data.recommendation || "",
+      rating: pickValue(
+        data.average_rating,
+        data.rating,
+        interview.average_rating,
+        interview.rating,
+        fallbackData.average_rating,
+        fallbackData.rating,
+        fallbackInterview.average_rating,
+        fallbackInterview.rating
+      ),
+      average_rating: pickValue(
+        data.average_rating,
+        data.rating,
+        interview.average_rating,
+        interview.rating,
+        fallbackData.average_rating,
+        fallbackData.rating,
+        fallbackInterview.average_rating,
+        fallbackInterview.rating
+      ),
+      recommendation: pickValue(
+        data.recommendation,
+        interview.recommendation,
+        fallbackData.recommendation,
+        fallbackInterview.recommendation
+      ),
       interviewer_notes: parsedNotes.notes,
-      result: data.result || "",
+      stored_assessment: parsedNotes.assessment,
+      result: pickValue(
+        data.result,
+        interview.result,
+        fallbackData.result,
+        fallbackInterview.result
+      ),
       criteria_scores: criteriaScores,
     };
   };
@@ -293,8 +378,8 @@ ${ASSESSMENT_END}`.trim();
 
     if (assessmentCriteria.length && Math.abs(summary.totalWeight - 100) > 0.01) {
       NotificationManager.error(
-        `Total bobot kriteria harus 100%. Saat ini ${summary.totalWeight.toFixed(2)}%`,
-        "Bobot kriteria belum valid",
+        `Total porsi kriteria harus 100%. Saat ini ${summary.totalWeight.toFixed(2)}%`,
+        "Porsi kriteria belum valid",
         4000
       );
       return;
@@ -326,6 +411,9 @@ ${ASSESSMENT_END}`.trim();
       setIsEdit(false);
       if (closeAfterSave && typeof onCloseForm === "function") {
         onCloseForm();
+      }
+      if (typeof onEvaluationSaved === "function") {
+        onEvaluationSaved();
       }
     } catch (err) {
       console.error(err);
@@ -375,7 +463,7 @@ ${ASSESSMENT_END}`.trim();
   useEffect(() => {
     if (isEdit) {
       setEvaluation(
-        getEvaluationFromData(detailCandidate || selectedCandidate || evaluation)
+        getEvaluationFromData(detailCandidate || {}, selectedCandidate || {})
       );
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -400,7 +488,7 @@ ${ASSESSMENT_END}`.trim();
           const data = res.data.application || res.data.interview || selectedCandidate;
           setDetailCandidate(data);
           // Set evaluation jika ada data interview
-          setEvaluation(getEvaluationFromData(data));
+          setEvaluation(getEvaluationFromData(data, selectedCandidate));
         })
         .catch((err) => {
           let msg = "Gagal mengambil detail pelamar/interview";
@@ -431,7 +519,7 @@ ${ASSESSMENT_END}`.trim();
               Penilaian Berdasarkan Kriteria Lowongan
             </h4>
             <p className="text-xs text-base-content/70">
-              Isi nilai kandidat 0-100 untuk setiap kriteria berbobot.
+              Isi nilai kandidat 0-100 untuk setiap kriteria.
             </p>
           </div>
           <div className="badge badge-primary gap-1 px-3 py-3">
@@ -475,7 +563,7 @@ ${ASSESSMENT_END}`.trim();
 
         <div className="mt-3 grid gap-2 text-sm sm:grid-cols-2">
           <div className="rounded-xl bg-base-100 px-3 py-2">
-            <p className="text-xs text-base-content/70">Rata-rata Berbobot</p>
+            <p className="text-xs text-base-content/70">Nilai Rata-rata</p>
             <p className="font-bold">{summary.averageScore.toFixed(2)}</p>
           </div>
           <div className="rounded-xl bg-base-100 px-3 py-2">
@@ -499,12 +587,9 @@ ${ASSESSMENT_END}`.trim();
             <p className="text-xs font-semibold text-base-content/70">
               Rincian Kriteria Penilaian
             </p>
-            <p className="text-sm font-bold">
-              Rata-rata Berbobot: {summary.averageScore.toFixed(2)} (Bobot {summary.totalWeight.toFixed(2)}%)
-            </p>
           </div>
           <span className="badge badge-primary">
-            Rata-rata Berbobot {summary.rating || evaluation.average_rating || evaluation.rating || "-"}
+            Jumlah Nilai Bobot {summary.totalWeight.toFixed(2)}%
           </span>
         </div>
         <div className="space-y-2">
@@ -928,7 +1013,7 @@ ${ASSESSMENT_END}`.trim();
                         <div>
                           <label className="label">
                             <span className="label-text text-xs font-semibold">
-                              Rata-rata Berbobot
+                              Nilai Rata-rata
                             </span>
                           </label>
                           {assessmentCriteria.length ? (
@@ -1047,7 +1132,7 @@ ${ASSESSMENT_END}`.trim();
                         <div>
                           <label className="label">
                             <span className="label-text text-xs font-semibold">
-                              Rata-rata Berbobot
+                              Nilai Rata-rata
                             </span>
                           </label>
                           {assessmentCriteria.length ? (
@@ -1158,6 +1243,20 @@ ${ASSESSMENT_END}`.trim();
                     </>
                   ) : (
                     (() => {
+                      const selectedNotes = parseStoredAssessment(
+                        selectedCandidate?.interviewer_notes
+                      );
+                      const evaluationNotes = parseStoredAssessment(
+                        evaluation.interviewer_notes
+                      );
+                      const assessment =
+                        evaluation.stored_assessment ||
+                        evaluationNotes.assessment ||
+                        selectedNotes.assessment;
+                      const displayNotes =
+                        evaluationNotes.notes ||
+                        selectedNotes.notes ||
+                        "";
                       const evalData = {
                         rating:
                           evaluation.average_rating ||
@@ -1168,10 +1267,14 @@ ${ASSESSMENT_END}`.trim();
                           evaluation.recommendation ||
                           selectedCandidate?.recommendation ||
                           "-",
-                        interviewer_notes:
-                          evaluation.interviewer_notes ||
-                          selectedCandidate?.interviewer_notes ||
-                          "-",
+                        interviewer_notes: formatAssessmentNotes({
+                          notes: displayNotes,
+                          assessment,
+                          fallbackRating:
+                            evaluation.average_rating ||
+                            evaluation.rating ||
+                            selectedCandidate?.rating,
+                        }),
                         result:
                           evaluation.result || selectedCandidate?.result || "-",
                       };
@@ -1194,7 +1297,7 @@ ${ASSESSMENT_END}`.trim();
                           <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
                             <div className="rounded-xl border border-base-300 bg-base-200/40 px-4 py-3">
                               <p className="text-xs text-base-content/60">
-                                Rata-rata Berbobot
+                                Hasil Penilaian Akhir
                               </p>
                               <p className="mt-1 text-lg font-bold">
                                 {evalData.rating || "-"}
