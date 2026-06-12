@@ -18,7 +18,6 @@ const POSITION_DOCUMENT_MAPPING = {
       "experience_letter_file",
       "reference_letter_file",
       "portfolio_file",
-      "marketing_portfolio_link",
       "campaign_link",
       "other_document",
     ],
@@ -120,7 +119,6 @@ const POSITION_DOCUMENT_MAPPING = {
       "experience_letter_file",
       "reference_letter_file",
       "design_link",
-      "marketing_portfolio_link",
       "campaign_link",
     ],
   },
@@ -178,7 +176,6 @@ const POSITION_DOCUMENT_MAPPING = {
       "certificate_file",
       "skck_file",
       "portfolio_file",
-      "marketing_portfolio_link",
       "campaign_link",
     ],
     optional: [
@@ -200,7 +197,6 @@ const POSITION_DOCUMENT_MAPPING = {
       "certificate_file",
       "skck_file",
       "portfolio_file",
-      "marketing_portfolio_link",
       "campaign_link",
     ],
     optional: [
@@ -222,7 +218,6 @@ const POSITION_DOCUMENT_MAPPING = {
       "certificate_file",
       "skck_file",
       "portfolio_file",
-      "marketing_portfolio_link",
       "campaign_link",
     ],
     optional: [
@@ -244,7 +239,6 @@ const POSITION_DOCUMENT_MAPPING = {
       "certificate_file",
       "skck_file",
       "portfolio_file",
-      "marketing_portfolio_link",
       "campaign_link",
     ],
     optional: [
@@ -465,63 +459,63 @@ const DOCUMENT_FIELD_METADATA = {
   cv_file: {
     label: "CV / Resume",
     description: "Curriculum Vitae atau Resume Anda",
-    accept: ".pdf,.doc,.docx",
+    accept: ".pdf,.jpg,.jpeg,.png",
     maxSize: 3 * 1024 * 1024, // 3MB
   },
   ktp_file: {
     label: "KTP",
     description: "Fotokopi Kartu Tanda Penduduk",
-    accept: "image/*,.pdf",
+    accept: ".jpg,.jpeg,.png",
     maxSize: 3 * 1024 * 1024, // 3MB
   },
   photo_file: {
     label: "Foto Diri",
     description: "Foto ukuran 4x6 atau 3x4",
-    accept: "image/*",
+    accept: ".jpg,.jpeg,.png",
     maxSize: 3 * 1024 * 1024, // 3MB
   },
   ijazah_file: {
     label: "Ijazah / Sertifikat Pendidikan",
     description: "Dokumen ijazah atau sertifikat pendidikan",
-    accept: "image/*,.pdf",
+    accept: ".pdf",
     maxSize: 5 * 1024 * 1024, // 5MB
   },
   transcript_file: {
     label: "Transkrip Nilai",
     description: "Lembar nilai akademik",
-    accept: "image/*,.pdf",
+    accept: ".pdf",
     maxSize: 5 * 1024 * 1024, // 5MB
   },
   certificate_file: {
     label: "Sertifikat & Penghargaan",
     description: "Sertifikat kursus, pelatihan, atau penghargaan",
-    accept: "image/*,.pdf",
+    accept: ".pdf",
     maxSize: 5 * 1024 * 1024, // 5MB
   },
   experience_letter_file: {
     label: "Surat Pengalaman Kerja",
     description: "Surat pengalaman kerja dari perusahaan sebelumnya",
-    accept: "image/*,.pdf",
+    accept: ".pdf",
     maxSize: 5 * 1024 * 1024, // 5MB
   },
   reference_letter_file: {
     label: "Surat Referensi",
     description: "Surat rekomendasi/referensi dari atasan atau rekan kerja",
-    accept: "image/*,.pdf",
+    accept: ".pdf",
     maxSize: 5 * 1024 * 1024, // 5MB
   },
   skck_file: {
     label: "SKCK (Surat Keterangan Catatan Kepolisian)",
     description: "Dokumen SKCK dari kepolisian setempat",
-    accept: "image/*,.pdf",
+    accept: ".pdf",
     maxSize: 5 * 1024 * 1024, // 5MB
   },
 
   // ===== DOKUMEN SPESIALIS =====
   portfolio_file: {
     label: "Portfolio File",
-    description: "File portfolio pekerjaan Anda (ZIP, PDF, atau file lainnya)",
-    accept: ".pdf,.zip,.rar,.7z",
+    description: "File portfolio pekerjaan Anda",
+    accept: ".pdf",
     maxSize: 10 * 1024 * 1024, // 10MB
   },
   github_link: {
@@ -543,13 +537,6 @@ const DOCUMENT_FIELD_METADATA = {
     label: "YouTube / Video Link",
     description:
       "Link ke video portfolio Anda di YouTube atau platform video lainnya",
-    accept: "text/plain,.txt",
-    maxSize: 1 * 1024 * 1024, // 1MB
-    isUrl: true,
-  },
-  marketing_portfolio_link: {
-    label: "Marketing Portfolio Link",
-    description: "Link ke portfolio marketing, blog, atau karya marketing Anda",
     accept: "text/plain,.txt",
     maxSize: 1 * 1024 * 1024, // 1MB
     isUrl: true,

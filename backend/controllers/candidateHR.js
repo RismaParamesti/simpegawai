@@ -51,6 +51,12 @@ const {
   validateDocuments,
   DOCUMENT_FIELD_METADATA,
 } = require("../utils/documentRequirements");
+const {
+  ACCEPTED_APPLICATION_STATUSES,
+  findAcceptedApplication,
+  rejectApplicationBecauseCandidateAccepted,
+  rejectOtherActiveApplications,
+} = require("../utils/recruitmentApplicationGuard");
 
 let applicationsTableHasCoverLetterFilePromise = null;
 const applicationsTableHasCoverLetterFile = async () => {
@@ -217,10 +223,11 @@ router.get(
   a.github_link,
   a.design_link,
   a.youtube_link,
-  a.marketing_portfolio_link,
   a.campaign_link,
 
   jo.title AS job_title,
+  jo.status AS job_status,
+  jo.hiring_status AS job_hiring_status,
   jo.base_position,
   p.name AS position_name,
   e.full_name AS reviewer_name
@@ -317,6 +324,49 @@ router.put(
         });
       }
 
+      const currentApplication = application[0];
+      const acceptedApplication = await findAcceptedApplication(
+        db.promise(),
+        currentApplication.candidate_id,
+        currentApplication.id,
+      );
+
+      if (acceptedApplication && !ACCEPTED_APPLICATION_STATUSES.includes(status)) {
+        const notes = await rejectApplicationBecauseCandidateAccepted(
+          db.promise(),
+          currentApplication,
+          acceptedApplication,
+        );
+
+        if (status === "ditolak") {
+          return res.json({
+            message:
+              "Kandidat sudah lolos pada lowongan lain. Lamaran ini otomatis digugurkan.",
+            admin_notes: notes,
+          });
+        }
+
+        return res.status(409).json({
+          message:
+            "Kandidat sudah lolos pada lowongan lain. Lamaran ini otomatis digugurkan.",
+          admin_notes: notes,
+        });
+      }
+
+      if (acceptedApplication && ACCEPTED_APPLICATION_STATUSES.includes(status)) {
+        const notes = await rejectApplicationBecauseCandidateAccepted(
+          db.promise(),
+          currentApplication,
+          acceptedApplication,
+        );
+
+        return res.status(409).json({
+          message:
+            "Kandidat sudah memiliki lowongan yang lolos. Lamaran ini tidak bisa diterima lagi dan otomatis digugurkan.",
+          admin_notes: notes,
+        });
+      }
+
       // Get employee_id
       const [employee] = await db
         .promise()
@@ -330,6 +380,15 @@ router.put(
              WHERE id = ?`,
         [status, admin_notes || null, reviewerId, id],
       );
+
+      if (ACCEPTED_APPLICATION_STATUSES.includes(status)) {
+        await rejectOtherActiveApplications(
+          db.promise(),
+          currentApplication.candidate_id,
+          currentApplication.id,
+          `Tidak lolos karena kandidat sudah lolos pada lowongan ini.`,
+        );
+      }
 
       res.json({ message: `Application status updated to ${status}` });
     } catch (error) {
@@ -369,6 +428,27 @@ router.post(
         return res.status(404).json({ message: "Application not found" });
       }
 
+      const currentApplication = application[0];
+      const acceptedApplication = await findAcceptedApplication(
+        db.promise(),
+        currentApplication.candidate_id,
+        currentApplication.id,
+      );
+
+      if (acceptedApplication) {
+        const notes = await rejectApplicationBecauseCandidateAccepted(
+          db.promise(),
+          currentApplication,
+          acceptedApplication,
+        );
+
+        return res.status(409).json({
+          message:
+            "Kandidat sudah lolos pada lowongan lain. Lamaran ini otomatis digugurkan dan tidak bisa dijadwalkan wawancara.",
+          admin_notes: notes,
+        });
+      }
+
       // Get employee_id as interviewer
       const [employee] = await db
         .promise()
@@ -385,7 +465,7 @@ router.post(
             ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, NOW())`,
         [
           id,
-          application[0].candidate_id, // ambil candidate_id dari aplikasi
+          currentApplication.candidate_id, // ambil candidate_id dari aplikasi
           interview_type || "video",
           scheduled_date,
           duration_minutes || 60,
@@ -458,7 +538,7 @@ router.post(
       }
 
       for (const interview of interviews) {
-        const applicationStatus =
+        let applicationStatus =
           interview.result === "passed"
             ? "diterima"
             : ["failed", "no_show"].includes(interview.result)
@@ -467,12 +547,45 @@ router.post(
 
         if (!applicationStatus) continue;
 
+        const [applicationRows] = await connection.query(
+          "SELECT id, candidate_id FROM applications WHERE id = ? FOR UPDATE",
+          [interview.application_id],
+        );
+        const application = applicationRows[0];
+        if (!application) continue;
+
+        if (applicationStatus === "diterima") {
+          const acceptedApplication = await findAcceptedApplication(
+            connection,
+            application.candidate_id,
+            application.id,
+          );
+
+          if (acceptedApplication) {
+            await rejectApplicationBecauseCandidateAccepted(
+              connection,
+              application,
+              acceptedApplication,
+            );
+            continue;
+          }
+        }
+
         await connection.query(
           `UPDATE applications
            SET status = ?, reviewed_at = NOW()
            WHERE id = ?`,
           [applicationStatus, interview.application_id],
         );
+
+        if (applicationStatus === "diterima") {
+          await rejectOtherActiveApplications(
+            connection,
+            application.candidate_id,
+            application.id,
+            `Tidak lolos karena kandidat sudah lolos pada lowongan ini.`,
+          );
+        }
       }
 
       await connection.query(

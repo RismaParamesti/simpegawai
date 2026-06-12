@@ -24,6 +24,30 @@ import {
   isUnmanagedApplicationWarningCandidate,
 } from "../../../utils/hiredCandidateStatus";
 
+const normalizeStatus = (value) =>
+  String(value || "")
+    .toLowerCase()
+    .trim();
+
+const inactiveJobStatuses = new Set(["closed", "canceled", "cancelled"]);
+const inactiveHiringStatuses = new Set(["completed", "canceled", "cancelled"]);
+
+const isActionableAlreadyHiredApplication = (application) => {
+  if (!isUnmanagedApplicationWarningCandidate(application)) return false;
+
+  const jobStatus = normalizeStatus(
+    application?.job_status || application?.job_opening_status,
+  );
+  const hiringStatus = normalizeStatus(
+    application?.job_hiring_status || application?.hiring_status,
+  );
+
+  if (inactiveJobStatuses.has(jobStatus)) return false;
+  if (inactiveHiringStatuses.has(hiringStatus)) return false;
+
+  return true;
+};
+
 const formatDateLabel = (value) => {
   if (!value) return "-";
   const date = new Date(value);
@@ -131,9 +155,25 @@ export default function CandidateJobList() {
       setJobs(jobsData);
       setFilteredJobs(jobsData);
 
-      const applications = Array.isArray(appsRes?.data?.applications)
+      const rawApplications = Array.isArray(appsRes?.data?.applications)
         ? appsRes.data.applications
         : [];
+      const jobsById = new Map(
+        jobsData
+          .map((job) => [job.id || job.job_opening_id, job])
+          .filter(([jobId]) => Boolean(jobId)),
+      );
+      const applications = rawApplications.map((application) => {
+        const job = jobsById.get(application.job_opening_id || application.job_id);
+        if (!job) return application;
+
+        return {
+          ...application,
+          job_status: application.job_status || job.status,
+          job_hiring_status:
+            application.job_hiring_status || job.hiring_status,
+        };
+      });
 
       setApplicationsList(applications);
       const hiredRes = await api
@@ -302,7 +342,7 @@ export default function CandidateJobList() {
   const hiredCandidateWarnings = useMemo(
     () =>
       applicationsList
-        .filter(isUnmanagedApplicationWarningCandidate)
+        .filter(isActionableAlreadyHiredApplication)
         .map((item) => {
           const hiredInfo = findHiredCandidateInfo(hiredCandidateLookup, item);
           if (!hiredInfo) return null;
