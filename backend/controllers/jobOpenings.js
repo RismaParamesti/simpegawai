@@ -79,13 +79,6 @@ router.get("/", async (req, res) => {
   try {
     const { status, position_id } = req.query;
 
-    // Update otomatis lowongan menjadi shortlisting saat deadline sudah lewat.
-    await db
-      .promise()
-      .query(
-        `UPDATE job_openings SET status = 'closed', hiring_status = 'shortlisting' WHERE status = 'open' AND deadline IS NOT NULL AND deadline < CURDATE()`,
-      );
-
     let query = `
         SELECT 
           jo.id,
@@ -122,6 +115,9 @@ router.get("/", async (req, res) => {
     if (status) {
       conditions.push("jo.status = ?");
       params.push(status);
+      if (String(status).toLowerCase() === "open") {
+        conditions.push("(jo.deadline IS NULL OR jo.deadline >= CURDATE())");
+      }
     }
     if (position_id) {
       conditions.push("jo.position_id = ?");
@@ -216,7 +212,9 @@ router.get("/:id/documents", async (req, res) => {
             FROM job_openings jo
             JOIN positions p ON jo.position_id = p.id
             JOIN departments d ON p.department_id = d.id
-            WHERE jo.id = ? AND jo.status = 'open'
+            WHERE jo.id = ?
+              AND jo.status = 'open'
+              AND (jo.deadline IS NULL OR jo.deadline >= CURDATE())
         `;
 
     const [jobs] = await db.promise().query(query, [id]);
@@ -527,7 +525,43 @@ router.put(
         userAgent: getUserAgent(req),
       });
 
-      res.json({ message: "Job opening updated successfully" });
+      const [updatedJobRows] = await db.promise().query(
+        `SELECT 
+          jo.id,
+          jo.position_id,
+          jo.base_position,
+          jo.title,
+          jo.description,
+          jo.requirements,
+          jo.assessment_criteria,
+          jo.responsibilities,
+          jo.quota,
+          jo.employment_type,
+          jo.salary_range_min,
+          jo.salary_range_max,
+          jo.location,
+          jo.deadline,
+          jo.status,
+          jo.hiring_status,
+          jo.created_by,
+          jo.created_at,
+          p.name AS position_name,
+          p.level,
+          d.name AS department_name,
+          (
+            SELECT COUNT(*) FROM applications a WHERE a.job_opening_id = jo.id
+          ) AS applications_count
+        FROM job_openings jo
+        JOIN positions p ON jo.position_id = p.id
+        JOIN departments d ON p.department_id = d.id
+        WHERE jo.id = ?`,
+        [id],
+      );
+
+      res.json({
+        message: "Job opening updated successfully",
+        job: updatedJobRows[0] || null,
+      });
     } catch (error) {
       console.error(error);
       res.status(500).json({ message: "Server error" });

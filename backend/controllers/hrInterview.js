@@ -2,6 +2,11 @@
 const express = require("express");
 const router = express.Router();
 const db = require("../config/db");
+const {
+  findAcceptedApplication,
+  rejectApplicationBecauseCandidateAccepted,
+  rejectOtherActiveApplications,
+} = require("../utils/recruitmentApplicationGuard");
 
 const ASSESSMENT_START = "[ASSESSMENT_CRITERIA]";
 const ASSESSMENT_END = "[/ASSESSMENT_CRITERIA]";
@@ -48,7 +53,7 @@ router.get("/interviews", async (req, res) => {
   // Tampilkan hanya kandidat yang lolos (i.result = 'passed')
   // dan job_openings status = 'closed' dan hiring_status = 'completed'
   try {
-    let query = `SELECT i.*, c.name AS name, c.email, j.title, j.base_position, j.position_id, p.name AS position_name, a.photo_file
+    let query = `SELECT i.*, a.job_opening_id, c.name AS name, c.email, j.title, j.base_position, j.position_id, p.name AS position_name, a.photo_file
       FROM interviews i
       JOIN applications a ON i.application_id = a.id
       JOIN candidates c ON a.candidate_id = c.id
@@ -91,14 +96,54 @@ router.put("/admin/applications/accept-by-job", async (req, res) => {
   const { job_opening_id } = req.body;
   if (!job_opening_id)
     return res.status(400).json({ message: "job_opening_id wajib diisi" });
+  const connection = await db.promise().getConnection();
   try {
-    await db.promise().query(
-      `UPDATE applications SET status = 'diterima' WHERE job_opening_id = ? AND status != 'diterima'`,
+    await connection.beginTransaction();
+
+    const [applications] = await connection.query(
+      `SELECT id, candidate_id
+       FROM applications
+       WHERE job_opening_id = ?
+         AND status NOT IN ('diterima', 'accepted', 'ditolak', 'rejected', 'withdrawn', 'canceled_by_company')
+       FOR UPDATE`,
       [job_opening_id],
     );
+
+    for (const application of applications) {
+      const acceptedApplication = await findAcceptedApplication(
+        connection,
+        application.candidate_id,
+        application.id,
+      );
+
+      if (acceptedApplication) {
+        await rejectApplicationBecauseCandidateAccepted(
+          connection,
+          application,
+          acceptedApplication,
+        );
+        continue;
+      }
+
+      await connection.query(
+        `UPDATE applications SET status = 'diterima', reviewed_at = NOW() WHERE id = ?`,
+        [application.id],
+      );
+      await rejectOtherActiveApplications(
+        connection,
+        application.candidate_id,
+        application.id,
+        "Tidak lolos karena kandidat sudah lolos pada lowongan ini.",
+      );
+    }
+
+    await connection.commit();
     res.json({ success: true });
   } catch (err) {
+    await connection.rollback();
     res.status(500).json({ message: err.message });
+  } finally {
+    connection.release();
   }
 });
 

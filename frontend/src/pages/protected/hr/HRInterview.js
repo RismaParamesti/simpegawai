@@ -1678,7 +1678,7 @@ export default function HRInterview() {
                 >
                   <option value="">Semua Status</option>
                   <option value="completed">Selesai</option>
-                  <option value="disqualified">Gugur</option>
+                  <option value="disqualified">Digugurkan</option>
                   <option value="canceled_by_company">
                     Dibatalkan Perusahaan
                   </option>
@@ -1805,7 +1805,9 @@ export default function HRInterview() {
                                   ) : d.status === "cancelled" ||
                                     d.status === "disqualified" ? (
                                     <span className="badge badge-error">
-                                      Gugur
+                                      {d.status === "disqualified"
+                                        ? "Digugurkan"
+                                        : "Gugur"}
                                     </span>
                                   ) : null}
                                   <button

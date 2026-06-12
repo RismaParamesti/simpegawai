@@ -11,6 +11,12 @@ const {
   validateDocuments,
   DOCUMENT_FIELD_METADATA,
 } = require("../utils/documentRequirements");
+const {
+  ACCEPTED_APPLICATION_STATUSES,
+  findAcceptedApplication,
+  rejectApplicationBecauseCandidateAccepted,
+  rejectOtherActiveApplications,
+} = require("../utils/recruitmentApplicationGuard");
 
 // ============================
 // GET SINGLE APPLICATION DETAIL (HR)
@@ -650,7 +656,6 @@ const APPLICATION_FILE_FIELD_ALIASES = {
   github: "github_link",
   design: "design_link",
   youtube: "youtube_link",
-  marketing_portfolio: "marketing_portfolio_link",
   campaign: "campaign_link",
   design_portfolio_file: "design_link",
   marketing_campaign_file: "campaign_link",
@@ -672,13 +677,39 @@ const APPLICATION_FILE_FIELDS = new Set([
   "github_link",
   "design_link",
   "youtube_link",
-  "marketing_portfolio_link",
   "campaign_link",
 ]);
+
+const APPLICATION_FILE_TYPE_RULES = {
+  cv_file: ["pdf", "jpg", "jpeg", "png"],
+  ktp_file: ["jpg", "jpeg", "png"],
+  photo_file: ["jpg", "jpeg", "png"],
+  ijazah_file: ["pdf"],
+  transcript_file: ["pdf"],
+  certificate_file: ["pdf"],
+  experience_letter_file: ["pdf"],
+  reference_letter_file: ["pdf"],
+  skck_file: ["pdf"],
+  portfolio_file: ["pdf"],
+  cover_letter_file: ["pdf", "doc", "docx"],
+  other_document: ["pdf", "jpg", "jpeg", "png", "zip", "rar", "7z", "doc", "docx"],
+};
 
 const normalizeApplicationFieldName = (fieldName) => {
   if (!fieldName) return fieldName;
   return APPLICATION_FILE_FIELD_ALIASES[fieldName] || fieldName;
+};
+
+const cleanupUploadedFiles = (files = []) => {
+  for (const file of files) {
+    try {
+      if (file.path && fs.existsSync(file.path)) {
+        fs.unlinkSync(file.path);
+      }
+    } catch (cleanupError) {
+      console.warn("Failed to cleanup upload:", cleanupError.message);
+    }
+  }
 };
 
 // ============================
@@ -961,24 +992,19 @@ router.post(
       const [job] = await db.promise().query(
         `SELECT jo.*, p.name as position_name FROM job_openings jo
                  LEFT JOIN positions p ON jo.position_id = p.id
-                 WHERE jo.id = ? AND jo.status = 'open'`,
+                 WHERE jo.id = ?
+                   AND jo.status = 'open'
+                   AND (jo.deadline IS NULL OR jo.deadline >= CURDATE())`,
         [job_opening_id],
       );
 
       if (job.length === 0) {
         return res
           .status(404)
-          .json({ message: "Job opening not found or closed" });
+          .json({ message: "Job opening not found, closed, or expired" });
       }
 
       const jobData = job[0];
-
-      // Check deadline
-      if (jobData.deadline && new Date(jobData.deadline) < new Date()) {
-        return res
-          .status(400)
-          .json({ message: "Application deadline has passed" });
-      }
 
       // Check if already applied
       const [existing] = await db
@@ -1051,19 +1077,43 @@ router.post(
 
       if (unexpectedFields.length > 0) {
         // Bersihkan file yang sempat tersimpan supaya request tidak gagal diam-diam.
-        for (const file of req.files || []) {
-          try {
-            if (file.path && fs.existsSync(file.path)) {
-              fs.unlinkSync(file.path);
-            }
-          } catch (cleanupError) {
-            console.warn("Failed to cleanup unexpected upload:", cleanupError.message);
-          }
-        }
+        cleanupUploadedFiles(req.files);
 
         return res.status(400).json({
           message: "Unexpected upload field",
           unexpectedFields,
+        });
+      }
+
+      const invalidFileFormats = (req.files || [])
+        .map((file) => {
+          const normalizedField = normalizeApplicationFieldName(file.fieldname);
+          const allowedExtensions = APPLICATION_FILE_TYPE_RULES[normalizedField];
+          const extension = path.extname(file.originalname || "")
+            .replace(".", "")
+            .toLowerCase();
+
+          if (
+            allowedExtensions &&
+            !allowedExtensions.includes(extension)
+          ) {
+            return {
+              fieldName: normalizedField,
+              label: DOCUMENT_FIELD_METADATA[normalizedField]?.label || normalizedField,
+              allowedFormats: allowedExtensions.map((item) => item.toUpperCase()),
+            };
+          }
+
+          return null;
+        })
+        .filter(Boolean);
+
+      if (invalidFileFormats.length > 0) {
+        cleanupUploadedFiles(req.files);
+
+        return res.status(400).json({
+          message: "Invalid document file format",
+          invalidFileFormats,
         });
       }
 
@@ -1072,7 +1122,6 @@ router.post(
         "github_link",
         "design_link",
         "youtube_link",
-        "marketing_portfolio_link",
         "campaign_link",
       ];
       urlFields.forEach((field) => {
@@ -1120,7 +1169,6 @@ router.post(
         "github_link",
         "design_link",
         "youtube_link",
-        "marketing_portfolio_link",
         "campaign_link",
       ];
       const applicationValues = [
@@ -1141,7 +1189,6 @@ router.post(
         filePaths.github_link || null,
         filePaths.design_link || null,
         filePaths.youtube_link || null,
-        filePaths.marketing_portfolio_link || null,
         filePaths.campaign_link || null,
       ];
 
@@ -1580,10 +1627,11 @@ router.get(
   a.github_link,
   a.design_link,
   a.youtube_link,
-  a.marketing_portfolio_link,
   a.campaign_link,
 
   jo.title AS job_title,
+  jo.status AS job_status,
+  jo.hiring_status AS job_hiring_status,
   jo.base_position,
   p.name AS position_name,
   e.full_name AS reviewer_name
@@ -1680,6 +1728,49 @@ router.put(
         });
       }
 
+      const currentApplication = application[0];
+      const acceptedApplication = await findAcceptedApplication(
+        db.promise(),
+        currentApplication.candidate_id,
+        currentApplication.id,
+      );
+
+      if (acceptedApplication && !ACCEPTED_APPLICATION_STATUSES.includes(status)) {
+        const notes = await rejectApplicationBecauseCandidateAccepted(
+          db.promise(),
+          currentApplication,
+          acceptedApplication,
+        );
+
+        if (status === "ditolak") {
+          return res.json({
+            message:
+              "Kandidat sudah lolos pada lowongan lain. Lamaran ini otomatis digugurkan.",
+            admin_notes: notes,
+          });
+        }
+
+        return res.status(409).json({
+          message:
+            "Kandidat sudah lolos pada lowongan lain. Lamaran ini otomatis digugurkan.",
+          admin_notes: notes,
+        });
+      }
+
+      if (acceptedApplication && ACCEPTED_APPLICATION_STATUSES.includes(status)) {
+        const notes = await rejectApplicationBecauseCandidateAccepted(
+          db.promise(),
+          currentApplication,
+          acceptedApplication,
+        );
+
+        return res.status(409).json({
+          message:
+            "Kandidat sudah memiliki lowongan yang lolos. Lamaran ini tidak bisa diterima lagi dan otomatis digugurkan.",
+          admin_notes: notes,
+        });
+      }
+
       // Get employee_id
       const [employee] = await db
         .promise()
@@ -1693,6 +1784,15 @@ router.put(
              WHERE id = ?`,
         [status, admin_notes || null, reviewerId, id],
       );
+
+      if (ACCEPTED_APPLICATION_STATUSES.includes(status)) {
+        await rejectOtherActiveApplications(
+          db.promise(),
+          currentApplication.candidate_id,
+          currentApplication.id,
+          `Tidak lolos karena kandidat sudah lolos pada lowongan ini.`,
+        );
+      }
 
       res.json({ message: `Application status updated to ${status}` });
     } catch (error) {
@@ -1732,6 +1832,27 @@ router.post(
         return res.status(404).json({ message: "Application not found" });
       }
 
+      const currentApplication = application[0];
+      const acceptedApplication = await findAcceptedApplication(
+        db.promise(),
+        currentApplication.candidate_id,
+        currentApplication.id,
+      );
+
+      if (acceptedApplication) {
+        const notes = await rejectApplicationBecauseCandidateAccepted(
+          db.promise(),
+          currentApplication,
+          acceptedApplication,
+        );
+
+        return res.status(409).json({
+          message:
+            "Kandidat sudah lolos pada lowongan lain. Lamaran ini otomatis digugurkan dan tidak bisa dijadwalkan wawancara.",
+          admin_notes: notes,
+        });
+      }
+
       // Get employee_id as interviewer
       const [employee] = await db
         .promise()
@@ -1748,7 +1869,7 @@ router.post(
             ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, NOW())`,
         [
           id,
-          application[0].candidate_id, // ambil candidate_id dari aplikasi
+          currentApplication.candidate_id, // ambil candidate_id dari aplikasi
           interview_type || "video",
           scheduled_date,
           duration_minutes || 60,
@@ -1928,8 +2049,8 @@ router.post(
       const [acceptedApp] = await db
         .promise()
         .query(
-          "SELECT id FROM applications WHERE candidate_id = ? AND status = 'accepted'",
-          [id],
+          "SELECT id FROM applications WHERE candidate_id = ? AND status IN (?)",
+          [id, ACCEPTED_APPLICATION_STATUSES],
         );
 
       if (acceptedApp.length === 0) {

@@ -60,6 +60,36 @@ function CandidateApplyPage() {
     doc.fieldName?.includes("marketing") ||
     doc.fieldName?.includes("campaign");
 
+  const documentFileTypeRules = {
+    cv_file: ["pdf", "jpg", "jpeg", "png"],
+    ktp_file: ["jpg", "jpeg", "png"],
+    photo_file: ["jpg", "jpeg", "png"],
+    ijazah_file: ["pdf"],
+    transcript_file: ["pdf"],
+    certificate_file: ["pdf"],
+    experience_letter_file: ["pdf"],
+    reference_letter_file: ["pdf"],
+    skck_file: ["pdf"],
+    portfolio_file: ["pdf"],
+    cover_letter_file: ["pdf", "doc", "docx"],
+  };
+
+  const defaultDocumentFileTypes = ["pdf"];
+
+  const getAllowedFileTypes = (fieldName) =>
+    documentFileTypeRules[fieldName] || defaultDocumentFileTypes;
+
+  const getDocumentAccept = (fieldName) =>
+    getAllowedFileTypes(fieldName).map((type) => `.${type}`).join(",");
+
+  const getDocumentFormatText = (fieldName) =>
+    getAllowedFileTypes(fieldName).map((type) => type.toUpperCase()).join(", ");
+
+  const isAllowedDocumentFile = (fieldName, file) => {
+    const extension = file?.name?.split(".").pop()?.toLowerCase();
+    return Boolean(extension && getAllowedFileTypes(fieldName).includes(extension));
+  };
+
   const hasDocumentValue = (doc) => Boolean(fileNames[doc.fieldName] || files[doc.fieldName]);
 
   const renderLongTextBlock = (title, value) => (
@@ -261,7 +291,6 @@ function CandidateApplyPage() {
     github_link: null,
     design_link: null,
     youtube_link: null,
-    marketing_portfolio_link: null,
     campaign_link: null,
   });
 
@@ -280,7 +309,6 @@ function CandidateApplyPage() {
     github_link: "",
     design_link: "",
     youtube_link: "",
-    marketing_portfolio_link: "",
     campaign_link: "",
   });
 
@@ -476,13 +504,24 @@ function CandidateApplyPage() {
   const handleFileChange = (e) => {
     const { name, files: fileList } = e.target;
     if (fileList.length > 0) {
+      const selectedFile = fileList[0];
+      if (!isAllowedDocumentFile(name, selectedFile)) {
+        NotificationManager.error(
+          `Format file ${selectedFile.name} tidak sesuai. Gunakan: ${getDocumentFormatText(name)}.`,
+          "Format File Tidak Valid",
+          4000,
+        );
+        e.target.value = "";
+        return;
+      }
+
       setFiles({
         ...files,
-        [name]: fileList[0],
+        [name]: selectedFile,
       });
       setFileNames({
         ...fileNames,
-        [name]: fileList[0].name,
+        [name]: selectedFile.name,
       });
     }
   };
@@ -609,6 +648,7 @@ function CandidateApplyPage() {
 
     // Validasi dokumen wajib: harus ada File object (untuk file) atau string (untuk URL)
     const missingRequiredDocs = [];
+    const invalidDocumentFormats = [];
     if (requiredDocuments && requiredDocuments.length > 0) {
       requiredDocuments.forEach((doc) => {
         const val = files[doc.fieldName];
@@ -628,6 +668,10 @@ function CandidateApplyPage() {
           // Untuk file, harus benar-benar File object
           if (!val || typeof val !== "object" || !(val instanceof File)) {
             missingRequiredDocs.push(doc.label);
+          } else if (!isAllowedDocumentFile(doc.fieldName, val)) {
+            invalidDocumentFormats.push(
+              `${doc.label} (${getDocumentFormatText(doc.fieldName)})`,
+            );
           }
         }
       });
@@ -638,6 +682,34 @@ function CandidateApplyPage() {
         `Dokumen berikut masih diperlukan: ${missingRequiredDocs.join(", ")}`,
         "Dokumen Tidak Lengkap",
         4000,
+      );
+      return;
+    }
+
+    [...requiredDocuments, ...optionalDocuments].forEach((doc) => {
+      if (isUrlDocumentField(doc)) return;
+      const val = files[doc.fieldName];
+      const alreadyReportedRequired = requiredDocuments.some(
+        (requiredDoc) => requiredDoc.fieldName === doc.fieldName,
+      );
+      if (
+        !alreadyReportedRequired &&
+        val &&
+        typeof val === "object" &&
+        val instanceof File &&
+        !isAllowedDocumentFile(doc.fieldName, val)
+      ) {
+        invalidDocumentFormats.push(
+          `${doc.label} (${getDocumentFormatText(doc.fieldName)})`,
+        );
+      }
+    });
+
+    if (invalidDocumentFormats.length > 0) {
+      NotificationManager.error(
+        `Format dokumen tidak sesuai: ${invalidDocumentFormats.join(", ")}`,
+        "Format File Tidak Valid",
+        5000,
       );
       return;
     }
@@ -721,6 +793,15 @@ function CandidateApplyPage() {
           `Field upload tidak dikenali: ${error.response.data.unexpectedFields.join(", ")}`,
           "Gagal Upload",
           4000,
+        );
+      } else if (error.response?.data?.invalidFileFormats?.length > 0) {
+        const invalidFiles = error.response.data.invalidFileFormats
+          .map((item) => `${item.label} (${item.allowedFormats.join(", ")})`)
+          .join(", ");
+        NotificationManager.error(
+          `Format dokumen tidak sesuai: ${invalidFiles}`,
+          "Format File Tidak Valid",
+          5000,
         );
       } else {
         NotificationManager.error(errorMsg, "Gagal", 3000);
@@ -1467,8 +1548,8 @@ function CandidateApplyPage() {
                       fileObj &&
                       fileObj.type &&
                       fileObj.type.startsWith("image/");
-                    // File type allowed by backend
-                    const allowedTypes = ".pdf,.doc,.docx,.jpg,.jpeg,.png,.zip";
+                    const allowedTypes = getDocumentAccept(doc.fieldName);
+                    const allowedFormatText = getDocumentFormatText(doc.fieldName);
                     return (
                       <div key={doc.fieldName} className="form-control">
                         <label className="label">
@@ -1529,8 +1610,7 @@ function CandidateApplyPage() {
                               required={doc.required}
                             />
                             <p className="text-xs text-gray-500 mt-1">
-                              Jenis file yang diperbolehkan: pdf, doc, docx,
-                              jpg, jpeg, png, zip
+                              Format yang diperbolehkan: {allowedFormatText}.
                             </p>
                           </>
                         )}
@@ -1568,6 +1648,8 @@ function CandidateApplyPage() {
                       fileObj &&
                       fileObj.type &&
                       fileObj.type.startsWith("image/");
+                    const allowedTypes = getDocumentAccept(doc.fieldName);
+                    const allowedFormatText = getDocumentFormatText(doc.fieldName);
                     return (
                       <div key={doc.fieldName} className="form-control">
                         <label className="label">
@@ -1622,10 +1704,13 @@ function CandidateApplyPage() {
                             <input
                               type="file"
                               name={doc.fieldName}
-                              accept={doc.accept}
+                              accept={allowedTypes}
                               className="file-input file-input-bordered"
                               onChange={handleFileChange}
                             />
+                            <p className="text-xs text-gray-500 mt-1">
+                              Format yang diperbolehkan: {allowedFormatText}.
+                            </p>
                           </>
                         )}
                         <label className="label">

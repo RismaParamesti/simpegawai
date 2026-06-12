@@ -121,32 +121,12 @@ export default function HRJobOpenings() {
       // Ambil data dari API
       const data = await jobService.getJobOpenings();
       let jobs = Array.isArray(data) ? data : data.jobs || [];
-      const now = new Date();
       const active = [];
       const history = [];
-      // Pisahkan dan update status jika perlu
+      // Pisahkan aktif/riwayat berdasarkan status yang tersimpan di database.
       for (const job of jobs) {
-        // Jika lowongan sudah ditutup, masukkan ke riwayat
         if (job.status === "closed") {
           history.push(job);
-          continue;
-        }
-        // Pastikan hiring_status tetap ikut di state
-        if (job.deadline && new Date(job.deadline) < now) {
-          if (job.status !== "closed") {
-            try {
-              await jobService.updateJobOpening(job.id, {
-                ...job,
-                status: "closed",
-                hiring_status: job.hiring_status || "ongoing",
-              });
-              history.push({ ...job, status: "closed" });
-            } catch (e) {
-              history.push({ ...job, status: "closed" });
-            }
-          } else {
-            history.push(job);
-          }
         } else {
           active.push(job);
         }
@@ -166,6 +146,27 @@ export default function HRJobOpenings() {
     } catch (e) {
       // abaikan error
     }
+  }
+
+  function syncUpdatedJobOpening(updatedJob) {
+    if (!updatedJob?.id) return;
+
+    setJobOpenings((items) =>
+      updatedJob.status === "closed"
+        ? items.filter((item) => item.id !== updatedJob.id)
+        : [
+            ...items.filter((item) => item.id !== updatedJob.id),
+            updatedJob,
+          ],
+    );
+    setHistoryOpenings((items) =>
+      updatedJob.status === "closed"
+        ? [
+            ...items.filter((item) => item.id !== updatedJob.id),
+            updatedJob,
+          ]
+        : items.filter((item) => item.id !== updatedJob.id),
+    );
   }
 
   function handleChange(e) {
@@ -255,7 +256,12 @@ export default function HRJobOpenings() {
       if (payload.salary_range_max)
         payload.salary_range_max = parseInt(payload.salary_range_max, 10);
       if (editMode && editId) {
-        await jobService.updateJobOpening(editId, payload);
+        const updated = await jobService.updateJobOpening(editId, payload);
+        if (updated?.job) {
+          syncUpdatedJobOpening(updated.job);
+        } else {
+          await fetchJobOpenings();
+        }
 
         const msg =
           "Lowongan pekerjaan berhasil diperbarui. Perubahan data telah disimpan dan akan langsung digunakan pada proses rekrutmen.";
@@ -274,8 +280,10 @@ export default function HRJobOpenings() {
       setForm(defaultJobOpening);
       setEditMode(false);
       setEditId(null);
-      setActiveTab("active");
-      fetchJobOpenings();
+      setActiveTab(payload.status === "closed" ? "history" : "active");
+      if (!editMode) {
+        fetchJobOpenings();
+      }
     } catch (e) {
       setError(e.message);
     }

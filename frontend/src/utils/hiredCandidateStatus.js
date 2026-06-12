@@ -30,8 +30,6 @@ const getCandidateKeys = (candidate) => {
   [
     candidate?.application_id,
     candidate?.applicationId,
-    candidate?.id,
-    candidate?._id,
   ].forEach((value) => {
     if (value) keys.add(`application:${value}`);
   });
@@ -43,6 +41,41 @@ const getCandidateKeys = (candidate) => {
   if (name) keys.add(`name:${name}`);
 
   return Array.from(keys);
+};
+
+const normalizeId = (value) => {
+  if (value === null || typeof value === "undefined" || value === "") return "";
+  return String(value);
+};
+
+const getApplicationId = (candidate) =>
+  normalizeId(candidate?.application_id || candidate?.applicationId);
+
+const getJobOpeningId = (candidate) =>
+  normalizeId(
+    candidate?.job_opening_id ||
+      candidate?.jobOpeningId ||
+      candidate?.job_id ||
+      candidate?.jobId,
+  );
+
+const isSameApplication = (left, right) => {
+  const leftId = getApplicationId(left);
+  const rightId = getApplicationId(right);
+  return Boolean(leftId && rightId && leftId === rightId);
+};
+
+const isSameJobOpening = (left, right) => {
+  const leftId = getJobOpeningId(left);
+  const rightId = getJobOpeningId(right);
+  return Boolean(leftId && rightId && leftId === rightId);
+};
+
+const isRelevantHiredMatch = (candidate, hiredInfo) => {
+  if (!hiredInfo) return false;
+  if (isSameApplication(candidate, hiredInfo)) return false;
+  if (isSameJobOpening(candidate, hiredInfo)) return false;
+  return true;
 };
 
 export const buildHiredCandidateLookup = (hiredCandidates = []) => {
@@ -67,7 +100,7 @@ export const findHiredCandidateInfo = (lookup, candidate) => {
 
   for (const key of getCandidateKeys(candidate)) {
     const match = lookup.get(key);
-    if (match) return match;
+    if (isRelevantHiredMatch(candidate, match)) return match;
   }
 
   return null;

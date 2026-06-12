@@ -46,6 +46,12 @@ const submittedStatuses = new Set(["submitted", "pending"]);
 const screeningStatuses = new Set(["screening"]);
 const acceptedStatuses = new Set(["diterima", "accepted"]);
 
+const isRejectedBecauseAlreadyHired = (application) =>
+  rejectedStatuses.has(normalizeStatus(application?.status)) &&
+  String(application?.admin_notes || "")
+    .toLowerCase()
+    .includes("sudah lolos");
+
 const gradientButtonBase =
   "inline-flex items-center justify-center gap-2 rounded-full px-4 py-2 text-sm font-semibold transition-all duration-200 shadow-sm";
 const gradientBlueButtonClass =
@@ -456,10 +462,9 @@ export default function HRRecruitmentProcessDetail() {
     return applications.filter((app) => {
       const status = normalizeStatus(app.status);
       if (screeningStatuses.has(status)) return true;
-      if (rejectedStatuses.has(status)) return !isResultPublished;
       return false;
     });
-  }, [applications, isResultPublished]);
+  }, [applications]);
 
   // Untuk tabel riwayat, jika lowongan sudah closed & completed, tampilkan SEMUA aplikasi kecuali yang diterima
   // Jika belum completed, hanya tampilkan yang ditolak saja
@@ -686,10 +691,9 @@ export default function HRRecruitmentProcessDetail() {
       : activeTab === "screening"
         ? filteredShortlistedApplications.length
         : filteredHistoryApplications.length;
-  const selectedHiredInfo = findHiredCandidateInfo(
-    hiredCandidateLookup,
-    selected,
-  );
+  const selectedHiredInfo = selected?.isHistory
+    ? null
+    : findHiredCandidateInfo(hiredCandidateLookup, selected);
 
   const menu = [
     {
@@ -723,6 +727,11 @@ export default function HRRecruitmentProcessDetail() {
     if (["ditolak", "rejected"].includes(normalized)) return "!bg-red-500 !text-white";
     if (["withdrawn"].includes(normalized)) return "!bg-slate-400 !text-white";
     return "!bg-orange-500 !text-white";
+  };
+
+  const getApplicationStatusLabel = (application) => {
+    if (isRejectedBecauseAlreadyHired(application)) return "Digugurkan";
+    return getStatusLabel(application?.status);
   };
 
   const renderFilterCard = () => (
@@ -792,10 +801,13 @@ export default function HRRecruitmentProcessDetail() {
               </tr>
             ) : (
               activeRows.map((item) => {
-                const hiredInfo = findHiredCandidateInfo(
-                  hiredCandidateLookup,
-                  item,
+                const isFinalRejected = rejectedStatuses.has(
+                  normalizeStatus(item.status),
                 );
+                const hiredInfo =
+                  activeTab !== "history" && !isFinalRejected
+                    ? findHiredCandidateInfo(hiredCandidateLookup, item)
+                    : null;
 
                 return (
                 <tr
@@ -846,7 +858,7 @@ export default function HRRecruitmentProcessDetail() {
                           ? rejectedStatuses.has(normalizeStatus(item.status))
                             ? "Ditolak"
                             : "Lolos Dokumen"
-                          : getStatusLabel(item.status)}
+                          : getApplicationStatusLabel(item)}
                       </span>
                     </td>
                   )}
@@ -1005,7 +1017,7 @@ export default function HRRecruitmentProcessDetail() {
             <HiredCandidateWarning
               items={hiredCandidateWarnings}
               title="Kandidat sudah lolos"
-              description="Ada kandidat pada tab ini yang sudah tercatat lolos pada lowongan tertentu. Gunakan aksi Jadikan Tidak Lolos agar kandidat tidak diproses ulang di lowongan ini."
+              description="Terdapat kandidat yang sudah tercatat lolos pada lowongan tertentu. Gunakan aksi tolak agar kandidat tidak mengikuti ulang pada lowongan ini."
             />
 
             <div className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-700 dark:bg-slate-900 sm:p-6">
@@ -1219,7 +1231,7 @@ export default function HRRecruitmentProcessDetail() {
                     <div className="flex items-center justify-between gap-3 rounded-2xl bg-slate-50 p-3 dark:bg-slate-950/50">
                       <span className="text-slate-500 dark:text-slate-400">Status</span>
                       <span className={`badge badge-sm rounded-full border-none px-3 py-3 font-bold ${statusBadgeClass(selected.status || "submitted")}`}>
-                        {getStatusLabel(selected.status || "submitted")}
+                        {getApplicationStatusLabel(selected)}
                       </span>
                     </div>
                     <div className="flex items-center justify-between gap-3 rounded-2xl bg-slate-50 p-3 dark:bg-slate-950/50">
