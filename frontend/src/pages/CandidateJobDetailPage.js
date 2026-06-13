@@ -45,7 +45,20 @@ export default function CandidateJobDetailPage() {
     <div className="bg-gray-50 min-h-screen pb-20">
       {/* HERO HEADER */}
       <div className="bg-gradient-to-r from-orange-500 to-orange-400 text-white py-12 shadow">
-        <div className="max-w-6xl mx-auto px-6">
+        <div className="max-w-6xl mx-auto px-6 relative">
+          <button
+            type="button"
+            className="btn btn-sm absolute right-6 top-0 border-none bg-white text-orange-600 hover:bg-orange-50"
+            onClick={() => {
+              if (window.history.length > 1) {
+                navigate(-1);
+              } else {
+                navigate("/candidate/jobs");
+              }
+            }}
+          >
+            Kembali
+          </button>
           <h1 className="text-3xl font-bold mb-2">
             {job.title || job.position_name}
           </h1>
@@ -178,7 +191,7 @@ export default function CandidateJobDetailPage() {
                   style={{ background: "#F58220" }}
                   onClick={() => {
                     if (!token) {
-                      navigate("/login");
+                      navigate("/login?role=kandidat");
                     } else {
                       navigate(`/candidate/apply/${job.id}`);
                     }

@@ -8,10 +8,12 @@ function LeftSidebar() {
   const activeRole = localStorage.getItem("activeRole") || "";
   const routes = getSidebarByRole(activeRole);
   const isRouteActive = (route) => {
+    const paths = [route.path, ...(route.activePaths || [])].filter(Boolean);
     if (route.exact) return location.pathname === route.path;
-    return (
-      location.pathname === route.path ||
-      location.pathname.startsWith(`${route.path}/`)
+    return paths.some(
+      (path) =>
+        location.pathname === path ||
+        location.pathname.startsWith(`${path}/`)
     );
   };
   const close = (e) => {

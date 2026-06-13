@@ -75,24 +75,6 @@ const getOnboardingBadge = (status) => {
     };
   }
 
-  if (status === "accepted") {
-    return {
-      label: "Diterima Onboarding",
-      className:
-        "border-emerald-200 bg-emerald-50 text-emerald-600 dark:border-emerald-900/60 dark:bg-emerald-950/40 dark:text-emerald-300",
-      icon: CheckCircle2,
-    };
-  }
-
-  if (status === "rejected") {
-    return {
-      label: "Menolak Onboarding",
-      className:
-        "border-red-200 bg-red-50 text-red-600 dark:border-red-900/60 dark:bg-red-950/40 dark:text-red-300",
-      icon: XCircle,
-    };
-  }
-
   return {
     label: status || "-",
     className:
@@ -237,14 +219,6 @@ const HRHiredCandidate = () => {
       className:
         "border-blue-200 bg-blue-50 text-blue-700 dark:border-blue-900/50 dark:bg-blue-950/30 dark:text-blue-200",
     },
-    {
-      label: "Diterima Onboarding",
-      value: summary.accepted,
-      description: "Kandidat menerima panggilan onboarding",
-      icon: CheckCircle2,
-      className:
-        "border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-900/50 dark:bg-emerald-950/30 dark:text-emerald-200",
-    },
   ];
 
   return (
@@ -268,7 +242,7 @@ const HRHiredCandidate = () => {
         </div>
 
         {/* Summary */}
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
           {summaryCards.map((item) => {
             const Icon = item.icon;
             return (
@@ -341,8 +315,6 @@ const HRHiredCandidate = () => {
                 <option value="">Semua Status Surat</option>
                 <option value="Belum dibuat">Belum dibuat</option>
                 <option value="sent">Undangan Dikirim</option>
-                <option value="accepted">Diterima Onboarding</option>
-                <option value="rejected">Menolak Onboarding</option>
               </select>
 
               <button

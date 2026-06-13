@@ -6,6 +6,16 @@ import api from "../lib/api";
 import { motion } from "framer-motion";
 import { Swiper, SwiperSlide } from "swiper/react";
 import { Navigation } from "swiper/modules";
+import {
+  ArrowLeft,
+  ArrowRight,
+  BriefcaseBusiness,
+  CalendarDays,
+  Clock3,
+  Eye,
+  MapPin,
+  Wallet,
+} from "lucide-react";
 
 import "swiper/css";
 import "swiper/css/navigation";
@@ -178,116 +188,168 @@ animate-gradient"
       </section>
 
       {/* JOB LIST   */}
-      <section className="pt-6 pb-16 bg-[#F5F5F5]">
+      <section className="bg-[#F5F5F5] pb-16 pt-6">
         <div className="container mx-auto px-4">
-          {/* KOTAK BESAR */}
-          <div className="bg-[#F58220] rounded-3xl p-10 lg:p-14 relative overflow-hidden">
-            <div className="grid lg:grid-cols-2 gap-10 items-center">
-              {/* LEFT TEXT */}
-              <div className="text-white max-w-lg">
-                <h2 className="text-4xl font-bold mb-4">
+          <div className="relative overflow-hidden rounded-3xl bg-[#F58220] p-6 shadow-xl shadow-orange-200/60 sm:p-8 lg:p-12">
+            <div className="pointer-events-none absolute -right-24 -top-24 h-64 w-64 rounded-full bg-white/10 blur-2xl" />
+            <div className="pointer-events-none absolute -bottom-32 left-1/3 h-72 w-72 rounded-full bg-yellow-300/20 blur-3xl" />
+
+            <div className="relative grid gap-8 lg:grid-cols-[minmax(260px,0.85fr)_minmax(0,1.55fr)] lg:items-center">
+              <div className="max-w-lg text-white">
+                <span className="mb-4 inline-flex items-center gap-2 rounded-full bg-white/15 px-4 py-2 text-sm font-semibold text-white ring-1 ring-white/25">
+                  <BriefcaseBusiness className="h-4 w-4" />
+                  Karier PT Otak Kanan
+                </span>
+                <h2 className="mb-4 text-3xl font-extrabold leading-tight sm:text-4xl">
                   Lowongan kerja yang tersedia
                 </h2>
 
-                <p className="opacity-90 mb-6">
+                <p className="mb-6 max-w-md text-sm leading-6 text-white/90 sm:text-base">
                   Temukan lowongan pekerjaan teratas yang banyak dilamar oleh
                   para pencari kerja.
                 </p>
 
-                {/* ARROW */}
-                <div className="flex gap-3 mt-8">
+                <div className="mt-8 flex gap-3">
                   <button
-                    className="btn btn-circle bg-white text-[#F58220] border-none hover:bg-gray-100"
+                    type="button"
+                    className="btn btn-circle border-none bg-white text-[#F58220] shadow-md hover:bg-orange-50"
                     onClick={() => swiperRef?.slidePrev()}
+                    aria-label="Lowongan sebelumnya"
                   >
-                    ❮
+                    <ArrowLeft className="h-5 w-5" />
                   </button>
 
                   <button
-                    className="btn btn-circle bg-white text-[#F58220] border-none hover:bg-gray-100"
+                    type="button"
+                    className="btn btn-circle border-none bg-white text-[#F58220] shadow-md hover:bg-orange-50"
                     onClick={() => swiperRef?.slideNext()}
+                    aria-label="Lowongan berikutnya"
                   >
-                    ❯
+                    <ArrowRight className="h-5 w-5" />
                   </button>
                 </div>
               </div>
 
-              {/* RIGHT CARD SLIDER */}
-              <Swiper
-                modules={[Navigation]}
-                spaceBetween={24}
-                slidesPerView={1}
-                breakpoints={{
-                  640: { slidesPerView: 1 },
-                  768: { slidesPerView: 2 },
-                  1024: { slidesPerView: 3 },
-                }}
-                onSwiper={setSwiperRef}
-                className="w-full pb-4"
-              >
-                {filteredJobs.slice(0, 6).map((job) => (
-                  <SwiperSlide key={job.id} className="h-full flex">
-                    <div className="bg-white rounded-2xl shadow-lg p-5 hover:-translate-y-1 hover:shadow-2xl transition duration-300 w-full h-[360px] md:h-[380px] lg:h-[420px] flex flex-col justify-between overflow-hidden">
-                      <div className="mb-4">
-                        {/* Logo + time */}
-                        <div className="flex justify-between items-center mb-3">
-                          <div className="w-12 h-12 bg-gray-200 rounded-lg"></div>
+              <div className="min-w-0">
+                {loading ? (
+                  <div className="flex min-h-[300px] items-center justify-center rounded-2xl bg-white/15 text-white">
+                    <span className="loading loading-spinner loading-lg" />
+                  </div>
+                ) : filteredJobs.length === 0 ? (
+                  <div className="flex min-h-[300px] flex-col items-center justify-center rounded-2xl bg-white px-6 text-center shadow-lg">
+                    <BriefcaseBusiness className="mb-3 h-10 w-10 text-orange-400" />
+                    <p className="font-bold text-slate-900">
+                      Tidak ada lowongan yang cocok
+                    </p>
+                    <p className="mt-1 text-sm text-slate-500">
+                      Coba gunakan kata kunci lain pada kolom pencarian.
+                    </p>
+                  </div>
+                ) : (
+                  <Swiper
+                    modules={[Navigation]}
+                    spaceBetween={18}
+                    slidesPerView={1}
+                    breakpoints={{
+                      640: { slidesPerView: 1 },
+                      768: { slidesPerView: 2 },
+                      1280: { slidesPerView: 3 },
+                    }}
+                    onSwiper={setSwiperRef}
+                    className="w-full pb-4"
+                  >
+                    {filteredJobs.slice(0, 6).map((job) => {
+                      const salaryText =
+                        job.salary_range_min && job.salary_range_max
+                          ? `Rp ${Number(job.salary_range_min).toLocaleString("id-ID")} - Rp ${Number(job.salary_range_max).toLocaleString("id-ID")}`
+                          : "Dirahasiakan";
+                      const deadlineText = job.deadline
+                        ? new Date(job.deadline).toLocaleDateString("id-ID", {
+                            day: "numeric",
+                            month: "short",
+                            year: "numeric",
+                          })
+                        : "-";
 
-                          <span className="text-xs text-gray-400">
-                            {timeAgo(job.created_at)}
-                          </span>
-                        </div>
+                      return (
+                        <SwiperSlide key={job.id} className="h-auto">
+                          <article className="flex h-[390px] flex-col overflow-hidden rounded-2xl bg-white p-5 shadow-lg ring-1 ring-orange-100 transition duration-300 hover:-translate-y-1 hover:shadow-2xl">
+                            <div className="mb-4 flex items-start justify-between gap-3">
+                              <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-orange-50 text-[#F58220] ring-1 ring-orange-100">
+                                <BriefcaseBusiness className="h-6 w-6" />
+                              </div>
 
-                        {/* Job Title */}
-                        <h3 className="font-bold text-[#333333] mb-1 line-clamp-2">
-                          {job.title}
-                        </h3>
+                              <span className="inline-flex shrink-0 items-center gap-1 rounded-full bg-slate-100 px-2.5 py-1 text-[11px] font-semibold text-slate-500">
+                                <Clock3 className="h-3.5 w-3.5" />
+                                {timeAgo(job.created_at) || "Baru"}
+                              </span>
+                            </div>
 
-                        {/* Company */}
-                        <div className="text-sm text-gray-600 mb-2">
-                          {job.position_name}
-                        </div>
+                            <div className="min-h-[88px]">
+                              <h3 className="line-clamp-2 text-lg font-extrabold leading-snug text-slate-900">
+                                {job.title || job.position_name || "Lowongan"}
+                              </h3>
 
-                        {/* Location */}
-                        <div className="text-xs text-gray-500 mb-3">
-                          📍 {job.location}
-                        </div>
+                              <p className="mt-2 truncate text-sm font-semibold text-slate-500">
+                                {job.position_name || "PT Otak Kanan"}
+                              </p>
+                            </div>
 
-                        {/* Salary */}
-                        <div className="text-sm font-semibold text-[#333333]">
-                          Kisaran Gaji
-                        </div>
+                            <div className="mt-3 space-y-3 text-sm">
+                              <div className="flex min-h-[22px] items-start gap-2 text-slate-600">
+                                <MapPin className="mt-0.5 h-4 w-4 shrink-0 text-orange-500" />
+                                <span className="line-clamp-1">
+                                  {job.location || "Lokasi belum ditentukan"}
+                                </span>
+                              </div>
 
-                        <div className="text-sm text-gray-500 mb-3">
-                          {job.salary_range_min && job.salary_range_max
-                            ? `Rp ${parseInt(job.salary_range_min).toLocaleString("id-ID")} - Rp ${parseInt(job.salary_range_max).toLocaleString("id-ID")}`
-                            : "Dirahasiakan"}
-                        </div>
+                              <div className="flex items-start gap-2 text-slate-600">
+                                <Wallet className="mt-0.5 h-4 w-4 shrink-0 text-orange-500" />
+                                <div className="min-w-0">
+                                  <p className="font-bold text-slate-900">
+                                    Kisaran Gaji
+                                  </p>
+                                  <p className="truncate text-slate-500">
+                                    {salaryText}
+                                  </p>
+                                </div>
+                              </div>
 
-                        {/* Deadline */}
-                        <div className="text-xs text-gray-400 mb-4">
-                          Lamar sebelum{" "}
-                          {job.deadline
-                            ? new Date(job.deadline).toLocaleDateString("id-ID", {
-                                day: "numeric",
-                                month: "long",
-                                year: "numeric",
-                              })
-                            : "-"}
-                        </div>
-                      </div>
+                              <div className="flex items-center gap-2 text-xs font-semibold text-slate-500">
+                                <CalendarDays className="h-4 w-4 shrink-0 text-orange-500" />
+                                <span>Lamar sebelum {deadlineText}</span>
+                              </div>
+                            </div>
 
-                      <button
-                        className="btn w-full text-white border-none"
-                        style={{ background: "#F58220" }}
-                        onClick={() => navigate(`/candidate/jobs/${job.id}`)}
-                      >
-                        Selengkapnya
-                      </button>
-                    </div>
-                  </SwiperSlide>
-                ))}
-              </Swiper>
+                            <button
+                              type="button"
+                              className="
+    mt-auto flex w-full items-center justify-center gap-2
+    rounded-xl
+    bg-gradient-to-r from-orange-500 to-orange-600
+    py-3 font-bold text-white
+    ring-2 ring-orange-100
+    shadow-md
+    transition-all duration-300
+    hover:from-orange-600
+    hover:to-orange-700
+    hover:ring-orange-200
+    hover:shadow-xl
+  "
+                              onClick={() =>
+                                navigate(`/candidate/jobs/${job.id}`)
+                              }
+                            >
+                              <Eye className="h-4 w-4" />
+                              Lihat Detail Lowongan
+                            </button>
+                          </article>
+                        </SwiperSlide>
+                      );
+                    })}
+                  </Swiper>
+                )}
+              </div>
             </div>
           </div>
         </div>

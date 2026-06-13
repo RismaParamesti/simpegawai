@@ -177,7 +177,7 @@ router.get(
       const hasCoverLetterFileColumn = await applicationsTableHasCoverLetterFile();
       const coverLetterSelect = hasCoverLetterFileColumn
         ? "a.cover_letter_file AS cover_letter_file"
-        : "a.cover_letter AS cover_letter_file";
+        : "CAST(a.cover_letter AS CHAR) AS cover_letter_file";
 
       let query = `
             SELECT  
@@ -386,7 +386,7 @@ router.put(
           db.promise(),
           currentApplication.candidate_id,
           currentApplication.id,
-          `Tidak lolos karena kandidat sudah lolos pada lowongan ini.`,
+          `Tidak lolos karena kandidat sudah lolos pada lowongan lain.`,
         );
       }
 

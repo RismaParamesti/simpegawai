@@ -6,7 +6,16 @@ function SidebarSubmenu({ submenu, name, icon }) {
   const location = useLocation();
   const [isExpanded, setIsExpanded] = useState(false);
   const isItemActive = (item) => {
+    const sidebarActivePath = location.state?.sidebarActivePath;
     const paths = [item.path, ...(item.activePaths || [])].filter(Boolean);
+
+    if (sidebarActivePath) {
+      return paths.some(
+        (path) =>
+          sidebarActivePath === path || sidebarActivePath.startsWith(`${path}/`),
+      );
+    }
+
     return paths.some(
       (path) =>
         location.pathname === path || location.pathname.startsWith(`${path}/`),

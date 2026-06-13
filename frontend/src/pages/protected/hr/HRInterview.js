@@ -862,20 +862,30 @@ export default function HRInterview() {
     return acc;
   }, {});
 
-  // Filter by posisi dan status
+  // Filter by posisi, status, dan nama kandidat.
   const filteredHistory = Object.fromEntries(
-    Object.entries(groupedHistory).filter(([job, list]) => {
-      const nameFilter = (form.searchName || "").toString().trim().toLowerCase();
-      // Filter posisi
-      if (form.positionFilterHistory && job !== form.positionFilterHistory) return false;
-      // Filter status
-      if (form.statusFilterHistory && !list.some((d) => d.status === form.statusFilterHistory)) return false;
-      // Filter by candidate name
-      if (nameFilter) {
-        return list.some((d) => ((d.candidate_name || d.name) || "").toString().toLowerCase().includes(nameFilter));
-      }
-      return true;
-    }),
+    Object.entries(groupedHistory)
+      .filter(([job]) => !form.positionFilterHistory || job === form.positionFilterHistory)
+      .map(([job, list]) => {
+        const nameFilter = (form.searchName || "").toString().trim().toLowerCase();
+        const filteredList = (list || []).filter((d) => {
+          const status = String(d.status || "").toLowerCase();
+          const selectedStatus = String(form.statusFilterHistory || "").toLowerCase();
+          const candidateName = ((d.candidate_name || d.name) || "")
+            .toString()
+            .toLowerCase();
+          const matchesStatus =
+            !selectedStatus ||
+            status === selectedStatus ||
+            (selectedStatus === "canceled_by_company" && status === "cancelled");
+          const matchesName = !nameFilter || candidateName.includes(nameFilter);
+
+          return matchesStatus && matchesName;
+        });
+
+        return [job, filteredList];
+      })
+      .filter(([, list]) => Array.isArray(list) && list.length > 0),
   );
 
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -1678,7 +1688,7 @@ export default function HRInterview() {
                 >
                   <option value="">Semua Status</option>
                   <option value="completed">Selesai</option>
-                  <option value="disqualified">Digugurkan</option>
+                  <option value="disqualified">Digugurkan/Diskualifikasi</option>
                   <option value="canceled_by_company">
                     Dibatalkan Perusahaan
                   </option>

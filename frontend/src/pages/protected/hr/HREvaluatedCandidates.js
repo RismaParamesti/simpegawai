@@ -912,6 +912,7 @@ const HREvaluatedCandidates = () => {
                             onClick={() =>
                               navigate("/app/DetailInterview-process", {
                                 state: {
+                                  sidebarActivePath: "/app/Evaluated-candidates",
                                   job: {
                                     id:
                                       firstItem?.position_id ||

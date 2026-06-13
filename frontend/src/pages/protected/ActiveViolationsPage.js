@@ -6,7 +6,6 @@ import { setPageTitle } from "../../features/common/headerSlice";
 import { hrApi } from "../../features/hr/api";
 import { atasanApi } from "../../features/atasan/api";
 import { pegawaiApi } from "../../features/pegawai/api";
-import { useDispatch as useReduxDispatch } from "react-redux";
 import { openModal } from "../../features/common/modalSlice";
 import { MODAL_BODY_TYPES } from "../../utils/globalConstantUtil";
 
@@ -21,7 +20,6 @@ function formatDateOnly(value) {
 
 function ActiveViolationsPage() {
   const dispatch = useDispatch();
-  const reduxDispatch = useReduxDispatch();
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [items, setItems] = useState([]);
@@ -61,9 +59,57 @@ function ActiveViolationsPage() {
     String(it?.status || it?.letter_status || "active").toLowerCase();
   const getLevelValue = (it) =>
     String(it?.sp_level || it?.sp || "-").toLowerCase();
+  const getEmployeeId = (it) =>
+    String(it?.employee_id || it?.employeeId || it?.employee?.id || "");
+
+  const normalizeResponseData = (res) => {
+    if (Array.isArray(res?.data)) return res.data;
+    if (Array.isArray(res?.employees)) return res.employees;
+    if (Array.isArray(res)) return res;
+    return [];
+  };
+
+  const normalizeSanctionLevel = (value) => String(value || "").toLowerCase().trim();
+
+  const buildViolationItemsFromEligibleEmployees = (employees = []) =>
+    employees
+      .filter((employee) => {
+        const level = normalizeSanctionLevel(employee.alpha_sanction_level);
+        return level && level !== "none" && level !== "0" && level !== "-";
+      })
+      .map((employee) => ({
+        id: `employee-${employee.employee_id || employee.id}`,
+        employee_id: employee.employee_id || employee.id,
+        employee_name:
+          employee.employee_name || employee.full_name || employee.name || "-",
+        employee_code: employee.employee_code || "-",
+        department_name: employee.department_name || "-",
+        position_name: employee.position_name || "-",
+        sp_level: employee.alpha_sanction_level,
+        violation_date:
+          employee.violation_date_start ||
+          employee.latest_alpha_date ||
+          employee.alpha_last_evaluated_at ||
+          null,
+        issued_date:
+          employee.violation_date_start ||
+          employee.latest_alpha_date ||
+          employee.alpha_last_evaluated_at ||
+          null,
+        status: "active",
+        evidence_snapshot: {
+          alpha_consecutive_days:
+            employee.alpha_consecutive_days ||
+            employee.consecutive_alpha_days ||
+            0,
+          alpha_accumulated_days: employee.alpha_accumulated_days || 0,
+          violation_date: employee.violation_date_start || employee.latest_alpha_date,
+          violation_date_end: employee.violation_date_end || null,
+        },
+      }));
 
   useEffect(() => {
-    dispatch(setPageTitle({ title: "Semua Surat Peringatan" }));
+    dispatch(setPageTitle({ title: "Semua Pelanggaran" }));
 
     const load = async () => {
       setLoading(true);
@@ -72,13 +118,19 @@ function ActiveViolationsPage() {
         const activeRole = localStorage.getItem("activeRole") || "";
         const loaders = [];
         if (activeRole === "hr" || activeRole === "admin") {
+          loaders.push(() => hrApi.getActiveWarningLetters());
           loaders.push(() => hrApi.getWarningLetters());
+          loaders.push(() => atasanApi.getTeamWarningLetters());
           loaders.push(() => atasanApi.getTeamWarningLettersAll());
         } else if (activeRole === "atasan") {
+          loaders.push(() => atasanApi.getTeamWarningLetters());
           loaders.push(() => atasanApi.getTeamWarningLettersAll());
+          loaders.push(() => hrApi.getActiveWarningLetters());
           loaders.push(() => hrApi.getWarningLetters());
         } else {
+          loaders.push(() => hrApi.getActiveWarningLetters());
           loaders.push(() => hrApi.getWarningLetters());
+          loaders.push(() => atasanApi.getTeamWarningLetters());
           loaders.push(() => atasanApi.getTeamWarningLettersAll());
         }
 
@@ -86,11 +138,7 @@ function ActiveViolationsPage() {
         for (const loader of loaders) {
           try {
             const res = await loader();
-            const data = Array.isArray(res?.data)
-              ? res.data
-              : Array.isArray(res)
-                ? res
-                : [];
+            const data = normalizeResponseData(res);
             if (data.length || loadedItems.length === 0) {
               loadedItems = data;
             }
@@ -99,11 +147,34 @@ function ActiveViolationsPage() {
             // try next available source
           }
         }
+
+        if (loadedItems.length === 0 && (activeRole === "hr" || activeRole === "admin")) {
+          try {
+            const eligibleRes = await hrApi.getWarningLetterEligibleEmployees();
+            loadedItems = buildViolationItemsFromEligibleEmployees(
+              normalizeResponseData(eligibleRes),
+            );
+          } catch (e) {
+            // keep empty warning-letter result if fallback is unavailable
+          }
+        }
+
+        if (loadedItems.length === 0 && activeRole === "atasan") {
+          try {
+            const teamRes = await atasanApi.getTeamMembers();
+            loadedItems = buildViolationItemsFromEligibleEmployees(
+              normalizeResponseData(teamRes),
+            );
+          } catch (e) {
+            // keep empty warning-letter result if team fallback is unavailable
+          }
+        }
+
         setItems(loadedItems);
 
         const employeeLoader =
           activeRole === "atasan"
-            ? atasanApi.getAllEmployees
+            ? atasanApi.getTeamMembers
             : hrApi.getEmployees;
 
         const [employeesRes, rulesRes, statusesRes] = await Promise.allSettled([
@@ -113,7 +184,7 @@ function ActiveViolationsPage() {
         ]);
 
         if (employeesRes.status === "fulfilled") {
-          const employees = employeesRes.value?.data || [];
+          const employees = normalizeResponseData(employeesRes.value);
           setEmployeeList(
             employees
               .map((employee) => ({
@@ -192,7 +263,7 @@ function ActiveViolationsPage() {
 
   const filteredItems = (items || []).filter((it) => {
     const matchEmployee =
-      !selectedEmployee || String(it.employee_id || "") === selectedEmployee;
+      !selectedEmployee || getEmployeeId(it) === selectedEmployee;
     const matchLevel = !selectedLevel || getLevelValue(it) === selectedLevel;
     const matchStatus =
       !selectedStatus || getStatusValue(it) === selectedStatus;
@@ -212,7 +283,7 @@ function ActiveViolationsPage() {
     <div>
       {error ? <div className="alert alert-error mb-4">{error}</div> : null}
 
-      <TitleCard title="Semua Surat Peringatan" topMargin="mt-0">
+      <TitleCard title="Peringatan Pelanggaran" topMargin="mt-0">
         <div className="grid md:grid-cols-4 grid-cols-1 gap-4 mb-6">
           <label className="form-control w-full">
             <div className="label">
@@ -318,7 +389,7 @@ function ActiveViolationsPage() {
                         {it.employee_name || "-"}
                       </div>
                       <div className="text-xs opacity-70">
-                        {it.employee_code || "-"} • {it.department_name || "-"}
+                        {it.employee_code || "-"} • {it.department_name || it.position_name || "-"}
                       </div>
                     </td>
                     <td>
@@ -337,7 +408,7 @@ function ActiveViolationsPage() {
                       <button
                         className="btn btn-ghost btn-sm"
                         onClick={() =>
-                          reduxDispatch(
+                          dispatch(
                             openModal({
                               title: "Detail Pelanggaran",
                               bodyType: MODAL_BODY_TYPES.WARNING_LETTER_DETAIL,

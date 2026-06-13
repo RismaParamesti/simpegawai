@@ -26,6 +26,10 @@ const ALPHA_SANCTION_LEVEL = {
     NONE: "none",
 };
 
+const isMissingWarningLettersTableError = (error) =>
+    (error?.code === "ER_NO_SUCH_TABLE" || error?.errno === 1146) &&
+    /warning_letters/i.test(String(error?.sqlMessage || error?.sql || ""));
+
 const normalizeSanctionLevel = (value) => {
     const raw = String(value || "").toLowerCase().trim();
     if (!raw) return null;
@@ -133,29 +137,43 @@ const getSanctionSeverityRank = (value) => {
 };
 
 const getActiveWarningLetterForEmployee = async (employeeId) => {
-    const [rows] = await db.promise().query(
-        `SELECT id, sp_level, issued_date, valid_until, status
-         FROM warning_letters
-         WHERE employee_id = ?
-           AND status = 'active'
-           AND valid_until >= CURDATE()
-         ORDER BY valid_until DESC, issued_date DESC, id DESC
-         LIMIT 1`,
-        [employeeId]
-    );
+    try {
+        const [rows] = await db.promise().query(
+            `SELECT id, sp_level, issued_date, valid_until, status
+             FROM warning_letters
+             WHERE employee_id = ?
+               AND status = 'active'
+               AND valid_until >= CURDATE()
+             ORDER BY valid_until DESC, issued_date DESC, id DESC
+             LIMIT 1`,
+            [employeeId]
+        );
 
-    return rows[0] || null;
+        return rows[0] || null;
+    } catch (error) {
+        if (isMissingWarningLettersTableError(error)) {
+            return null;
+        }
+        throw error;
+    }
 };
 
 const expireOutdatedWarningLettersForEmployee = async (employeeId) => {
-    await db.promise().query(
-        `UPDATE warning_letters
-         SET status = 'expired', updated_at = NOW()
-         WHERE employee_id = ?
-           AND status = 'active'
-           AND valid_until < CURDATE()`,
-        [employeeId]
-    );
+    try {
+        await db.promise().query(
+            `UPDATE warning_letters
+             SET status = 'expired', updated_at = NOW()
+             WHERE employee_id = ?
+               AND status = 'active'
+               AND valid_until < CURDATE()`,
+            [employeeId]
+        );
+    } catch (error) {
+        if (isMissingWarningLettersTableError(error)) {
+            return;
+        }
+        throw error;
+    }
 };
 
 const persistAutoWarningLetter = async ({
@@ -194,12 +212,19 @@ const persistAutoWarningLetter = async ({
     }
 
     if (activeWarning && nextRank > currentRank) {
-        await db.promise().query(
-            `UPDATE warning_letters
-             SET status = 'escalated', updated_at = NOW()
-             WHERE id = ?`,
-            [activeWarning.id]
-        );
+        try {
+            await db.promise().query(
+                `UPDATE warning_letters
+                 SET status = 'escalated', updated_at = NOW()
+                 WHERE id = ?`,
+                [activeWarning.id]
+            );
+        } catch (error) {
+            if (isMissingWarningLettersTableError(error)) {
+                return;
+            }
+            throw error;
+        }
     }
 
     const evidenceSnapshot = {
@@ -217,33 +242,40 @@ const persistAutoWarningLetter = async ({
     };
 
     // Persist as a regular warning_letter record so manual and system-generated entries live in one table
-    await db.promise().query(
-        `INSERT IGNORE INTO warning_letters (
-            auto_letter_number,
-            employee_id,
-            rule_id,
-            rule_code,
-            sp_level,
-            violation_date,
-            issued_date,
-            valid_until,
-            status,
-            evidence_snapshot,
-            generated_by
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'active', ?, ?)`,
-        [
-            autoLetterNumber,
-            employeeId,
-            rule?.id || rule?.ruleId || null,
-            rule?.rule_code || rule?.ruleCode || null,
-            sanctionLevel,
-            violationDate,
-            issuedDate,
-            validUntil,
-            JSON.stringify(evidenceSnapshot),
-            'system',
-        ]
-    );
+    try {
+        await db.promise().query(
+            `INSERT IGNORE INTO warning_letters (
+                auto_letter_number,
+                employee_id,
+                rule_id,
+                rule_code,
+                sp_level,
+                violation_date,
+                issued_date,
+                valid_until,
+                status,
+                evidence_snapshot,
+                generated_by
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'active', ?, ?)`,
+            [
+                autoLetterNumber,
+                employeeId,
+                rule?.id || rule?.ruleId || null,
+                rule?.rule_code || rule?.ruleCode || null,
+                sanctionLevel,
+                violationDate,
+                issuedDate,
+                validUntil,
+                JSON.stringify(evidenceSnapshot),
+                'system',
+            ]
+        );
+    } catch (error) {
+        if (isMissingWarningLettersTableError(error)) {
+            return;
+        }
+        throw error;
+    }
 };
 
 // ============================
@@ -1923,9 +1955,21 @@ router.get(
             }
 
             let query = `
-                SELECT e.id as employee_id, e.employee_code, u.name as employee_name, p.department_id, p.name as position_name, p.level as level
+                SELECT
+                    e.id as employee_id,
+                    e.employee_code,
+                    COALESCE(e.full_name, u.name) as employee_name,
+                    p.department_id,
+                    p.name as position_name,
+                    d.name as department_name,
+                    p.level as level,
+                    e.alpha_sanction_level,
+                    e.alpha_consecutive_days,
+                    e.alpha_accumulated_days,
+                    e.alpha_last_evaluated_at
                 FROM employees e
                 JOIN positions p ON e.position_id = p.id
+                LEFT JOIN departments d ON p.department_id = d.id
                 JOIN users u ON e.user_id = u.id
                 WHERE 1=1
             `;

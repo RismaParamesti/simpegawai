@@ -179,6 +179,11 @@ const hrRoutes = [
 
   {
     path: "/app/hr-allowance",
+    activePaths: [
+      "/app/hr/settings",
+      "/app/hr/position-allowance",
+      "/app/hr/other-allowance",
+    ],
     icon: <BanknotesIcon className={iconClasses} />,
     name: "Manajemen Payroll",
   },
@@ -257,6 +262,11 @@ const financeRoutes = [
   },
   {
     path: "/app/payroll/component",
+    activePaths: [
+      "/app/payroll/settings",
+      "/app/payroll/position-allowance",
+      "/app/payroll/other-allowance",
+    ],
     icon: <DocumentTextIcon className={iconClasses} />,
     name: "Komponen Payroll",
   },
