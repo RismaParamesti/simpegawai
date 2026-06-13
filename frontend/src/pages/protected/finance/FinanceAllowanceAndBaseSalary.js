@@ -6,6 +6,7 @@ import Pagination from "../../../components/Pagination/Pagination";
 import { useNavigate } from "react-router-dom";
 import { financeApi } from "../../../features/finance/api";
 import useTablePagination from "../../../hooks/useTablePagination";
+import { formatCurrencyInput, normalizeCurrencyInput } from "../../../components/Formatters/CurrencyFormatter";
 
 const formatCurrency = (value) =>
   `Rp ${Number(value || 0).toLocaleString("id-ID")}`;
@@ -63,6 +64,10 @@ function PositionSalary() {
         [field]: value,
       },
     }));
+  };
+
+  const handleCurrencyChange = (id, field, value) => {
+    handleChange(id, field, normalizeCurrencyInput(value));
   };
 
   const handleSave = async (id) => {
@@ -153,13 +158,15 @@ function PositionSalary() {
                   {/* Base Salary */}
                   <td>
                     <input
-                      type="number"
+                      type="text"
+                      inputMode="numeric"
                       disabled={isReadOnly}
                       className={`input input-bordered w-full ${isReadOnly ? "opacity-60 cursor-not-allowed" : ""}`}
-                      value={current.base_salary ?? pos.base_salary}
+                      value={formatCurrencyInput(current.base_salary ?? pos.base_salary)}
                       onChange={(e) =>
-                        handleChange(pos.id, "base_salary", e.target.value)
+                        handleCurrencyChange(pos.id, "base_salary", e.target.value)
                       }
+                      placeholder="Rp"
                     />
                     <div className="text-xs opacity-60">
                       {formatCurrency(current.base_salary ?? pos.base_salary)}
@@ -169,21 +176,23 @@ function PositionSalary() {
                   {/* Allowance */}
                   <td>
                     <input
-                      type="number"
+                      type="text"
+                      inputMode="numeric"
                       disabled={isReadOnly}
                       className={`input input-bordered w-full ${isReadOnly ? "opacity-60 cursor-not-allowed" : ""}`}
-                      value={
+                      value={formatCurrencyInput(
                         current.position_allowance ??
                         pos.position_allowance ??
                         ""
-                      }
+                      )}
                       onChange={(e) =>
-                        handleChange(
+                        handleCurrencyChange(
                           pos.id,
                           "position_allowance",
                           e.target.value,
                         )
                       }
+                      placeholder="Rp"
                     />
                     <div className="text-xs opacity-60">
                       {formatCurrency(

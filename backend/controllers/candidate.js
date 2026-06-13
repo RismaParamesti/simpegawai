@@ -32,7 +32,7 @@ router.get(
       const hasCoverLetterFileColumn = await applicationsTableHasCoverLetterFile();
       const coverLetterSelect = hasCoverLetterFileColumn
         ? "a.cover_letter_file AS cover_letter_file"
-        : "a.cover_letter AS cover_letter_file";
+        : "CAST(a.cover_letter AS CHAR) AS cover_letter_file";
 
       const query = `
         SELECT a.*, 
@@ -1240,7 +1240,7 @@ router.get(
       const hasCoverLetterFileColumn = await applicationsTableHasCoverLetterFile();
       const coverLetterSelect = hasCoverLetterFileColumn
         ? "a.cover_letter_file AS cover_letter_file"
-        : "a.cover_letter AS cover_letter_file";
+        : "CAST(a.cover_letter AS CHAR) AS cover_letter_file";
 
       const query = `
              SELECT a.*, jo.title AS job_title, jo.location, jo.employment_type,
@@ -1390,7 +1390,7 @@ router.get(
       const hasCoverLetterFileColumn = await applicationsTableHasCoverLetterFile();
       const coverLetterSelect = hasCoverLetterFileColumn
         ? "a.cover_letter_file AS cover_letter_file"
-        : "a.cover_letter AS cover_letter_file";
+        : "CAST(a.cover_letter AS CHAR) AS cover_letter_file";
 
       const query = `
                  SELECT a.*, 
@@ -1581,7 +1581,7 @@ router.get(
       const hasCoverLetterFileColumn = await applicationsTableHasCoverLetterFile();
       const coverLetterSelect = hasCoverLetterFileColumn
         ? "a.cover_letter_file AS cover_letter_file"
-        : "a.cover_letter AS cover_letter_file";
+        : "CAST(a.cover_letter AS CHAR) AS cover_letter_file";
 
       let query = `
             SELECT  

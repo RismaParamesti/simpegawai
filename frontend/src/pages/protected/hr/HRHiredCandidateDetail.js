@@ -28,9 +28,7 @@ const HRHiredCandidateDetail = () => {
             const callRes = await axios.get(
               `/api/candidate-calls/last/${interviewData.candidate_id}`,
             );
-            setInvitationLetterFile(
-              callRes.data?.invitation_letter_file || "",
-            );
+            setInvitationLetterFile(callRes.data?.invitation_letter_file || "");
           } catch {
             setInvitationLetterFile("");
           }

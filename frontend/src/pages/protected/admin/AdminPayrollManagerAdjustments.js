@@ -7,6 +7,7 @@ import { adminApi } from '../../../features/admin/api'
 import { formatRupiah, resolveFixedPositionAllowance } from '../../../utils/fixedPositionAllowance'
 import { MagnifyingGlassIcon } from '@heroicons/react/24/outline'
 import useTablePagination from '../../../hooks/useTablePagination'
+import { formatCurrencyInput, normalizeCurrencyInput } from '../../../components/Formatters/CurrencyFormatter'
 
 const statusLabelMap = {
     draft: 'Draft',
@@ -52,10 +53,6 @@ const isHrAtasanEmployee = (employee) => {
     )
 }
 
-const disableNumberWheelChange = (event) => {
-    event.currentTarget.blur()
-}
-
 function AdminPayrollManagerAdjustments() {
     const dispatch = useDispatch()
     const initialPeriod = getCurrentPeriod()
@@ -80,6 +77,10 @@ function AdminPayrollManagerAdjustments() {
         other_deduction: '',
         notes: '',
     })
+
+    const handleCurrencyChange = (field, value) => {
+        setForm((prev) => ({ ...prev, [field]: normalizeCurrencyInput(value) }))
+    }
 
     const selectedAdjustment = useMemo(() => {
         if (!selectedEmployeeId) return null
@@ -238,22 +239,21 @@ function AdminPayrollManagerAdjustments() {
                     <label className="form-control">
                         <span className="label-text">Bonus</span>
                         <input
-                            type="number"
-                            min="0"
-                            step="1"
+                            type="text"
+                            inputMode="numeric"
                             className="input input-bordered"
-                            value={form.bonus}
-                            onWheel={disableNumberWheelChange}
-                            onChange={(e) => setForm((prev) => ({ ...prev, bonus: e.target.value }))}
+                            value={formatCurrencyInput(form.bonus)}
+                            onChange={(e) => handleCurrencyChange('bonus', e.target.value)}
+                            placeholder="Rp"
                         />
                     </label>
                     <label className="form-control">
                         <span className="label-text">Tunjangan Lainnya</span>
                         <input
-                            type="number"
-                            min="0"
+                            type="text"
+                            inputMode="numeric"
                             className="input input-bordered"
-                            value={form.other_allowance}
+                            value={formatCurrencyInput(form.other_allowance)}
                             disabled
                         />
                         <span className="label-text-alt">Nominal tetap sesuai jabatan: {formatRupiah(selectedEmployeeFixedAllowance)}</span>
@@ -261,13 +261,12 @@ function AdminPayrollManagerAdjustments() {
                     <label className="form-control">
                         <span className="label-text">Potongan Lainnya</span>
                         <input
-                            type="number"
-                            min="0"
-                            step="1"
+                            type="text"
+                            inputMode="numeric"
                             className="input input-bordered"
-                            value={form.other_deduction}
-                            onWheel={disableNumberWheelChange}
-                            onChange={(e) => setForm((prev) => ({ ...prev, other_deduction: e.target.value }))}
+                            value={formatCurrencyInput(form.other_deduction)}
+                            onChange={(e) => handleCurrencyChange('other_deduction', e.target.value)}
+                            placeholder="Rp"
                         />
                     </label>
                 </div>

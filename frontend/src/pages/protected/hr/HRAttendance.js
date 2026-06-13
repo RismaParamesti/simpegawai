@@ -26,17 +26,19 @@ const attendanceStatusLabels = {
     izin: 'Izin',
 }
 
+const getDefaultFilters = () => ({
+    date: '',
+    month: new Date().getMonth() + 1,
+    year: new Date().getFullYear(),
+    employeeSearch: '',
+    status: 'all',
+})
+
 function HRAttendance() {
     const dispatch = useDispatch()
     const location = useLocation()
     const [loading, setLoading] = useState(true)
-    const [filters, setFilters] = useState({
-        date: '',
-        month: new Date().getMonth() + 1,
-        year: new Date().getFullYear(),
-        employeeSearch: '',
-        status: 'all',
-    })
+    const [filters, setFilters] = useState(getDefaultFilters)
     const [records, setRecords] = useState([])
     const recordsPagination = useTablePagination(records)
     const [allRecords, setAllRecords] = useState([])
@@ -174,9 +176,14 @@ function HRAttendance() {
         return attendanceStatusLabels[category] || category
     }
 
+    const resetFilters = () => {
+        setFilters(getDefaultFilters())
+        recordsPagination.setPage(1)
+    }
+
     return (
         <TitleCard title="Laporan Kehadiran Pegawai" topMargin="mt-0">
-            <div className="grid md:grid-cols-5 grid-cols-1 gap-4 mb-6">
+            <div className="grid grid-cols-1 gap-4 mb-6 md:grid-cols-6">
                 <input
                     type="date"
                     className="input input-bordered"
@@ -232,6 +239,13 @@ function HRAttendance() {
                     <option value="cuti">Cuti</option>
                     <option value="izin">Izin</option>
                 </select>
+                <button
+                    type="button"
+                    className="btn btn-outline w-full border-orange-500 text-orange-600 hover:border-orange-600 hover:bg-orange-500 hover:text-white"
+                    onClick={resetFilters}
+                >
+                    Reset Filter
+                </button>
             </div>
 
             <div className="grid md:grid-cols-4 grid-cols-2 gap-4 mb-6">

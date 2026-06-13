@@ -1,7 +1,6 @@
 import { useEffect, useState, useCallback, useMemo, useRef } from 'react'
 import { useDispatch } from 'react-redux'
 import { setPageTitle, showNotification } from '../../../features/common/headerSlice'
-import TitleCard from '../../../components/Cards/TitleCard'
 import Pagination from '../../../components/Pagination/Pagination'
 import { hrApi } from '../../../features/hr/api'
 import useTablePagination from '../../../hooks/useTablePagination'
@@ -24,6 +23,7 @@ const getStatusLabel = (status) => {
     return statusLabelMap[status] || status
 }
 
+const normalizeStatus = (status) => String(status || '').trim().toLowerCase()
 const isProcessedByHr = (status) => ['included_in_payroll', 'rejected'].includes(status)
 const HR_REJECTION_MARKER = '[HR_REJECTION_REASON]'
 
@@ -60,10 +60,14 @@ function HRReimbursements() {
     const [processingId, setProcessingId] = useState(null)
     const [selectedItem, setSelectedItem] = useState(null)
     const [showDetailModal, setShowDetailModal] = useState(false)
+    const [approveTarget, setApproveTarget] = useState(null)
+    const [showApproveModal, setShowApproveModal] = useState(false)
     const [rejectTarget, setRejectTarget] = useState(null)
     const [rejectReason, setRejectReason] = useState('')
     const [showRejectModal, setShowRejectModal] = useState(false)
     const [items, setItems] = useState([])
+    const [isPendingCardOpen, setIsPendingCardOpen] = useState(false)
+    const [isHistoryCardOpen, setIsHistoryCardOpen] = useState(false)
     const historyCardRef = useRef(null)
     const [pendingFilters, setPendingFilters] = useState({
         search: '',
@@ -111,13 +115,19 @@ function HRReimbursements() {
             return
         }
 
-        const confirmed = window.confirm('Yakin ingin memvalidasi reimbursement ini?')
-        if (!confirmed) return
+        setApproveTarget(item)
+        setShowApproveModal(true)
+    }
+
+    const handleConfirmApprove = async () => {
+        if (!approveTarget?.id) return
 
         try {
-            setProcessingId(item.id)
-            await hrApi.validateReimbursement(item.id)
+            setProcessingId(approveTarget.id)
+            await hrApi.validateReimbursement(approveTarget.id)
             dispatch(showNotification({ message: 'Reimbursement berhasil divalidasi', status: 1 }))
+            setShowApproveModal(false)
+            setApproveTarget(null)
 
             await loadData()
             scrollToHistoryCard()
@@ -198,19 +208,105 @@ function HRReimbursements() {
     }, [items, historyFilters, applyCommonFilters])
     const pendingPagination = useTablePagination(pendingItems)
     const historyPagination = useTablePagination(historyItems)
+    const summaryStats = useMemo(() => {
+        return items.reduce((stats, item) => {
+            const status = normalizeStatus(item.status)
+            const amount = Number(item.amount) || 0
+            const isOwnSubmission = Number(item.submitter_user_id || 0) === currentUserId
+
+            if (status === 'approved' && !isOwnSubmission) stats.waitingValidation += 1
+            if (status === 'included_in_payroll') stats.approved += 1
+            if (status === 'rejected') stats.rejected += 1
+            if (status === 'included_in_payroll') {
+                stats.includedInPayroll += 1
+                stats.totalAmount += amount
+            }
+
+            return stats
+        }, {
+            waitingValidation: 0,
+            approved: 0,
+            rejected: 0,
+            includedInPayroll: 0,
+            totalAmount: 0,
+        })
+    }, [items, currentUserId])
 
     return (
-        <>
-            <TitleCard title="Data Belum di Validasi" topMargin="mt-0">
-                <div className="grid lg:grid-cols-3 md:grid-cols-2 grid-cols-1 gap-4 mb-4">
+        <div className="mt-4 overflow-hidden rounded-[1.5rem] border border-slate-200/80 bg-white p-4 shadow-[0_20px_70px_rgba(15,23,42,0.07)] dark:border-slate-700 dark:bg-slate-950 dark:shadow-[0_20px_70px_rgba(2,6,23,0.45)] sm:p-7">
+            <div className="space-y-6">
+                <div className="relative min-h-[120px] overflow-hidden rounded-[1.4rem] bg-gradient-to-r from-white via-white to-orange-50/80 px-5 py-6 dark:from-slate-950 dark:via-slate-950 dark:to-slate-900">
+                    <div className="relative z-10 max-w-3xl">
+                        <div className="mb-3 inline-flex items-center gap-2 rounded-full border border-orange-200 bg-orange-50 px-3 py-1 text-xs font-bold text-orange-600 dark:border-orange-900/60 dark:bg-orange-950/70 dark:text-orange-300">
+                            Validasi Reimbursement
+                        </div>
+                        <h1 className="text-[28px] font-extrabold leading-tight text-slate-900 dark:text-slate-50">
+                            Validasi Reimbursement Pegawai
+                        </h1>
+                        <p className="mt-2 max-w-2xl text-sm font-medium text-slate-500 dark:text-slate-400">
+                            Kelola reimbursement yang menunggu validasi, lihat detail lampiran, dan pantau riwayat validasi reimbursement.
+                        </p>
+                    </div>
+                </div>
+            {/* Summary Stats */}
+            <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-5 mb-6">
+                <div className="rounded-3xl border border-amber-200 bg-amber-50 p-5 shadow-sm transition hover:-translate-y-0.5 hover:shadow-md">
+                    <div className="text-sm font-bold text-amber-700">Menunggu Validasi</div>
+                    <div className="mt-2 text-3xl font-extrabold text-slate-900">
+                        {summaryStats.waitingValidation}
+                    </div>
+                </div>
+                <div className="rounded-3xl border border-sky-200 bg-sky-50 p-5 shadow-sm transition hover:-translate-y-0.5 hover:shadow-md">
+                    <div className="text-sm font-bold text-sky-700">Disetujui</div>
+                    <div className="mt-2 text-3xl font-extrabold text-slate-900">
+                        {summaryStats.approved}
+                    </div>
+                </div>
+                <div className="rounded-3xl border border-rose-200 bg-rose-50 p-5 shadow-sm transition hover:-translate-y-0.5 hover:shadow-md">
+                    <div className="text-sm font-bold text-rose-700">Ditolak</div>
+                    <div className="mt-2 text-3xl font-extrabold text-slate-900">
+                        {summaryStats.rejected}
+                    </div>
+                </div>
+                <div className="rounded-3xl border border-emerald-200 bg-emerald-50 p-5 shadow-sm transition hover:-translate-y-0.5 hover:shadow-md">
+                    <div className="text-sm font-bold text-emerald-700">Sudah Masuk Payroll</div>
+                    <div className="mt-2 text-3xl font-extrabold text-slate-900">
+                        {summaryStats.includedInPayroll}
+                    </div>
+                </div>
+                <div className="rounded-3xl border border-indigo-200 bg-indigo-50 p-5 shadow-sm transition hover:-translate-y-0.5 hover:shadow-md">
+                    <div className="text-sm font-bold text-indigo-700">Total Nominal</div>
+                    <div className="mt-2 text-2xl font-extrabold text-slate-900">
+                        Rp {summaryStats.totalAmount.toLocaleString('id-ID')}
+                    </div>
+                </div>
+            </div>
+
+            <section className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm dark:border-slate-700 dark:bg-slate-900">
+                <div className="mb-5 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                    <div>
+                        <h2 className="text-2xl font-extrabold text-slate-900 dark:text-slate-50">Data Belum di Validasi</h2>
+                        <p className="mt-1 text-sm font-medium text-slate-500 dark:text-slate-400">Daftar reimbursement yang menunggu validasi HR.</p>
+                    </div>
+                    <button
+                        type="button"
+                        className="btn rounded-xl !border-orange-500 !bg-orange-500 !text-white hover:!border-orange-600 hover:!bg-orange-600"
+                        onClick={() => setIsPendingCardOpen((prev) => !prev)}
+                    >
+                        {isPendingCardOpen ? 'Tutup' : 'Buka'}
+                    </button>
+                </div>
+                {isPendingCardOpen && (
+                    <>
+                <div className="mb-5 grid grid-cols-1 gap-3 rounded-2xl border border-slate-200 bg-slate-50/70 p-4 md:grid-cols-2 lg:grid-cols-3">
                     <input
-                        className="input input-bordered"
+                        className="input input-bordered rounded-xl bg-white"
                         placeholder="Cari nama/kode/jenis reimbursement"
                         value={pendingFilters.search}
                         onChange={(e) => setPendingFilters((prev) => ({ ...prev, search: e.target.value }))}
                     />
                     <select
-                        className="select select-bordered"
+                        className="select select-bordered rounded-xl bg-white"
                         value={pendingFilters.month}
                         onChange={(e) => setPendingFilters((prev) => ({ ...prev, month: e.target.value }))}
                     >
@@ -222,7 +318,7 @@ function HRReimbursements() {
                         ))}
                     </select>
                     <select
-                        className="select select-bordered"
+                        className="select select-bordered rounded-xl bg-white"
                         value={pendingFilters.year}
                         onChange={(e) => setPendingFilters((prev) => ({ ...prev, year: e.target.value }))}
                     >
@@ -234,39 +330,11 @@ function HRReimbursements() {
                     </select>
                 </div>
 
-                {/* Summary Stats */}
-                <div className="grid lg:grid-cols-4 md:grid-cols-2 gap-4 mb-6">
-                    <div className="stat bg-warning text-warning-content rounded-lg">
-                        <div className="stat-title text-warning-content">Menunggu Validasi</div>
-                        <div className="stat-value text-2xl">
-                            {items.filter(a => a.status === 'approved' && Number(a.submitter_user_id || 0) !== currentUserId).length}
-                        </div>
-                    </div>
-                    <div className="stat bg-success text-success-content rounded-lg">
-                        <div className="stat-title text-success-content">Sudah Masuk Payroll</div>
-                        <div className="stat-value text-2xl">
-                            {items.filter(a => a.status === 'included_in_payroll').length}
-                        </div>
-                    </div>
-                    <div className="stat bg-error text-error-content rounded-lg">
-                        <div className="stat-title text-error-content">Ditolak</div>
-                        <div className="stat-value text-2xl">
-                            {items.filter(a => a.status === 'rejected').length}
-                        </div>
-                    </div>
-                    <div className="stat bg-info text-info-content rounded-lg">
-                        <div className="stat-title text-info-content">Total Nominal</div>
-                        <div className="stat-value text-xl">
-                            Rp {items.reduce((sum, a) => sum + (Number(a.amount) || 0), 0).toLocaleString('id-ID')}
-                        </div>
-                    </div>
-                </div>
-
                 {loading ? (
-                    <div className="text-center py-10">Memuat data reimbursement...</div>
+                    <div className="rounded-2xl border border-dashed border-slate-200 py-10 text-center text-slate-500">Memuat data reimbursement...</div>
                 ) : (
-                    <div className="overflow-x-auto">
-                        <table className="table table-zebra">
+                    <div className="overflow-x-auto rounded-2xl border border-slate-200">
+                        <table className="table table-sm w-full">
                             <thead className="text-center">
                                 <tr>
                                     <th className="text-center">Pegawai</th>
@@ -282,11 +350,11 @@ function HRReimbursements() {
                                     return (
                                         <tr key={item.id}>
                                             <td>
-                                                <div className="font-semibold">{item.employee_name || '-'}</div>
-                                                <div className="text-xs opacity-70">{item.employee_code || '-'}</div>
+                                                <div className="font-bold text-slate-800">{item.employee_name || '-'}</div>
+                                                <div className="text-xs text-slate-500">{item.employee_code || '-'}</div>
                                             </td>
                                             <td>{item.reimbursement_type || '-'}</td>
-                                            <td className="font-semibold">Rp {(Number(item.amount) || 0).toLocaleString('id-ID')}</td>
+                                            <td className="font-bold text-slate-800">Rp {(Number(item.amount) || 0).toLocaleString('id-ID')}</td>
                                             <td>{item.created_at ? new Date(item.created_at).toLocaleDateString('id-ID') : '-'}</td>
                                             <td>
                                                 <span className={`badge ${getStatusBadge(item.status)}`}>
@@ -330,7 +398,7 @@ function HRReimbursements() {
                                 })}
                                 {pendingItems.length === 0 && (
                                     <tr>
-                                        <td colSpan={6} className="text-center opacity-70">Tidak ada data yang perlu divalidasi</td>
+                                        <td colSpan={6} className="text-center text-slate-500">Tidak ada data yang perlu divalidasi</td>
                                     </tr>
                                 )}
                             </tbody>
@@ -338,19 +406,36 @@ function HRReimbursements() {
                         <Pagination page={pendingPagination.page} totalPages={pendingPagination.totalPages} onChangePage={pendingPagination.setPage} itemsPerPage={pendingPagination.itemsPerPage} />
                     </div>
                 )}
-            </TitleCard>
+                    </>
+                )}
+            </section>
 
             <div ref={historyCardRef}>
-                <TitleCard title="Riwayat Validasi" topMargin="mt-6">
-                <div className="grid lg:grid-cols-4 md:grid-cols-2 grid-cols-1 gap-4 mb-4">
+                <section className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm dark:border-slate-700 dark:bg-slate-900">
+                    <div className="mb-5 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                        <div>
+                            <h2 className="text-2xl font-extrabold text-slate-900 dark:text-slate-50">Riwayat Validasi</h2>
+                            <p className="mt-1 text-sm font-medium text-slate-500 dark:text-slate-400">Riwayat reimbursement yang sudah divalidasi atau ditolak.</p>
+                        </div>
+                        <button
+                            type="button"
+                            className="btn rounded-xl !border-orange-500 !bg-orange-500 !text-white hover:!border-orange-600 hover:!bg-orange-600"
+                            onClick={() => setIsHistoryCardOpen((prev) => !prev)}
+                        >
+                            {isHistoryCardOpen ? 'Tutup' : 'Buka'}
+                        </button>
+                    </div>
+                {isHistoryCardOpen && (
+                    <>
+                <div className="mb-5 grid grid-cols-1 gap-3 rounded-2xl border border-slate-200 bg-slate-50/70 p-4 md:grid-cols-2 lg:grid-cols-4">
                     <input
-                        className="input input-bordered"
+                        className="input input-bordered rounded-xl bg-white"
                         placeholder="Cari nama/kode/jenis reimbursement"
                         value={historyFilters.search}
                         onChange={(e) => setHistoryFilters((prev) => ({ ...prev, search: e.target.value }))}
                     />
                     <select
-                        className="select select-bordered"
+                        className="select select-bordered rounded-xl bg-white"
                         value={historyFilters.status}
                         onChange={(e) => setHistoryFilters((prev) => ({ ...prev, status: e.target.value }))}
                     >
@@ -359,7 +444,7 @@ function HRReimbursements() {
                         <option value="rejected">Ditolak</option>
                     </select>
                     <select
-                        className="select select-bordered"
+                        className="select select-bordered rounded-xl bg-white"
                         value={historyFilters.month}
                         onChange={(e) => setHistoryFilters((prev) => ({ ...prev, month: e.target.value }))}
                     >
@@ -371,7 +456,7 @@ function HRReimbursements() {
                         ))}
                     </select>
                     <select
-                        className="select select-bordered"
+                        className="select select-bordered rounded-xl bg-white"
                         value={historyFilters.year}
                         onChange={(e) => setHistoryFilters((prev) => ({ ...prev, year: e.target.value }))}
                     >
@@ -412,10 +497,10 @@ function HRReimbursements() {
                 </div>
 
                 {loading ? (
-                    <div className="text-center py-10">Memuat data reimbursement...</div>
+                    <div className="rounded-2xl border border-dashed border-slate-200 py-10 text-center text-slate-500">Memuat data reimbursement...</div>
                 ) : (
-                    <div className="overflow-x-auto">
-                        <table className="table table-zebra">
+                    <div className="overflow-x-auto rounded-2xl border border-slate-200">
+                        <table className="table table-sm w-full">
                             <thead className="text-center">
                                 <tr>
                                     <th className="text-center">Pegawai</th>
@@ -431,11 +516,11 @@ function HRReimbursements() {
                                 {historyPagination.paginatedItems.map((item) => (
                                     <tr key={`history-${item.id}`}>
                                         <td>
-                                            <div className="font-semibold">{item.employee_name || '-'}</div>
-                                            <div className="text-xs opacity-70">{item.employee_code || '-'}</div>
+                                            <div className="font-bold text-slate-800">{item.employee_name || '-'}</div>
+                                            <div className="text-xs text-slate-500">{item.employee_code || '-'}</div>
                                         </td>
                                         <td>{item.reimbursement_type || '-'}</td>
-                                        <td className="font-semibold">Rp {(Number(item.amount) || 0).toLocaleString('id-ID')}</td>
+                                        <td className="font-bold text-slate-800">Rp {(Number(item.amount) || 0).toLocaleString('id-ID')}</td>
                                         <td>{item.created_at ? new Date(item.created_at).toLocaleDateString('id-ID') : '-'}</td>
                                         <td>
                                             <span className={`badge ${getStatusBadge(item.status)}`}>
@@ -463,7 +548,7 @@ function HRReimbursements() {
                                 ))}
                                 {historyItems.length === 0 && (
                                     <tr>
-                                        <td colSpan={7} className="text-center opacity-70">Belum ada riwayat validasi</td>
+                                        <td colSpan={7} className="text-center text-slate-500">Belum ada riwayat validasi</td>
                                     </tr>
                                 )}
                             </tbody>
@@ -471,58 +556,60 @@ function HRReimbursements() {
                         <Pagination page={historyPagination.page} totalPages={historyPagination.totalPages} onChangePage={historyPagination.setPage} itemsPerPage={historyPagination.itemsPerPage} />
                     </div>
                 )}
-                </TitleCard>
+                    </>
+                )}
+                </section>
             </div>
 
             {showDetailModal && selectedItem && (
                 <div className="modal modal-open">
-                    <div className="modal-box max-w-2xl">
-                        <h3 className="font-bold text-lg mb-4">Detail Reimbursement</h3>
+                    <div className="modal-box max-w-2xl overflow-hidden rounded-3xl border border-slate-200 p-0">
+                        <h3 className="border-b border-slate-200 bg-gradient-to-r from-white to-orange-50 px-6 py-5 text-lg font-extrabold text-slate-900">Detail Reimbursement</h3>
 
-                        <div className="grid md:grid-cols-2 grid-cols-1 gap-4">
+                        <div className="grid grid-cols-1 gap-4 p-6 md:grid-cols-2">
                             <div>
-                                <p className="text-xs opacity-70">Pegawai</p>
-                                <p className="font-semibold">{selectedItem.employee_name || '-'}</p>
+                                <p className="text-xs text-slate-500">Pegawai</p>
+                                <p className="font-bold text-slate-800">{selectedItem.employee_name || '-'}</p>
                                 <p className="text-sm opacity-70">{selectedItem.employee_code || '-'}</p>
                             </div>
                             <div>
-                                <p className="text-xs opacity-70">Status</p>
+                                <p className="text-xs text-slate-500">Status</p>
                                 <span className={`badge ${getStatusBadge(selectedItem.status)}`}>
                                     {getStatusLabel(selectedItem.status)}
                                 </span>
                             </div>
                             <div>
-                                <p className="text-xs opacity-70">Jenis Reimbursement</p>
-                                <p className="font-semibold">{selectedItem.reimbursement_type || '-'}</p>
+                                <p className="text-xs text-slate-500">Jenis Reimbursement</p>
+                                <p className="font-bold text-slate-800">{selectedItem.reimbursement_type || '-'}</p>
                             </div>
                             <div>
-                                <p className="text-xs opacity-70">Nominal</p>
-                                <p className="font-semibold">Rp {(Number(selectedItem.amount) || 0).toLocaleString('id-ID')}</p>
+                                <p className="text-xs text-slate-500">Nominal</p>
+                                <p className="font-bold text-slate-800">Rp {(Number(selectedItem.amount) || 0).toLocaleString('id-ID')}</p>
                             </div>
                             <div>
-                                <p className="text-xs opacity-70">Tanggal Pengajuan</p>
+                                <p className="text-xs text-slate-500">Tanggal Pengajuan</p>
                                 <p>{selectedItem.created_at ? new Date(selectedItem.created_at).toLocaleString('id-ID') : '-'}</p>
                             </div>
                             {isProcessedByHr(selectedItem.status) && (
                                 <div>
-                                    <p className="text-xs opacity-70">Tanggal Diproses</p>
+                                    <p className="text-xs text-slate-500">Tanggal Diproses</p>
                                     <p>{selectedItem.updated_at ? new Date(selectedItem.updated_at).toLocaleString('id-ID') : '-'}</p>
                                 </div>
                             )}
                             <div className="md:col-span-2">
-                                <p className="text-xs opacity-70">Keterangan Pegawai</p>
-                                <p className="bg-base-200 rounded p-3">{getEmployeeDescription(selectedItem) || '-'}</p>
+                                <p className="text-xs text-slate-500">Keterangan Pegawai</p>
+                                <p className="rounded-2xl border border-slate-200 bg-slate-50 p-3">{getEmployeeDescription(selectedItem) || '-'}</p>
                             </div>
                             {selectedItem.status === 'rejected' && (
                                 <div className="md:col-span-2">
-                                    <p className="text-xs opacity-70">Alasan Penolakan HR</p>
-                                    <p className="bg-error/10 border border-error/30 rounded p-3 text-error-content">
+                                    <p className="text-xs text-slate-500">Alasan Penolakan HR</p>
+                                    <p className="rounded-2xl border border-red-200 bg-red-50 p-3 text-red-600">
                                         {getRejectionReason(selectedItem) || '-'}
                                     </p>
                                 </div>
                             )}
                             <div className="md:col-span-2">
-                                <p className="text-xs opacity-70">Lampiran</p>
+                                <p className="text-xs text-slate-500">Lampiran</p>
                                 {selectedItem.attachment ? (
                                     <a
                                         href={`${process.env.REACT_APP_API_URL || 'http://localhost:5000'}/${selectedItem.attachment}`}
@@ -538,9 +625,48 @@ function HRReimbursements() {
                             </div>
                         </div>
 
-                        <div className="modal-action">
-                            <button className="btn btn-primary rounded-full" onClick={() => setShowDetailModal(false)}>
+                        <div className="modal-action border-t border-slate-200 px-6 py-4">
+                            <button className="btn rounded-xl border-none bg-orange-500 text-white hover:bg-orange-600" onClick={() => setShowDetailModal(false)}>
                                 Tutup
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {showApproveModal && approveTarget && (
+                <div className="modal modal-open">
+                    <div className="modal-box max-w-lg overflow-hidden rounded-3xl border border-slate-200 p-0">
+                        <h3 className="font-bold text-lg">Konfirmasi Validasi Reimbursement</h3>
+                        <div className="mt-3 space-y-3">
+                            <p className="text-sm text-base-content/70">
+                                Pastikan data reimbursement sudah sesuai sebelum divalidasi.
+                            </p>
+                            <div className="bg-base-200 rounded p-3 text-sm">
+                                <p><span className="font-bold text-slate-800">Pegawai:</span> {approveTarget.employee_name || '-'}</p>
+                                <p><span className="font-bold text-slate-800">Jenis:</span> {approveTarget.reimbursement_type || '-'}</p>
+                                <p><span className="font-bold text-slate-800">Nominal:</span> Rp {(Number(approveTarget.amount) || 0).toLocaleString('id-ID')}</p>
+                                <p><span className="font-bold text-slate-800">Tanggal:</span> {approveTarget.created_at ? new Date(approveTarget.created_at).toLocaleDateString('id-ID') : '-'}</p>
+                            </div>
+                        </div>
+
+                        <div className="modal-action border-t border-slate-200 px-6 py-4">
+                            <button
+                                className="btn rounded-xl"
+                                onClick={() => {
+                                    setShowApproveModal(false)
+                                    setApproveTarget(null)
+                                }}
+                                disabled={processingId === approveTarget.id}
+                            >
+                                Batal
+                            </button>
+                            <button
+                                className={`btn btn-success ${processingId === approveTarget.id ? 'loading' : ''}`}
+                                onClick={handleConfirmApprove}
+                                disabled={processingId === approveTarget.id}
+                            >
+                                Validasi Reimbursement
                             </button>
                         </div>
                     </div>
@@ -549,13 +675,13 @@ function HRReimbursements() {
 
             {showRejectModal && rejectTarget && (
                 <div className="modal modal-open">
-                    <div className="modal-box max-w-lg">
+                    <div className="modal-box max-w-lg overflow-hidden rounded-3xl border border-slate-200 p-0">
                         <h3 className="font-bold text-lg">Alasan Penolakan Reimbursement</h3>
                         <div className="mt-3 space-y-3">
                             <div className="bg-base-200 rounded p-3 text-sm">
-                                <p><span className="font-semibold">Pegawai:</span> {rejectTarget.employee_name || '-'}</p>
-                                <p><span className="font-semibold">Jenis:</span> {rejectTarget.reimbursement_type || '-'}</p>
-                                <p><span className="font-semibold">Nominal:</span> Rp {(Number(rejectTarget.amount) || 0).toLocaleString('id-ID')}</p>
+                                <p><span className="font-bold text-slate-800">Pegawai:</span> {rejectTarget.employee_name || '-'}</p>
+                                <p><span className="font-bold text-slate-800">Jenis:</span> {rejectTarget.reimbursement_type || '-'}</p>
+                                <p><span className="font-bold text-slate-800">Nominal:</span> Rp {(Number(rejectTarget.amount) || 0).toLocaleString('id-ID')}</p>
                             </div>
 
                             <div className="form-control">
@@ -563,7 +689,7 @@ function HRReimbursements() {
                                     <span className="label-text font-semibold">Alasan Penolakan</span>
                                 </label>
                                 <textarea
-                                    className="textarea textarea-bordered min-h-[120px]"
+                                    className="textarea textarea-bordered min-h-[120px] rounded-2xl"
                                     placeholder="Tulis alasan penolakan reimbursement..."
                                     value={rejectReason}
                                     onChange={(e) => setRejectReason(e.target.value)}
@@ -574,9 +700,9 @@ function HRReimbursements() {
                             </div>
                         </div>
 
-                        <div className="modal-action">
+                        <div className="modal-action border-t border-slate-200 px-6 py-4">
                             <button
-                                className="btn"
+                                className="btn rounded-xl"
                                 onClick={() => {
                                     setShowRejectModal(false)
                                     setRejectTarget(null)
@@ -598,9 +724,9 @@ function HRReimbursements() {
                 </div>
             )}
 
-        </>
+            </div>
+        </div>
     )
 }
 
 export default HRReimbursements
-

@@ -4,6 +4,7 @@ import { useNavigate } from "react-router-dom";
 import { setPageTitle } from "../../../features/common/headerSlice";
 import TitleCard from "../../../components/Cards/TitleCard";
 import { financeApi } from "../../../features/finance/api";
+import { formatCurrencyInput, normalizeCurrencyInput } from "../../../components/Formatters/CurrencyFormatter";
 
 const formatCurrency = (value) =>
   `Rp ${Number(value || 0).toLocaleString("id-ID")}`;
@@ -92,6 +93,14 @@ function FinancePayrollSettings() {
 
   const handleChange = (e) => {
     const { name, value } = e.target;
+    if (name === "transport_per_day" || name === "meal_per_day") {
+      setForm({
+        ...form,
+        [name]: normalizeCurrencyInput(value),
+      });
+      return;
+    }
+
     setForm({
       ...form,
       [name]: value === "" ? "" : Number(value),
@@ -324,12 +333,12 @@ function FinancePayrollSettings() {
                 </span>
               </label>
               <input
-                type="number"
-                step="0.01"
+                type="text"
+                inputMode="numeric"
                 name="transport_per_day"
-                value={form.transport_per_day}
+                value={formatCurrencyInput(form.transport_per_day)}
                 onChange={handleChange}
-                placeholder="Contoh: 50000"
+                placeholder="Contoh: 50.000"
                 className="input input-bordered w-full"
                 disabled={!canEditOperational}
                 required
@@ -341,12 +350,12 @@ function FinancePayrollSettings() {
                 <span className="label-text font-semibold">Makan per Hari</span>
               </label>
               <input
-                type="number"
-                step="0.01"
+                type="text"
+                inputMode="numeric"
                 name="meal_per_day"
-                value={form.meal_per_day}
+                value={formatCurrencyInput(form.meal_per_day)}
                 onChange={handleChange}
-                placeholder="Contoh: 25000"
+                placeholder="Contoh: 25.000"
                 className="input input-bordered w-full"
                 disabled={!canEditOperational}
                 required

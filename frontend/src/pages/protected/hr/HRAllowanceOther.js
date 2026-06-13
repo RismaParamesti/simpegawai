@@ -9,6 +9,7 @@ import { resolveFixedPositionAllowance } from '../../../utils/fixedPositionAllow
 import { MagnifyingGlassIcon } from '@heroicons/react/24/outline'
 import { useLocation, useNavigate } from 'react-router-dom'
 import useTablePagination from '../../../hooks/useTablePagination'
+import { formatCurrencyInput, normalizeCurrencyInput } from '../../../components/Formatters/CurrencyFormatter'
 
 const statusLabelMap = {
     draft: 'Draft',
@@ -57,10 +58,6 @@ const getCurrentPeriod = () => {
         month: String(now.getMonth() + 1),
         year: String(now.getFullYear()),
     }
-}
-
-const disableNumberWheelChange = (event) => {
-    event.currentTarget.blur()
 }
 
 const buildEmployeeSelectionOptions = (items = []) => {
@@ -132,6 +129,10 @@ function HRPayrollDirectorAdjustments() {
         other_deduction: '',
         notes: '',
     })
+
+    const handleCurrencyChange = (field, value) => {
+        setForm((prev) => ({ ...prev, [field]: normalizeCurrencyInput(value) }))
+    }
 
     const employeeSelectionOptions = useMemo(() => buildEmployeeSelectionOptions(availableEmployees), [availableEmployees])
 
@@ -403,13 +404,11 @@ function HRPayrollDirectorAdjustments() {
                         <label className="form-control">
                             <span className="label-text">Bonus</span>
                             <input
-                                type="number"
-                                min="0"
-                                step="1"
+                                type="text"
+                                inputMode="numeric"
                                 className="input input-bordered"
-                                value={form.bonus}
-                                onWheel={disableNumberWheelChange}
-                                onChange={(e) => setForm((prev) => ({ ...prev, bonus: e.target.value }))}
+                                value={formatCurrencyInput(form.bonus)}
+                                onChange={(e) => handleCurrencyChange('bonus', e.target.value)}
                                 placeholder="Rp"
                             />
                         </label>
@@ -417,14 +416,12 @@ function HRPayrollDirectorAdjustments() {
                         <label className="form-control">
                             <span className="label-text">Potongan Lainnya</span>
                             <input
-                                type="number"
-                                min="0"
-                                step="1"
+                                type="text"
+                                inputMode="numeric"
                                 className="input input-bordered"
-                                value={form.other_deduction}
-                                onWheel={disableNumberWheelChange}
-                                onChange={(e) => setForm((prev) => ({ ...prev, other_deduction: e.target.value }))}
-                                  placeholder="Rp"
+                                value={formatCurrencyInput(form.other_deduction)}
+                                onChange={(e) => handleCurrencyChange('other_deduction', e.target.value)}
+                                placeholder="Rp"
                             />
                         </label>
                     </div>

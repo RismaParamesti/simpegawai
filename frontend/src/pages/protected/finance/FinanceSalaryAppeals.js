@@ -2,7 +2,6 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useDispatch } from 'react-redux'
 import { useNavigate } from 'react-router-dom'
 import { setPageTitle } from '../../../features/common/headerSlice'
-import TitleCard from '../../../components/Cards/TitleCard'
 import Pagination from '../../../components/Pagination/Pagination'
 import { financeApi } from '../../../features/finance/api'
 import useTablePagination from '../../../hooks/useTablePagination'
@@ -114,6 +113,8 @@ function FinanceSalaryAppeals() {
     const [approvedAppeals, setApprovedAppeals] = useState([])
     const [selectedAppeal, setSelectedAppeal] = useState(null)
     const [showDetailModal, setShowDetailModal] = useState(false)
+    const [isApprovedCardOpen, setIsApprovedCardOpen] = useState(false)
+    const [isHistoryCardOpen, setIsHistoryCardOpen] = useState(false)
     const [filters, setFilters] = useState({
         search: '',
         month: '',
@@ -140,10 +141,9 @@ function FinanceSalaryAppeals() {
 
     const activeApprovedAppeals = useMemo(() => {
         return approvedAppeals.filter((item) => {
-            const payrollStatus = String(item.payroll_status || '').toLowerCase()
             const hasRevisedAmount = item.final_amount !== null && item.final_amount !== undefined
 
-            if (hasRevisedAmount && ['published', 'claimed'].includes(payrollStatus)) {
+            if (hasRevisedAmount) {
                 return false
             }
 
@@ -183,10 +183,9 @@ function FinanceSalaryAppeals() {
 
     const historyAppeals = useMemo(() => {
         return approvedAppeals.filter((item) => {
-            const payrollStatus = String(item.payroll_status || '').toLowerCase()
             const hasRevisedAmount = item.final_amount !== null && item.final_amount !== undefined
 
-            return hasRevisedAmount || ['published', 'claimed'].includes(payrollStatus)
+            return hasRevisedAmount
         })
     }, [approvedAppeals])
     const approvedPagination = useTablePagination(filteredAppeals)
@@ -205,9 +204,6 @@ function FinanceSalaryAppeals() {
         setShowDetailModal(true)
     }
 
-    if (loading) {
-        return <div className="text-center py-10">Memuat data banding gaji...</div>
-    }
     const getPayrollStatusBadge = (status) => {
     const normalized = String(status || '').toLowerCase().trim()
 
@@ -247,147 +243,213 @@ const payrollStatusLabel = (status) => {
 }
 
     return (
-        <>
-            {error && <div className="alert alert-error mb-4"><span>{error}</span></div>}
+        <div className="mt-4 overflow-hidden rounded-[1.5rem] border border-slate-200/80 bg-white p-4 shadow-[0_20px_70px_rgba(15,23,42,0.07)] dark:border-slate-700 dark:bg-slate-950 dark:shadow-[0_20px_70px_rgba(2,6,23,0.45)] sm:p-7">
+            <div className="space-y-6">
+                {error && <div className="alert alert-error"><span>{error}</span></div>}
 
-            <TitleCard title="Daftar Banding Gaji Disetujui HR / Admin" topMargin="mt-0">
-                <div className="grid md:grid-cols-3 grid-cols-1 gap-3 mb-4">
-                    <div className="rounded-lg p-4 bg-base-200">
-                        <p className="text-sm opacity-70">Total Disetujui HR / Admin</p>
-                        <p className="text-2xl font-semibold">{activeApprovedAppeals.length}</p>
-                    </div>
-                    <div className="rounded-lg p-4 bg-base-200">
-                        <p className="text-sm opacity-70">Data Ditampilkan</p>
-                        <p className="text-2xl font-semibold">{filteredAppeals.length}</p>
-                    </div>
-                    <div className="rounded-lg p-4 bg-base-200">
-                        <p className="text-sm opacity-70">Total Nominal Perbaikan</p>
-                        <p className="text-xl font-semibold">{formatCurrency(totalAdjustmentAmount)}</p>
+                <div className="relative min-h-[125px] overflow-hidden rounded-[1.4rem] bg-gradient-to-r from-white via-white to-orange-50/80 px-5 py-6 dark:from-slate-950 dark:via-slate-950 dark:to-slate-900 sm:px-6">
+                    <div className="absolute right-10 top-3 hidden h-24 w-64 rounded-full bg-orange-100/70 blur-sm lg:block dark:bg-orange-900/30" />
+                    <div className="relative z-10 max-w-3xl">
+                        <div className="mb-3 inline-flex items-center gap-2 rounded-full border border-orange-200 bg-orange-50 px-3 py-1 text-xs font-bold text-orange-600 dark:border-orange-900/60 dark:bg-orange-950/70 dark:text-orange-300">
+                            Banding Gaji Finance
+                        </div>
+                        <h1 className="text-[28px] font-extrabold leading-tight text-slate-900 dark:text-slate-50">
+                            Kelola Revisi Banding Gaji
+                        </h1>
+                        <p className="mt-2 max-w-2xl text-sm font-medium text-slate-500 dark:text-slate-400">
+                            Lihat banding gaji yang sudah disetujui HR atau Admin, lalu lanjutkan ke revisi payroll bila diperlukan.
+                        </p>
                     </div>
                 </div>
 
-                <div className="grid lg:grid-cols-3 md:grid-cols-2 grid-cols-1 gap-3 mb-4">
-                    <input
-                        className="input input-bordered w-full"
-                        placeholder="Cari nama/kode/departemen/posisi"
-                        value={filters.search}
-                        onChange={(e) => handleFilterChange('search', e.target.value)}
-                    />
-                    <select
-                        className="select select-bordered w-full"
-                        value={filters.month}
-                        onChange={(e) => handleFilterChange('month', e.target.value)}
-                    >
-                        <option value="">Semua Bulan</option>
-                        {Array.from({ length: 12 }, (_, index) => (
-                            <option key={index + 1} value={index + 1}>
-                                {new Date(2000, index, 1).toLocaleString('id-ID', { month: 'long' })}
-                            </option>
-                        ))}
-                    </select>
-                    <select
-                        className="select select-bordered w-full"
-                        value={filters.year}
-                        onChange={(e) => handleFilterChange('year', e.target.value)}
-                    >
-                        <option value="">Semua Tahun</option>
-                        {yearOptions.map((year) => (
-                            <option key={year} value={year}>{year}</option>
-                        ))}
-                    </select>
+                <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
+                    {[
+                        { label: 'Perlu Direvisi', value: activeApprovedAppeals.length, desc: 'Pengajuan yang siap ditindaklanjuti', cls: 'border-emerald-200 bg-emerald-50 text-emerald-700' },
+                        { label: 'Sudah Direvisi', value: historyAppeals.length, desc: 'Data yang sudah memiliki nominal final', cls: 'border-amber-200 bg-amber-50 text-amber-700' },
+                        { label: 'Total Nominal Perbaikan', value: formatCurrency(totalAdjustmentAmount), desc: 'Akumulasi nominal dari data tampil', cls: 'border-sky-200 bg-sky-50 text-sky-700' },
+                    ].map((item) => (
+                        <div key={item.label} className={`rounded-3xl border p-5 shadow-sm transition hover:-translate-y-0.5 hover:shadow-md ${item.cls} dark:border-slate-700 dark:bg-slate-900`}>
+                            <p className="text-sm font-bold">{item.label}</p>
+                            <p className="mt-2 text-3xl font-extrabold text-slate-900 dark:text-slate-50">{item.value}</p>
+                            <p className="mt-1 text-xs font-medium opacity-80">{item.desc}</p>
+                        </div>
+                    ))}
                 </div>
 
-                <div className="overflow-x-auto">
-                    <table className="table table-zebra table-sm">
-                        <thead>
-                            <tr>
-                                <th>Pegawai</th>
-                                <th>Kode</th>
-                                <th>Departement</th>
-                                <th>Posisi</th>
-                                <th>Periode</th>
-                                <th>Tanggal Review</th>
-                                <th>Aksi</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            {approvedPagination.paginatedItems.map((item) => (
-                                <tr key={item.id}>
-                                    <td>{item.full_name || item.employee_name || '-'}</td>
-                                    <td>{item.employee_code || '-'}</td>
-                                    <td>{item.department_name || '-'}</td>
-                                    <td>{item.position_name || '-'}</td>
-                                    <td>{item.period_month}/{item.period_year}</td>
-                                    <td>{item.reviewed_at ? new Date(item.reviewed_at).toLocaleString('id-ID') : '-'}</td>
-                                    <td>
-                                        <button
-                                            type="button"
-                                            className="
-        px-3 py-1 text-xs
-        bg-gradient-to-b from-blue-400 to-blue-600
-        text-white rounded-full
-        shadow-md hover:shadow-lg
-        border border-blue-600
-        hover:from-blue-500 hover:to-blue-700
-        transition-all duration-200"
-                                            onClick={() => openDetailModal(item)}
-                                        >
-                                            Lihat
-                                        </button>
-                                    </td>
-                                </tr>
-                            ))}
-                            {filteredAppeals.length === 0 && (
-                                <tr><td colSpan={7} className="text-center opacity-70">Belum ada banding gaji yang disetujui HR / Admin</td></tr>
+                <section className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-700 dark:bg-slate-900 sm:p-6">
+                    <div className="mb-5 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                        <div>
+                            <h2 className="text-xl font-extrabold text-slate-900 dark:text-slate-50">Daftar Banding Gaji yang Perlu Direvisi</h2>
+                            <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">Pengajuan yang sudah disetujui bisa dilanjutkan ke revisi payroll.</p>
+                        </div>
+                        <button
+                            type="button"
+                            className="btn rounded-xl !border-orange-500 !bg-orange-500 !text-white hover:!border-orange-600 hover:!bg-orange-600"
+                            onClick={() => setIsApprovedCardOpen((prev) => !prev)}
+                        >
+                            {isApprovedCardOpen ? 'Tutup' : 'Buka'}
+                        </button>
+                    </div>
+
+                    {isApprovedCardOpen && (
+                        <>
+                            <div className="mb-6 grid grid-cols-1 gap-3 rounded-2xl border border-slate-200 bg-slate-50/70 p-4 md:grid-cols-2 lg:grid-cols-3 dark:border-slate-700 dark:bg-slate-950/50">
+                                <input
+                                    className="input input-bordered w-full rounded-xl bg-white text-slate-900 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100"
+                                    placeholder="Cari nama/kode/departemen/posisi"
+                                    value={filters.search}
+                                    onChange={(e) => handleFilterChange('search', e.target.value)}
+                                />
+                                <select
+                                    className="select select-bordered w-full rounded-xl bg-white text-slate-900 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100"
+                                    value={filters.month}
+                                    onChange={(e) => handleFilterChange('month', e.target.value)}
+                                >
+                                    <option value="">Semua Bulan</option>
+                                    {Array.from({ length: 12 }, (_, index) => (
+                                        <option key={index + 1} value={index + 1}>
+                                            {new Date(2000, index, 1).toLocaleString('id-ID', { month: 'long' })}
+                                        </option>
+                                    ))}
+                                </select>
+                                <select
+                                    className="select select-bordered w-full rounded-xl bg-white text-slate-900 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100"
+                                    value={filters.year}
+                                    onChange={(e) => handleFilterChange('year', e.target.value)}
+                                >
+                                    <option value="">Semua Tahun</option>
+                                    {yearOptions.map((year) => (
+                                        <option key={year} value={year}>{year}</option>
+                                    ))}
+                                </select>
+                            </div>
+
+                            {loading ? (
+                                <div className="flex min-h-[180px] items-center justify-center rounded-2xl border border-dashed border-slate-200 text-slate-500 dark:border-slate-700">
+                                    Memuat data banding gaji...
+                                </div>
+                            ) : (
+                                <div className="overflow-hidden rounded-2xl border border-slate-200 dark:border-slate-700">
+                                    <div className="overflow-x-auto">
+                                        <table className="table table-sm w-full">
+                                            <thead className="bg-slate-50 text-xs uppercase tracking-wide text-slate-500 dark:bg-slate-950 dark:text-slate-400">
+                                                <tr>
+                                                    <th>Pegawai</th>
+                                                    <th>Kode</th>
+                                                    <th>Departement</th>
+                                                    <th>Posisi</th>
+                                                    <th>Periode</th>
+                                                    <th>Tanggal Review</th>
+                                                    <th className="text-right">Aksi</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
+                                                {approvedPagination.paginatedItems.map((item) => (
+                                                    <tr key={item.id} className="hover:bg-orange-50/40 dark:hover:bg-slate-800/70">
+                                                        <td>{item.full_name || item.employee_name || '-'}</td>
+                                                        <td>{item.employee_code || '-'}</td>
+                                                        <td>{item.department_name || '-'}</td>
+                                                        <td>{item.position_name || '-'}</td>
+                                                        <td>{item.period_month}/{item.period_year}</td>
+                                                        <td>{item.reviewed_at ? new Date(item.reviewed_at).toLocaleString('id-ID') : '-'}</td>
+                                                        <td>
+                                                            <div className="flex justify-end">
+                                                                <button
+                                                                    type="button"
+                                                                    className="rounded-full bg-orange-500 px-4 py-1.5 text-xs font-bold text-white shadow-sm transition hover:bg-orange-600"
+                                                                    onClick={() => openDetailModal(item)}
+                                                                >
+                                                                    Lihat
+                                                                </button>
+                                                            </div>
+                                                        </td>
+                                                    </tr>
+                                                ))}
+                                                {filteredAppeals.length === 0 && (
+                                                    <tr><td colSpan={7} className="py-10 text-center text-slate-500">Belum ada banding gaji yang disetujui HR / Admin</td></tr>
+                                                )}
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                    <div className="border-t border-slate-200 bg-white px-4 py-3 dark:border-slate-700 dark:bg-slate-900">
+                                        <Pagination page={approvedPagination.page} totalPages={approvedPagination.totalPages} onChangePage={approvedPagination.setPage} itemsPerPage={approvedPagination.itemsPerPage} />
+                                    </div>
+                                </div>
                             )}
-                        </tbody>
-                    </table>
-                    <Pagination page={approvedPagination.page} totalPages={approvedPagination.totalPages} onChangePage={approvedPagination.setPage} itemsPerPage={approvedPagination.itemsPerPage} />
-                </div>
-            </TitleCard>
+                        </>
+                    )}
+                </section>
 
-            <TitleCard title="Riwayat Banding Gaji" topMargin="mt-6">
-                <div className="overflow-x-auto">
-                    <table className="table table-zebra table-sm">
-                        <thead>
-                            <tr>
-                                <th>Pegawai</th>
-                                <th>Kode</th>
-                                <th>Periode</th>
-                                <th>Nominal Banding</th>
-                                <th>Nominal Final</th>
-                                <th>Status Payroll</th>
-                                <th>Tanggal Review</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            {historyPagination.paginatedItems.map((item) => (
-                                <tr key={`history-${item.id}`}>
-                                    <td>{item.full_name || item.employee_name || '-'}</td>
-                                    <td>{item.employee_code || '-'}</td>
-                                    <td>{item.period_month}/{item.period_year}</td>
-                                    <td>{formatCurrency(item.expected_amount || 0)}</td>
-                                    <td>{formatCurrency(item.final_amount || 0)}</td>
-                                    <td>
-    <span className={`badge badge-sm ${getPayrollStatusBadge(item.payroll_status)}`}>
-        {payrollStatusLabel(item.payroll_status)}
-    </span>
-</td>
-                                    <td>{item.reviewed_at ? new Date(item.reviewed_at).toLocaleString('id-ID') : '-'}</td>
-                                </tr>
-                            ))}
-                            {historyAppeals.length === 0 && (
-                                <tr>
-                                    <td colSpan={7} className="text-center opacity-70">Belum ada riwayat banding gaji</td>
-                                </tr>
+                <section className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-700 dark:bg-slate-900 sm:p-6">
+                    <div className="mb-5 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                        <div>
+                            <h2 className="text-xl font-extrabold text-slate-900 dark:text-slate-50">Riwayat Banding Gaji</h2>
+                            <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">Data banding gaji yang sudah masuk proses revisi payroll atau selesai.</p>
+                        </div>
+                        <button
+                            type="button"
+                            className="btn rounded-xl !border-orange-500 !bg-orange-500 !text-white hover:!border-orange-600 hover:!bg-orange-600"
+                            onClick={() => setIsHistoryCardOpen((prev) => !prev)}
+                        >
+                            {isHistoryCardOpen ? 'Tutup' : 'Buka'}
+                        </button>
+                    </div>
+
+                    {isHistoryCardOpen && (
+                        <>
+                            {loading ? (
+                                <div className="flex min-h-[180px] items-center justify-center rounded-2xl border border-dashed border-slate-200 text-slate-500 dark:border-slate-700">
+                                    Memuat data riwayat...
+                                </div>
+                            ) : (
+                                <div className="overflow-hidden rounded-2xl border border-slate-200 dark:border-slate-700">
+                                    <div className="overflow-x-auto">
+                                        <table className="table table-sm w-full">
+                                            <thead className="bg-slate-50 text-xs uppercase tracking-wide text-slate-500 dark:bg-slate-950 dark:text-slate-400">
+                                                <tr>
+                                                    <th>Pegawai</th>
+                                                    <th>Kode</th>
+                                                    <th>Periode</th>
+                                                    <th>Nominal Banding</th>
+                                                    <th>Nominal Final</th>
+                                                    <th>Status Payroll</th>
+                                                    <th>Tanggal Review</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
+                                                {historyPagination.paginatedItems.map((item) => (
+                                                    <tr key={`history-${item.id}`} className="hover:bg-orange-50/40 dark:hover:bg-slate-800/70">
+                                                        <td>{item.full_name || item.employee_name || '-'}</td>
+                                                        <td>{item.employee_code || '-'}</td>
+                                                        <td>{item.period_month}/{item.period_year}</td>
+                                                        <td>{formatCurrency(item.expected_amount || 0)}</td>
+                                                        <td>{formatCurrency(item.final_amount || 0)}</td>
+                                                        <td>
+                                                            <span className={`badge badge-sm ${getPayrollStatusBadge(item.payroll_status)}`}>
+                                                                {payrollStatusLabel(item.payroll_status)}
+                                                            </span>
+                                                        </td>
+                                                        <td>{item.reviewed_at ? new Date(item.reviewed_at).toLocaleString('id-ID') : '-'}</td>
+                                                    </tr>
+                                                ))}
+                                                {historyAppeals.length === 0 && (
+                                                    <tr>
+                                                        <td colSpan={7} className="py-10 text-center text-slate-500">Belum ada riwayat banding gaji</td>
+                                                    </tr>
+                                                )}
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                    <div className="border-t border-slate-200 bg-white px-4 py-3 dark:border-slate-700 dark:bg-slate-900">
+                                        <Pagination page={historyPagination.page} totalPages={historyPagination.totalPages} onChangePage={historyPagination.setPage} itemsPerPage={historyPagination.itemsPerPage} />
+                                    </div>
+                                </div>
                             )}
-                        </tbody>
-                    </table>
-                    <Pagination page={historyPagination.page} totalPages={historyPagination.totalPages} onChangePage={historyPagination.setPage} itemsPerPage={historyPagination.itemsPerPage} />
-                </div>
-            </TitleCard>
+                        </>
+                    )}
+                </section>
 
-            {showDetailModal && selectedAppeal && (
+                {showDetailModal && selectedAppeal && (
                 <div className="modal modal-open">
                     <div className="modal-box max-w-4xl">
                         <h3 className="font-bold text-lg mb-4">Detail Banding Gaji untuk Revisi</h3>
@@ -491,10 +553,10 @@ const payrollStatusLabel = (status) => {
                         </div>
                     </div>
                 </div>
-            )}
-        </>
+                )}
+            </div>
+        </div>
     )
 }
 
 export default FinanceSalaryAppeals
-

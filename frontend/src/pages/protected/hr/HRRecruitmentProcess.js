@@ -319,9 +319,9 @@ export default function CandidateJobList() {
     },
     {
       key: "unchanged",
-      title: "Belum Dikelola",
+      title: "Informasi Lowongan Belum Dipublish",
       value: candidateSummary.unchanged,
-      description: "Lamaran masih berstatus submitted",
+      description: "Lowongan belum dipublish",
       icon: Clock3,
       baseClass:
         "border-amber-200 bg-amber-50 text-amber-700 hover:bg-amber-100 dark:border-amber-900/50 dark:bg-amber-950/30 dark:text-amber-200 dark:hover:bg-amber-950/50",
@@ -332,9 +332,33 @@ export default function CandidateJobList() {
   ];
 
   const jobsForFilter = activeFilter ? computeJobsList(activeFilter) : null;
-  const visibleJobs = activeFilter
+  const baseVisibleJobs = activeFilter
     ? jobsForFilter.map((item) => item.job)
     : filteredJobs;
+  const visibleJobs = activeFilter
+    ? baseVisibleJobs.filter((job) => {
+        const keyword = search.toLowerCase().trim();
+        const searchableText = [
+          job.position_name,
+          job.title,
+          job.base_position,
+        ]
+          .filter(Boolean)
+          .join(" ")
+          .toLowerCase();
+        const matchesSearch = !keyword || searchableText.includes(keyword);
+        const matchesLocation =
+          !locationFilter ||
+          String(job.location || "").toLowerCase() ===
+            locationFilter.toLowerCase();
+        const matchesStatus =
+          !statusFilter ||
+          String(job.status || "").toLowerCase() ===
+            statusFilter.toLowerCase();
+
+        return matchesSearch && matchesLocation && matchesStatus;
+      })
+    : baseVisibleJobs;
   const hiredCandidateLookup = useMemo(
     () => buildHiredCandidateLookup(hiredCandidates),
     [hiredCandidates],

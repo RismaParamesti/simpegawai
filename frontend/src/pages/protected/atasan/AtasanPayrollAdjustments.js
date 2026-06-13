@@ -5,6 +5,7 @@ import Pagination from '../../../components/Pagination/Pagination'
 import { setPageTitle, showNotification } from '../../../features/common/headerSlice'
 import { atasanApi } from '../../../features/atasan/api'
 import useTablePagination from '../../../hooks/useTablePagination'
+import { formatCurrencyInput, normalizeCurrencyInput } from '../../../components/Formatters/CurrencyFormatter'
 
 const statusLabelMap = {
     draft: 'Draft',
@@ -132,6 +133,10 @@ function AtasanPayrollAdjustments() {
         }
     }
 
+    const handleCurrencyChange = (field, value) => {
+        setForm((prev) => ({ ...prev, [field]: normalizeCurrencyInput(value) }))
+    }
+
     return (
         <>
             <TitleCard title="Input Adjustment Payroll Tim" topMargin="mt-0">
@@ -167,31 +172,34 @@ function AtasanPayrollAdjustments() {
                     <label className="form-control">
                         <span className="label-text">Bonus</span>
                         <input
-                            type="number"
-                            min="0"
+                            type="text"
+                            inputMode="numeric"
                             className="input input-bordered"
-                            value={form.bonus}
-                            onChange={(e) => setForm((prev) => ({ ...prev, bonus: e.target.value }))}
+                            value={formatCurrencyInput(form.bonus)}
+                            onChange={(e) => handleCurrencyChange('bonus', e.target.value)}
+                            placeholder="Rp"
                         />
                     </label>
                     <label className="form-control">
                         <span className="label-text">Tunjangan Lainnya</span>
                         <input
-                            type="number"
-                            min="0"
+                            type="text"
+                            inputMode="numeric"
                             className="input input-bordered"
-                            value={form.other_allowance}
-                            onChange={(e) => setForm((prev) => ({ ...prev, other_allowance: e.target.value }))}
+                            value={formatCurrencyInput(form.other_allowance)}
+                            onChange={(e) => handleCurrencyChange('other_allowance', e.target.value)}
+                            placeholder="Rp"
                         />
                     </label>
                     <label className="form-control">
                         <span className="label-text">Potongan Lainnya</span>
                         <input
-                            type="number"
-                            min="0"
+                            type="text"
+                            inputMode="numeric"
                             className="input input-bordered"
-                            value={form.other_deduction}
-                            onChange={(e) => setForm((prev) => ({ ...prev, other_deduction: e.target.value }))}
+                            value={formatCurrencyInput(form.other_deduction)}
+                            onChange={(e) => handleCurrencyChange('other_deduction', e.target.value)}
+                            placeholder="Rp"
                         />
                     </label>
                 </div>

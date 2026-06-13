@@ -12,6 +12,17 @@ const ALPHA_SANCTION_LEVEL = {
     NONE: "none",
 };
 
+const isMissingWarningLettersTableError = (error) =>
+    (error?.code === "ER_NO_SUCH_TABLE" || error?.errno === 1146) &&
+    /warning_letters/i.test(String(error?.sqlMessage || error?.sql || ""));
+
+const sendEmptyWarningLetters = (res, message) =>
+    res.json({
+        message,
+        total: 0,
+        data: [],
+    });
+
 const normalizeSpLevel = (value) => {
     const raw = String(value || "").toLowerCase().trim();
     if (!raw) return null;
@@ -718,6 +729,9 @@ router.get(
                 data: rows.map(mapViolationRow),
             });
         } catch (error) {
+            if (isMissingWarningLettersTableError(error)) {
+                return sendEmptyWarningLetters(res, "Active warning letters fetched successfully");
+            }
             console.error(error);
             return res.status(500).json({ message: "Server error" });
         }
@@ -802,6 +816,9 @@ router.get("/", verifyToken, verifyRole(["hr", "admin"]), async (req, res) => {
             data: normalized,
         });
     } catch (error) {
+        if (isMissingWarningLettersTableError(error)) {
+            return sendEmptyWarningLetters(res, "Warning letters fetched successfully");
+        }
         console.error(error);
         res.status(500).json({ message: "Server error" });
     }
@@ -858,6 +875,9 @@ router.get("/my", verifyToken, verifyRole(["pegawai"]), async (req, res) => {
             data: normalizedRows,
         });
     } catch (error) {
+        if (isMissingWarningLettersTableError(error)) {
+            return sendEmptyWarningLetters(res, "My warning letters fetched successfully");
+        }
         console.error(error);
         return res.status(500).json({ message: "Server error" });
     }
@@ -920,6 +940,9 @@ router.get(
                 data: normalizedRows,
             });
         } catch (error) {
+            if (isMissingWarningLettersTableError(error)) {
+                return sendEmptyWarningLetters(res, "Team warning letters fetched successfully");
+            }
             console.error(error);
             return res.status(error.statusCode || 500).json({
                 message: error.message || "Server error",
@@ -955,6 +978,9 @@ router.get(
                 data: rows.map(mapViolationRow),
             });
         } catch (error) {
+            if (isMissingWarningLettersTableError(error)) {
+                return sendEmptyWarningLetters(res, "Active team warning letters fetched successfully");
+            }
             console.error(error);
             return res.status(error.statusCode || 500).json({
                 message: error.message || "Server error",
@@ -980,6 +1006,9 @@ router.get(
 
             return res.json({ message: 'Warning letter statuses fetched', total: statuses.length, data: statuses });
         } catch (error) {
+            if (isMissingWarningLettersTableError(error)) {
+                return res.json({ message: 'Warning letter statuses fetched', total: 0, data: [] });
+            }
             console.error(error);
             return res.status(500).json({ message: 'Server error' });
         }
@@ -1023,6 +1052,10 @@ router.get(
             );
 
             const letter = rows[0];
+            if (!letter) {
+                return res.status(404).json({ message: "Surat peringatan tidak ditemukan" });
+            }
+
             const adminContext = isAdminContext(req);
             if (
                 adminContext &&
@@ -1039,6 +1072,9 @@ router.get(
 
             return res.json({ data: letter });
         } catch (error) {
+            if (isMissingWarningLettersTableError(error)) {
+                return res.status(404).json({ message: "Surat peringatan tidak ditemukan" });
+            }
             console.error(error);
             return res.status(500).json({ message: "Server error" });
         }
@@ -1241,6 +1277,11 @@ router.post("/", verifyToken, verifyRole(["hr", "admin"]), async (req, res) => {
             data: createdRows[0] || null,
         });
     } catch (error) {
+        if (isMissingWarningLettersTableError(error)) {
+            return res.status(503).json({
+                message: "Fitur surat peringatan belum tersedia karena tabel warning_letters tidak ada di database aktif.",
+            });
+        }
         console.error(error);
         return res.status(error.statusCode || 500).json({
             message: error.message || "Server error",

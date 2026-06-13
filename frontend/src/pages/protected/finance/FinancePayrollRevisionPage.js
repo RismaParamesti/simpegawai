@@ -1245,7 +1245,7 @@ function FinancePayroll({ isRevisionPage = false }) {
           total_sakit_days: Number(payrollPreview?.sickDays || 0),
           total_izin_days: Number(payrollPreview?.permissionDays || 0),
           present_days: Number(payrollPreview?.presentDays || 0),
-          notes: "Revisi payroll dari banding gaji disetujui HR",
+          notes: "Revisi payroll dari banding gaji yang telah disetujui",
         });
 
         const refreshedRows = await financeApi.getPayrollByEmployee(

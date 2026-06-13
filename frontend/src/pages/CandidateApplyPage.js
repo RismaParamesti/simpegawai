@@ -105,8 +105,12 @@ function CandidateApplyPage() {
 
   const previewButtonClass =
     "btn btn-xs rounded-xl border-none bg-orange-500 text-white shadow-sm hover:bg-orange-600";
+  const token = localStorage.getItem("token");
+
   // Ambil daftar aplikasi user saat mount
   useEffect(() => {
+    if (!token) return;
+
     const fetchAppliedJobs = async () => {
       try {
         const res = await axios.get("/api/candidates/applications");
@@ -168,13 +172,19 @@ function CandidateApplyPage() {
     };
 
     fetchAppliedJobs();
-  }, []);
+  }, [token]);
   // Untuk menampilkan detail lowongan pada step Pilih Lowongan
   const [detailJobId, setDetailJobId] = useState(null);
 
   const dispatch = useDispatch();
   const location = useLocation();
   const navigate = useNavigate();
+
+  useEffect(() => {
+    if (!token) {
+      navigate("/login?role=kandidat", { replace: true });
+    }
+  }, [navigate, token]);
 
   const jobFromPage = location.state?.job || null;
   const comeFromJobListing = !!jobFromPage;
@@ -359,6 +369,8 @@ function CandidateApplyPage() {
   // ========== INITIALIZATION (Optimized: parallel fetch) ==========
   useEffect(() => {
     dispatch(setPageTitle({ title: "Ajukan Lamaran Pekerjaan" }));
+    if (!token) return;
+
     let candidateDataFromDB = null;
 
     const initializeApplication = async () => {
@@ -466,7 +478,7 @@ function CandidateApplyPage() {
       }
     };
     initializeApplication();
-  }, [dispatch, comeFromJobListing, jobFromPage, loadRequiredDocuments]);
+  }, [dispatch, comeFromJobListing, jobFromPage, loadRequiredDocuments, token]);
 
   // ========== REFRESH DOKUMEN SAAT PILIHAN LOWONGAN BERUBAH ==========
   useEffect(() => {
@@ -2118,6 +2130,10 @@ function CandidateApplyPage() {
       </div>
     );
   };
+
+  if (!token) {
+    return null;
+  }
 
   if (loading) {
     return (
