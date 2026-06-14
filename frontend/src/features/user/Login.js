@@ -102,78 +102,84 @@ function Login() {
   };
 
   return (
-    <div className="min-h-screen bg-base-200 flex items-center justify-center px-4">
-      <div className="w-full max-w-lg bg-base-100 rounded-2xl shadow-xl p-8 sm:p-10">
-        {/* Title */}
-        <div className="text-center mb-3">
-          <h2 className="text-2xl font-semibold">Login</h2>
+  <div className="min-h-screen bg-base-200 flex items-center justify-center px-4">
+    <div className="card w-full max-w-5xl shadow-xl">
+      <div className="grid grid-cols-1 md:grid-cols-2 bg-base-100 rounded-xl overflow-hidden">
+        
+        {/* Logo / Intro */}
+        <div className="hidden md:block">
+          <LandingIntro />
         </div>
 
-        <form onSubmit={(e) => submitForm(e)} className="space-y-5">
-          {/* Email */}
-          <InputText
-            type="email"
-            defaultValue={loginObj.email}
-            updateType="email"
-            labelTitle="Email"
-            placeholder="Silahkan input email anda"
-            containerStyle="w-full"
-            updateFormValue={updateFormValue}
-          />
-
-          {/* Password */}
-          <InputText
-            type="password"
-            defaultValue={loginObj.password}
-            updateType="password"
-            labelTitle="Password"
-            placeholder="Silahkan input password anda"
-            containerStyle="w-full"
-            updateFormValue={updateFormValue}
-          />
-
-          {/* Forgot Password */}
-          <div className="flex justify-end">
-            <Link to="/forgot-password">
-              <span className="text-sm text-primary hover:underline cursor-pointer">
-                Lupa kata sandi?
-              </span>
-            </Link>
+        {/* Form Login */}
+        <div className="py-16 px-8 sm:px-10">
+          <div className="text-center mb-8">
+            <h2 className="text-2xl font-semibold">Login</h2>
+            <p className="mt-2 text-sm text-base-content/60">
+              Masuk ke akun Anda untuk melanjutkan
+            </p>
           </div>
 
-          {/* Error */}
-          <ErrorText>{errorMessage}</ErrorText>
+          <form onSubmit={submitForm} className="space-y-5">
+            <InputText
+              type="email"
+              defaultValue={loginObj.email}
+              updateType="email"
+              labelTitle="Email"
+              placeholder="Silahkan input email anda"
+              containerStyle="w-full"
+              updateFormValue={updateFormValue}
+            />
 
-          {/* Button */}
-          <button
-            type="submit"
-            className={
-              "btn w-full btn-primary rounded-lg text-base font-medium h-11 " +
-              (loading ? " loading" : "")
-            }
-          >
-            {loading ? "Sedang masuk..." : "Masuk"}
-          </button>
+            <InputText
+              type="password"
+              defaultValue={loginObj.password}
+              updateType="password"
+              labelTitle="Password"
+              placeholder="Silahkan input password anda"
+              containerStyle="w-full"
+              updateFormValue={updateFormValue}
+            />
 
-          {/* Register */}
-          {isKandidat && (
-            <>
-              {/* Divider */}
-              <div className="divider text-xs text-base-content/50">atau</div>
-              <p className="text-center text-sm text-base-content/70">
-                Belum punya akun?{" "}
-                <Link to="/register?role=kandidat">
-                  <span className="text-primary font-medium hover:underline cursor-pointer">
-                    Daftar sekarang
-                  </span>
-                </Link>
-              </p>
-            </>
-          )}
-        </form>
+            <div className="flex justify-end">
+              <Link to="/forgot-password">
+                <span className="text-sm text-primary hover:underline cursor-pointer">
+                  Lupa kata sandi?
+                </span>
+              </Link>
+            </div>
+
+            <ErrorText>{errorMessage}</ErrorText>
+
+            <button
+              type="submit"
+              className={
+                "btn w-full btn-primary rounded-lg text-base font-medium h-11 " +
+                (loading ? " loading" : "")
+              }
+            >
+              {loading ? "Sedang masuk..." : "Masuk"}
+            </button>
+
+            {isKandidat && (
+              <>
+                <div className="divider text-xs text-base-content/50">atau</div>
+                <p className="text-center text-sm text-base-content/70">
+                  Belum punya akun?{" "}
+                  <Link to="/register?role=kandidat">
+                    <span className="text-primary font-medium hover:underline cursor-pointer">
+                      Daftar sekarang
+                    </span>
+                  </Link>
+                </p>
+              </>
+            )}
+          </form>
+        </div>
       </div>
     </div>
-  );
+  </div>
+);
 }
 
 export default Login;

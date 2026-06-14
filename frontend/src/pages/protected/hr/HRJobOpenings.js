@@ -1243,13 +1243,13 @@ export default function HRJobOpenings() {
                 >
                   <option value="open">Buka</option>
                   {editMode && <option value="closed">Tutup</option>}
-                  <option value="draft">Draft</option>
+                  <option value="draft">Draf</option>
                 </select>
               </div>
 
               <div>
                 <label className="label label-text text-base-content">
-                  Hiring Status
+                  Status Rekrutmen
                 </label>
                 <select
                   name="hiring_status"
@@ -1754,7 +1754,7 @@ export default function HRJobOpenings() {
                                       : "badge-success"
                                 }`}
                               >
-                                {j.status}
+                                {j.status === "draft" ? "Draf" : j.status === "closed" ? "Tutup" : "Buka"}
                               </span>
                             </td>
 

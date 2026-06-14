@@ -11,6 +11,7 @@ import { Chart as ChartJS, ArcElement, Tooltip, Legend } from "chart.js";
 import { Doughnut } from "react-chartjs-2";
 import { getChartColors, toRgba } from "../utils/themePalette";
 import useTablePagination from "../hooks/useTablePagination";
+import getStatusLabel from "../utils/statusLabels";
 
 ChartJS.register(ArcElement, Tooltip, Legend);
 
@@ -284,7 +285,8 @@ export default function CandidateDashboardHome() {
                             "Pegawai Tetap"}
                           {app.employment_type === "contract" && "Kontrak"}
                           {app.employment_type === "internship" && "Magang"}
-                          {app.employment_type === "freelance" && "Freelance"}
+                          {app.employment_type === "freelance" &&
+                            "Pekerja Lepas"}
                           {![
                             "permanent",
                             "contract",
@@ -317,7 +319,7 @@ export default function CandidateDashboardHome() {
                           )}
                           {app.status === "lolos_dokumen" && (
                             <span className="badge badge-accent">
-                              Lolos Screening Dokumen
+                              Lolos Seleksi Dokumen
                             </span>
                           )}
                           {app.status === "submitted" && (
@@ -334,7 +336,9 @@ export default function CandidateDashboardHome() {
                             "lolos_dokumen",
                             "submitted",
                           ].includes(app.status) && (
-                            <span className="badge">{app.status}</span>
+                            <span className="badge">
+                              {getStatusLabel(app.status)}
+                            </span>
                           )}
                         </td>
                       </tr>
@@ -496,7 +500,7 @@ export default function CandidateDashboardHome() {
                   ) {
                     return [
                       { key: "submitted", label: "Kirim Lamaran" },
-                      { key: "screening", label: "Screening" },
+                      { key: "screening", label: "Seleksi" },
                       { key: "ditolak", label: "Ditolak" },
                     ];
                   }
@@ -505,9 +509,9 @@ export default function CandidateDashboardHome() {
                   if (status === "ditolak") {
                     return [
                       { key: "submitted", label: "Kirim Lamaran" },
-                      { key: "screening", label: "Screening" },
+                      { key: "screening", label: "Seleksi" },
                       { key: "lolos_dokumen", label: "Lolos Dokumen" },
-                      { key: "wawancara", label: "Interview" },
+                      { key: "wawancara", label: "Wawancara" },
                       { key: "ditolak", label: "Ditolak" },
                     ];
                   }
@@ -515,9 +519,9 @@ export default function CandidateDashboardHome() {
                   // proses normal diterima
                   return [
                     { key: "submitted", label: "Kirim Lamaran" },
-                    { key: "screening", label: "Screening" },
+                    { key: "screening", label: "Seleksi" },
                     { key: "lolos_dokumen", label: "Lolos Dokumen" },
-                    { key: "wawancara", label: "Interview" },
+                    { key: "wawancara", label: "Wawancara" },
                     { key: "diterima", label: "Diterima" },
                   ];
                 };
@@ -603,11 +607,8 @@ export default function CandidateDashboardHome() {
                             Status saat ini
                           </span>
 
-                          <span className="badge badge-sm badge-primary capitalize">
-                            {(selectedApplication.status || "-").replaceAll(
-                              "_",
-                              " ",
-                            )}
+                          <span className="badge badge-sm badge-primary">
+                            {getStatusLabel(selectedApplication.status)}
                           </span>
                         </div>
                       </div>

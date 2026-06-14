@@ -6,7 +6,9 @@ import Pagination from "../../../components/Pagination/Pagination";
 import { formatLateDuration } from "../../../components/Typography/LateDurationText";
 import { financeApi } from "../../../features/finance/api";
 import { resolveFixedPositionAllowance } from "../../../utils/fixedPositionAllowance";
+import { calculateWorkdaysInMonth } from "../../../utils/attendanceUtils";
 import useTablePagination from "../../../hooks/useTablePagination";
+import useAppPopup from "../../../hooks/useAppPopup";
 
 const getCurrentPeriod = () => {
   const now = new Date();
@@ -50,9 +52,13 @@ const statusBadgeClass = {
 };
 
 const statusLabelMap = {
-  draft: "draf",
-  published: "dipublikasikan",
-  claimed: "diklaim",
+  draft: "Draf",
+  published: "Dipublikasikan",
+  claimed: "Diklaim",
+  transferred: "Sudah Ditransfer",
+  rejected: "Ditolak",
+  approved: "Disetujui",
+  submitted: "Menunggu",
 };
 
 const getStatusLabel = (status) =>
@@ -85,6 +91,7 @@ const resolvePhotoUrl = (photoPath) => {
 
 function FinancePayroll() {
   const dispatch = useDispatch();
+  const { popup, confirmPopup } = useAppPopup();
 
   const period = getCurrentPeriod();
   const [error, setError] = useState("");
@@ -111,6 +118,9 @@ function FinancePayroll() {
   );
   const [latestGenerated, setLatestGenerated] = useState(null);
   const [monthlyPayrollRows, setMonthlyPayrollRows] = useState([]);
+  const [yearlyPayrollRows, setYearlyPayrollRows] = useState([]);
+  const [payrollSummaryModal, setPayrollSummaryModal] = useState(null);
+  const [selectedPayrollPdf, setSelectedPayrollPdf] = useState(null);
   const [employeeReferenceData, setEmployeeReferenceData] = useState([]);
   const [attendanceSummaryData, setAttendanceSummaryData] = useState([]);
   const [reimbursements, setReimbursements] = useState([]);
@@ -433,6 +443,24 @@ function FinancePayroll() {
 
     loadMonthlyRows();
   }, [recapMonth, recapYear, latestGenerated]);
+
+  useEffect(() => {
+    const loadYearlyRows = async () => {
+      try {
+        const rows = await financeApi.getPayrollList();
+        const selectedYear = String(recapYear || "").trim();
+        setYearlyPayrollRows(
+          (rows || []).filter(
+            (item) => String(item.period_year || "") === selectedYear,
+          ),
+        );
+      } catch (err) {
+        setYearlyPayrollRows([]);
+      }
+    };
+
+    loadYearlyRows();
+  }, [recapYear, latestGenerated]);
 
   const hasPayrollFiltersSelected = Boolean(
     selectedEmployeeId && periodMonth && String(periodYear).trim(),
@@ -862,7 +890,11 @@ function FinancePayroll() {
     const reimbursement = Number(reimbursementOverview.included || 0);
     const totalIncome = Number((grossSalary + reimbursement).toFixed(2));
 
-    const dailySalary = basicSalary / 30;
+    const workdaysInPeriod = calculateWorkdaysInMonth(
+      Number(periodMonth),
+      Number(periodYear),
+    );
+    const dailySalary = basicSalary / Math.max(workdaysInPeriod, 1);
     const hourlyRate = dailySalary / DEFAULT_WORKING_HOURS_PER_DAY;
     const lateDeduction = Math.round(
       (totalLateMinutes / 60) * hourlyRate * autoLateDeductionPercentage,
@@ -919,6 +951,7 @@ function FinancePayroll() {
       sickDays,
       deductibleAbsentDays,
       totalLateMinutes,
+      workdaysInPeriod,
     };
   }, [
     latestGenerated,
@@ -937,6 +970,8 @@ function FinancePayroll() {
     autoTaxDeduction,
     autoLateDeductionPercentage,
     autoAlphaDeductionPercentage,
+    periodMonth,
+    periodYear,
   ]);
 
   const isManualFieldDisabled = () => {
@@ -981,7 +1016,7 @@ function FinancePayroll() {
       const result = await financeApi.generatePayroll(payload);
       setLatestGenerated(result);
       setSuccessMessage(
-        "Slip gaji berhasil dibuat, silahkan publish slip gaji ini",
+        "Slip gaji berhasil dibuat, silakan publikasikan slip gaji ini",
       );
     } catch (err) {
       setError(err.message);
@@ -999,7 +1034,7 @@ function FinancePayroll() {
     );
 
     if (!draftRows.length) {
-      setError("Tidak ada slip draft yang perlu dipublish");
+      setError("Tidak ada slip draf yang perlu dipublikasikan");
       return;
     }
 
@@ -1009,7 +1044,7 @@ function FinancePayroll() {
         draftRows.map((item) => financeApi.publishPayroll(item.id)),
       );
       setSuccessMessage(
-        "Semua slip bulan ini berhasil dipublish ke akun masing-masing pegawai",
+        "Semua slip bulan ini berhasil dipublikasikan ke akun masing-masing pegawai",
       );
 
       const refreshedRows = await financeApi.getPayrollList({
@@ -1025,24 +1060,21 @@ function FinancePayroll() {
   };
 
   const openPayrollPdf = async (payrollId) => {
-    const previewWindow = window.open("about:blank", "_blank");
-
     try {
       setError("");
       const blob = await financeApi.getPayrollPdfBlob(payrollId);
       const url = window.URL.createObjectURL(blob);
-      if (previewWindow) {
-        previewWindow.location.href = url;
-      } else {
-        window.open(url, "_blank");
-      }
-      setTimeout(() => window.URL.revokeObjectURL(url), 60_000);
+      setSelectedPayrollPdf({ url, title: "Slip Gaji" });
     } catch (err) {
-      if (previewWindow && !previewWindow.closed) {
-        previewWindow.close();
-      }
       setError(err.message);
     }
+  };
+
+  const closePayrollPdfModal = () => {
+    if (selectedPayrollPdf?.url) {
+      window.URL.revokeObjectURL(selectedPayrollPdf.url);
+    }
+    setSelectedPayrollPdf(null);
   };
 
   const handleViewRow = (row) => {
@@ -1067,20 +1099,26 @@ function FinancePayroll() {
 
   const handleDeleteRow = async (row) => {
     if (row.status !== "draft") {
-      setError("Hanya slip berstatus draft yang bisa dihapus");
+      setError("Hanya slip berstatus draf yang bisa dihapus");
       return;
     }
 
-    const confirmed = window.confirm(
-      `Hapus slip payroll ID ${row.id} untuk ${row.employee_name}?`,
-    );
+    const confirmed = await confirmPopup({
+      title: "Hapus Slip Payroll",
+      subtitle: "Slip draf akan dihapus dari rekap payroll",
+      badge: "Konfirmasi",
+      message: `Hapus slip payroll ID ${row.id} untuk ${row.employee_name}?`,
+      confirmLabel: "Hapus Slip",
+      cancelLabel: "Batal",
+      variant: "warning",
+    });
 
     if (!confirmed) return;
 
     try {
       setError("");
       await financeApi.deletePayroll(row.id);
-      setSuccessMessage("Slip draft berhasil dihapus");
+      setSuccessMessage("Slip draf berhasil dihapus");
 
       const updatedRows = monthlyPayrollRows.filter(
         (item) => item.id !== row.id,
@@ -1118,6 +1156,41 @@ function FinancePayroll() {
   const doneEmployeeIds = new Set(
     monthlyPayrollRows.map((item) => String(item.employee_id)),
   );
+  const employeesWithoutPayroll = employeeReferenceData.filter(
+    (item) => !doneEmployeeIds.has(String(item.employee_id)),
+  );
+  const draftPayrollRows = yearlyPayrollRows.filter(
+    (item) => String(item.status || "").toLowerCase() === "draft",
+  );
+  const payrollSummaryCards = [
+    {
+      key: "employees",
+      title: "Total Pegawai",
+      value: employeeReferenceData.length,
+      description: "Pegawai aktif yang menjadi referensi payroll",
+      tone:
+        "border-blue-200 bg-blue-50 text-blue-700 dark:border-blue-900/50 dark:bg-blue-950/20 dark:text-blue-200",
+      rows: employeeReferenceData,
+    },
+    {
+      key: "missing",
+      title: "Belum Dibuat Slip",
+      value: employeesWithoutPayroll.length,
+      description: "Pegawai yang belum punya slip pada periode rekap",
+      tone:
+        "border-orange-200 bg-orange-50 text-orange-700 dark:border-orange-900/50 dark:bg-orange-950/20 dark:text-orange-200",
+      rows: employeesWithoutPayroll,
+    },
+    {
+      key: "draft",
+      title: "Belum Dipublikasikan",
+      value: draftPayrollRows.length,
+      description: `Slip draf sepanjang tahun ${recapYear || "-"}`,
+      tone:
+        "border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-900/50 dark:bg-emerald-950/20 dark:text-emerald-200",
+      rows: draftPayrollRows,
+    },
+  ];
   const recapPayrollRows = monthlyPayrollRows.filter(
     (item) => String(item.status || "").toLowerCase() !== "claimed",
   );
@@ -1126,8 +1199,27 @@ function FinancePayroll() {
     (item) => item.status === "draft",
   );
 
+  const openPayrollSummaryModal = (card) => {
+    setPayrollSummaryModal(card);
+  };
+
+  const closePayrollSummaryModal = () => {
+    setPayrollSummaryModal(null);
+  };
+
+  const handleSelectMissingPayrollEmployee = (employee) => {
+    setSelectedEmployeeId(String(employee.employee_id || ""));
+    setPeriodMonth(String(recapMonth || period.month));
+    setPeriodYear(String(recapYear || period.year));
+    setLatestGenerated(null);
+    setError("");
+    setSuccessMessage("");
+    closePayrollSummaryModal();
+  };
+
   return (
     <>
+      {popup}
       {(error || setupWarning || successMessage) && (
         <div className="mb-4">
           {error && (
@@ -1152,6 +1244,38 @@ function FinancePayroll() {
       )}
 
       <div className="space-y-6">
+        <section className="overflow-hidden rounded-[1.5rem] border border-orange-100 bg-gradient-to-r from-orange-50 via-white to-blue-50 p-5 shadow-sm dark:border-orange-900/40 dark:from-orange-950/20 dark:via-slate-950 dark:to-blue-950/20">
+          <div className="mb-5">
+            <span className="inline-flex rounded-full border border-orange-200 bg-white px-4 py-1 text-sm font-semibold text-orange-600 dark:border-orange-900/60 dark:bg-orange-950/40 dark:text-orange-200">
+              Payroll Finance
+            </span>
+            <h2 className="mt-4 text-2xl font-black leading-tight text-base-content">
+              Ringkasan Payroll Bulanan
+            </h2>
+            <p className="mt-2 text-sm text-base-content/60">
+              Pantau jumlah pegawai, slip yang belum dibuat, dan slip draf
+              yang belum dipublikasikan dalam tahun rekap.
+            </p>
+          </div>
+
+          <div className="grid gap-4 md:grid-cols-3">
+            {payrollSummaryCards.map((card) => (
+              <button
+                key={card.key}
+                type="button"
+                className={`rounded-2xl border p-5 text-left shadow-sm transition hover:-translate-y-0.5 hover:shadow-md ${card.tone}`}
+                onClick={() => openPayrollSummaryModal(card)}
+              >
+                <p className="text-sm font-semibold">{card.title}</p>
+                <p className="mt-4 text-4xl font-black leading-none">
+                  {card.value}
+                </p>
+                <p className="mt-3 text-sm opacity-80">{card.description}</p>
+              </button>
+            ))}
+          </div>
+        </section>
+
         <TitleCard title="Membuat Payroll" topMargin="mt-0">
           <form onSubmit={handleGenerate} className="grid grid-cols-1 gap-4">
             <label className="form-control">
@@ -1328,10 +1452,14 @@ function FinancePayroll() {
                 )}
 
                 <div className="grid gap-3 text-sm lg:grid-cols-2">
-                  <div className="rounded-2xl border border-base-300 bg-base-100 p-4">
+                  <div className="rounded-2xl border border-emerald-200 bg-emerald-50/60 p-4 shadow-sm dark:border-emerald-900/50 dark:bg-emerald-950/20">
                     <div className="mb-3 flex items-center justify-between">
-                      <p className="font-semibold">Kehadiran</p>
-                      <span className="text-xs opacity-60">Bulanan</span>
+                      <p className="font-semibold text-emerald-700 dark:text-emerald-200">
+                        Kehadiran
+                      </p>
+                      <span className="rounded-full border border-emerald-200 bg-white/70 px-3 py-1 text-xs text-emerald-700 dark:border-emerald-900/60 dark:bg-emerald-950/40 dark:text-emerald-200">
+                        Bulanan
+                      </span>
                     </div>
                     <div className="grid grid-cols-2 gap-3 md:grid-cols-3">
                       {[
@@ -1350,9 +1478,9 @@ function FinancePayroll() {
                       ].map(([label, value]) => (
                         <div
                           key={label}
-                          className="rounded-2xl border border-base-300 bg-base-200/60 px-3 py-3"
+                          className="rounded-2xl border border-emerald-100 bg-white px-3 py-3 shadow-sm dark:border-emerald-900/40 dark:bg-slate-900"
                         >
-                          <p className="text-[10px] uppercase tracking-[0.18em] opacity-50">
+                          <p className="text-[10px] uppercase tracking-[0.18em] text-emerald-700/70 dark:text-emerald-200/70">
                             {label}
                           </p>
                           <p className="mt-1 font-semibold leading-tight tabular-nums">
@@ -1363,10 +1491,14 @@ function FinancePayroll() {
                     </div>
                   </div>
 
-                  <div className="rounded-2xl border border-base-300 bg-base-100 p-4">
+                  <div className="rounded-2xl border border-sky-200 bg-sky-50/60 p-4 shadow-sm dark:border-sky-900/50 dark:bg-sky-950/20">
                     <div className="mb-3 flex items-center justify-between">
-                      <p className="font-semibold">Parameter</p>
-                      <span className="text-xs opacity-60">Otomatis</span>
+                      <p className="font-semibold text-sky-700 dark:text-sky-200">
+                        Parameter
+                      </p>
+                      <span className="rounded-full border border-sky-200 bg-white/70 px-3 py-1 text-xs text-sky-700 dark:border-sky-900/60 dark:bg-sky-950/40 dark:text-sky-200">
+                        Otomatis
+                      </span>
                     </div>
                     <div className="grid grid-cols-2 gap-3">
                       {[
@@ -1388,9 +1520,9 @@ function FinancePayroll() {
                       ].map(([label, value]) => (
                         <div
                           key={label}
-                          className="rounded-2xl border border-base-300 bg-base-200/60 px-3 py-3"
+                          className="rounded-2xl border border-sky-100 bg-white px-3 py-3 shadow-sm dark:border-sky-900/40 dark:bg-slate-900"
                         >
-                          <p className="text-[10px] uppercase tracking-[0.18em] opacity-50">
+                          <p className="text-[10px] uppercase tracking-[0.18em] text-sky-700/70 dark:text-sky-200/70">
                             {label}
                           </p>
                           <p className="mt-1 font-semibold leading-tight tabular-nums">
@@ -1439,14 +1571,14 @@ function FinancePayroll() {
                   </span>
                 </div>
 
-                <div className="rounded-2xl border border-base-300 bg-base-100 shadow-sm overflow-hidden">
-                  <div className="border-b border-base-300 bg-gradient-to-r from-primary/10 via-base-100 to-base-100 px-4 py-3">
+                <div className="overflow-hidden rounded-2xl border border-orange-200 bg-orange-50/30 shadow-sm dark:border-orange-900/50 dark:bg-orange-950/20">
+                  <div className="border-b border-orange-200 bg-gradient-to-r from-orange-500 to-amber-500 px-4 py-3 text-white dark:border-orange-900/50">
                     <div className="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
                       <div>
                         <p className="text-base font-semibold">
                           Pratinjau Perhitungan Payroll
                         </p>
-                        <p className="text-xs opacity-70">
+                        <p className="text-xs opacity-90">
                           Ringkasan otomatis sebelum slip dibuat.
                         </p>
                       </div>
@@ -1455,48 +1587,50 @@ function FinancePayroll() {
 
                   <div className="p-4 space-y-4">
                     <div className="grid gap-3 md:grid-cols-3">
-                      <div className="rounded-2xl bg-primary/10 p-4 border border-primary/15">
-                        <p className="text-xs uppercase tracking-wide opacity-70">
+                      <div className="rounded-2xl border border-emerald-200 bg-emerald-50 p-4 dark:border-emerald-900/50 dark:bg-emerald-950/20">
+                        <p className="text-xs uppercase tracking-wide text-emerald-700/70 dark:text-emerald-200/70">
                           Gaji Yang Diterima
                         </p>
-                        <p className="mt-1 text-2xl font-black leading-tight text-primary">
+                        <p className="mt-1 text-2xl font-black leading-tight text-emerald-700 dark:text-emerald-200">
                           {formatCurrency(payrollPreview.netSalary)}
                         </p>
-                        <p className="mt-1 text-xs opacity-70">
+                        <p className="mt-1 text-xs text-emerald-800/70 dark:text-emerald-100/70">
                           Nominal akhir yang diterima pegawai.
                         </p>
                       </div>
 
-                      <div className="rounded-2xl bg-base-200 p-4 border border-base-300">
-                        <p className="text-xs uppercase tracking-wide opacity-70">
+                      <div className="rounded-2xl border border-sky-200 bg-sky-50 p-4 dark:border-sky-900/50 dark:bg-sky-950/20">
+                        <p className="text-xs uppercase tracking-wide text-sky-700/70 dark:text-sky-200/70">
                           Total Pendapatan
                         </p>
-                        <p className="mt-1 text-xl font-bold leading-tight">
+                        <p className="mt-1 text-xl font-bold leading-tight text-sky-800 dark:text-sky-100">
                           {formatCurrency(payrollPreview.totalIncome)}
                         </p>
-                        <p className="mt-2 text-xs opacity-70">
+                        <p className="mt-2 text-xs text-sky-800/70 dark:text-sky-100/70">
                           Gaji pokok, tunjangan, bonus, dan reimbursement.
                         </p>
                       </div>
 
-                      <div className="rounded-2xl bg-base-200 p-4 border border-base-300">
-                        <p className="text-xs uppercase tracking-wide opacity-70">
+                      <div className="rounded-2xl border border-red-200 bg-red-50 p-4 dark:border-red-900/50 dark:bg-red-950/20">
+                        <p className="text-xs uppercase tracking-wide text-red-700/70 dark:text-red-200/70">
                           Total Potongan
                         </p>
-                        <p className="mt-1 text-xl font-bold leading-tight">
+                        <p className="mt-1 text-xl font-bold leading-tight text-red-800 dark:text-red-100">
                           {formatCurrency(payrollPreview.totalDeduction)}
                         </p>
-                        <p className="mt-2 text-xs opacity-70">
+                        <p className="mt-2 text-xs text-red-800/70 dark:text-red-100/70">
                           Keterlambatan, alpha, pajak, dan potongan lain.
                         </p>
                       </div>
                     </div>
 
                     <div className="grid gap-3 lg:grid-cols-2">
-                      <div className="rounded-2xl border border-base-300 bg-base-200/60 p-4">
+                      <div className="rounded-2xl border border-emerald-200 bg-emerald-50/60 p-4 dark:border-emerald-900/50 dark:bg-emerald-950/20">
                         <div className="mb-3 flex items-center justify-between">
-                          <p className="font-semibold">Pendapatan</p>
-                          <span className="text-xs opacity-60">
+                          <p className="font-semibold text-emerald-700 dark:text-emerald-200">
+                            Pendapatan
+                          </p>
+                          <span className="text-xs text-emerald-700/70 dark:text-emerald-200/70">
                             Detail komponen
                           </span>
                         </div>
@@ -1530,8 +1664,8 @@ function FinancePayroll() {
                                 label === "Total Tunjangan" ||
                                 label === "Gaji Kotor" ||
                                 label === "Total Reimbursement"
-                                  ? "bg-base-100 font-semibold"
-                                  : "bg-base-100/70"
+                                  ? "bg-white font-semibold shadow-sm dark:bg-slate-900"
+                                  : "bg-white/70 dark:bg-slate-900/70"
                               }`}
                             >
                               <span className="text-sm opacity-80">
@@ -1545,10 +1679,12 @@ function FinancePayroll() {
                         </div>
                       </div>
 
-                      <div className="rounded-2xl border border-base-300 bg-base-200/60 p-4">
+                      <div className="rounded-2xl border border-red-200 bg-red-50/60 p-4 dark:border-red-900/50 dark:bg-red-950/20">
                         <div className="mb-3 flex items-center justify-between">
-                          <p className="font-semibold">Potongan</p>
-                          <span className="text-xs opacity-60">
+                          <p className="font-semibold text-red-700 dark:text-red-200">
+                            Potongan
+                          </p>
+                          <span className="text-xs text-red-700/70 dark:text-red-200/70">
                             Detail komponen
                           </span>
                         </div>
@@ -1573,8 +1709,8 @@ function FinancePayroll() {
                               className={`flex items-center justify-between gap-3 rounded-xl px-3 py-2 ${
                                 label === "Total Potongan" ||
                                 label === "Gaji yang Diterima"
-                                  ? "bg-base-100 font-semibold"
-                                  : "bg-base-100/70"
+                                  ? "bg-white font-semibold shadow-sm dark:bg-slate-900"
+                                  : "bg-white/70 dark:bg-slate-900/70"
                               }`}
                             >
                               <span className="text-sm opacity-80">
@@ -1634,12 +1770,12 @@ function FinancePayroll() {
             latestGenerated?.payroll_id &&
             String(latestGenerated?.employee?.id) ===
               String(selectedEmployeeId) && (
-              <div className="mt-5 rounded-2xl border border-base-300 bg-base-100 shadow-sm overflow-hidden">
-                <div className="border-b border-base-300 bg-gradient-to-r from-primary/10 via-base-100 to-base-100 px-4 py-3">
+              <div className="mt-5 overflow-hidden rounded-2xl border border-indigo-200 bg-indigo-50/30 shadow-sm dark:border-indigo-900/50 dark:bg-indigo-950/20">
+                <div className="border-b border-indigo-200 bg-gradient-to-r from-indigo-500 to-blue-500 px-4 py-3 text-white dark:border-indigo-900/50">
                   <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
                     <div>
                       <p className="text-base font-semibold">Detail Slip Gaji</p>
-                      <p className="text-xs opacity-70">
+                      <p className="text-xs opacity-90">
                         Ringkasan slip yang baru dibuat.
                       </p>
                     </div>
@@ -1655,7 +1791,7 @@ function FinancePayroll() {
 
                 <div className="p-4 space-y-4">
                   <div className="grid gap-3 lg:grid-cols-[1fr_1.1fr]">
-                    <div className="rounded-2xl border border-base-300 bg-base-200/40 p-4">
+                    <div className="rounded-2xl border border-indigo-100 bg-white p-4 shadow-sm dark:border-indigo-900/40 dark:bg-slate-900">
                       <div className="flex items-start justify-between gap-3">
                         <div>
                           <p className="text-[10px] uppercase tracking-[0.22em] opacity-50">
@@ -1668,7 +1804,7 @@ function FinancePayroll() {
                             {latestGenerated?.period || "-"}
                           </p>
                         </div>
-                        <span className="rounded-full border border-primary/20 bg-primary/10 px-3 py-1 text-xs font-medium text-primary">
+                        <span className="rounded-full border border-indigo-200 bg-indigo-50 px-3 py-1 text-xs font-medium text-indigo-700 dark:border-indigo-900/60 dark:bg-indigo-950/40 dark:text-indigo-200">
                           {latestGenerated.payroll_id}
                         </span>
                       </div>
@@ -1695,7 +1831,7 @@ function FinancePayroll() {
                           className={`rounded-2xl border px-4 py-3 ${
                             index === 0
                               ? "border-primary/15 bg-primary/10"
-                              : "border-base-300 bg-base-200/50"
+                              : "border-indigo-100 bg-white dark:border-indigo-900/40 dark:bg-slate-900"
                           }`}
                         >
                           <p className="text-[10px] uppercase tracking-[0.22em] opacity-50">
@@ -1713,7 +1849,7 @@ function FinancePayroll() {
                     </div>
                   </div>
 
-                  <div className="rounded-2xl border border-base-300 bg-base-100 p-4">
+                  <div className="rounded-2xl border border-indigo-100 bg-white p-4 shadow-sm dark:border-indigo-900/40 dark:bg-slate-900">
                     <div className="mb-3 flex items-center justify-between">
                       <p className="font-semibold">Rincian Komponen</p>
                       <span className="text-xs opacity-60">Perhitungan final</span>
@@ -1747,7 +1883,7 @@ function FinancePayroll() {
                       ].map(([label, value]) => (
                         <div
                           key={label}
-                          className="flex items-center justify-between gap-4 rounded-2xl border border-base-300 bg-base-200/50 px-4 py-3"
+                          className="flex items-center justify-between gap-4 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 dark:border-slate-700 dark:bg-slate-800/60"
                         >
                           <span className="text-sm opacity-80">{label}</span>
                           <span className="text-sm font-semibold tabular-nums">
@@ -1755,9 +1891,9 @@ function FinancePayroll() {
                           </span>
                         </div>
                       ))}
-                      <div className="flex items-center justify-between gap-4 rounded-2xl border border-primary/15 bg-primary/10 px-4 py-3">
+                      <div className="flex items-center justify-between gap-4 rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 dark:border-emerald-900/50 dark:bg-emerald-950/20">
                         <span className="text-sm font-semibold">Gaji Diterima</span>
-                        <span className="text-base font-black text-primary tabular-nums">
+                        <span className="text-base font-black text-emerald-700 tabular-nums dark:text-emerald-200">
                           {formatCurrency(latestGenerated?.details?.net_salary)}
                         </span>
                       </div>
@@ -1769,8 +1905,8 @@ function FinancePayroll() {
         </TitleCard>
 
         <TitleCard title="Rekap Slip Gaji & Publikasi" topMargin="mt-0">
-          <div className="flex flex-wrap items-center gap-2 mb-3">
-            <span className="badge badge-outline">
+          <div className="mb-3 flex flex-wrap items-center gap-2 rounded-2xl border border-blue-200 bg-blue-50/60 p-3 dark:border-blue-900/50 dark:bg-blue-950/20">
+            <span className="badge border-blue-200 bg-white text-blue-700 dark:border-blue-900/60 dark:bg-blue-950/40 dark:text-blue-200">
               Pegawai aktif: {employeeReferenceData.length}
             </span>
             <span
@@ -1783,7 +1919,7 @@ function FinancePayroll() {
             >
               Slip dibuat: {doneEmployeeIds.size}/{employeeReferenceData.length}
             </span>
-            <span className="badge badge-info">
+            <span className="badge border-blue-200 bg-blue-100 text-blue-700 dark:border-blue-900/60 dark:bg-blue-950/40 dark:text-blue-200">
               Draf:{" "}
               {
                 monthlyPayrollRows.filter((item) => item.status === "draft")
@@ -1792,7 +1928,7 @@ function FinancePayroll() {
             </span>
           </div>
 
-          <div className="grid grid-cols-2 gap-3 mb-3">
+          <div className="mb-3 grid grid-cols-2 gap-3 rounded-2xl border border-slate-200 bg-slate-50/70 p-3 dark:border-slate-700 dark:bg-slate-900/50">
             <label className="form-control">
               <span className="label-text mb-1">Filter Bulan Rekap</span>
               <select
@@ -1826,10 +1962,10 @@ function FinancePayroll() {
             ))}
           </datalist>
 
-          <div className="overflow-x-auto">
+          <div className="overflow-x-auto rounded-2xl border border-slate-200 dark:border-slate-700">
             <table className="table table-zebra table-sm">
               <thead>
-                <tr>
+                <tr className="bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-100">
                   <th>ID Payroll</th>
                   <th>Pegawai</th>
                   <th>Gaji Pokok</th>
@@ -1860,29 +1996,14 @@ function FinancePayroll() {
                       <div className="flex gap-2">
                         <button
                           type="button"
-                          className="
-        px-3 py-1 text-xs
-        bg-gradient-to-b from-blue-400 to-blue-600
-        text-white rounded-full
-        shadow-md hover:shadow-lg
-        border border-blue-600
-        hover:from-blue-500 hover:to-blue-700
-        transition-all duration-200"
+                          className="btn btn-xs rounded-full border-blue-600 bg-blue-600 px-4 text-white hover:border-blue-700 hover:bg-blue-700"
                           onClick={() => handleViewRow(item)}
                         >
                           Lihat
                         </button>
                         <button
                           type="button"
-                          className="
-    px-3 py-1 text-xs
-    bg-gradient-to-b from-yellow-300 to-yellow-500
-    text-black rounded-full
-    shadow-md hover:shadow-lg
-    border border-yellow-500
-    hover:from-yellow-400 hover:to-yellow-600
-    transition-all duration-200
-  "
+                          className="btn btn-xs rounded-full border-amber-500 bg-amber-400 px-4 text-slate-900 hover:border-amber-600 hover:bg-amber-500"
                           onClick={() => handleEditRow(item)}
                         >
                           Edit
@@ -1924,7 +2045,7 @@ function FinancePayroll() {
           </div>
 
           <button
-            className={`btn btn-secondary w-full mt-4 ${loadingPublishAll ? "loading" : ""}`}
+            className={`btn w-full mt-4 rounded-2xl border-none bg-gradient-to-r from-orange-500 to-amber-500 text-white shadow-md hover:from-orange-600 hover:to-amber-600 ${loadingPublishAll ? "loading" : ""}`}
             onClick={handlePublishAll}
             disabled={!hasDraftToPublish || loadingPublishAll}
           >
@@ -2048,6 +2169,167 @@ function FinancePayroll() {
           </div>
         </TitleCard>
       )}
+
+      {payrollSummaryModal ? (
+        <div className="modal modal-open">
+          <div className="modal-box max-w-5xl">
+            <button
+              type="button"
+              className="btn btn-sm btn-circle absolute right-2 top-2"
+              onClick={closePayrollSummaryModal}
+            >
+              x
+            </button>
+            <div className="mb-4 pr-8">
+              <h3 className="text-xl font-bold">
+                {payrollSummaryModal.title}
+              </h3>
+              <p className="mt-1 text-sm text-base-content/60">
+                {payrollSummaryModal.description}
+              </p>
+            </div>
+
+            <div className="overflow-x-auto rounded-2xl border border-base-200">
+              <table className="table table-zebra table-sm">
+                <thead>
+                  <tr className="bg-base-200/80">
+                    {payrollSummaryModal.key === "draft" ? (
+                      <>
+                        <th>ID Payroll</th>
+                        <th>Pegawai</th>
+                        <th>Periode</th>
+                        <th>Gaji Bersih</th>
+                        <th>Status</th>
+                        <th>Aksi</th>
+                      </>
+                    ) : (
+                      <>
+                        <th>Kode</th>
+                        <th>Nama Pegawai</th>
+                        <th>Posisi</th>
+                        <th>Departemen</th>
+                        <th>Aksi</th>
+                      </>
+                    )}
+                  </tr>
+                </thead>
+                <tbody>
+                  {payrollSummaryModal.rows.length ? (
+                    payrollSummaryModal.rows.map((item) =>
+                      payrollSummaryModal.key === "draft" ? (
+                        <tr key={`draft-${item.id}`}>
+                          <td>{item.id}</td>
+                          <td>{item.employee_name || "-"}</td>
+                          <td>
+                            {item.period_month}/{item.period_year}
+                          </td>
+                          <td>
+                            {formatCurrency(
+                              item.final_amount || item.net_salary,
+                            )}
+                          </td>
+                          <td>
+                            <span
+                              className={`badge ${statusBadgeClass[item.status] || "badge-outline"}`}
+                            >
+                              {getStatusLabel(item.status)}
+                            </span>
+                          </td>
+                          <td>
+                            <button
+                              type="button"
+                              className="btn btn-xs rounded-full border-amber-500 bg-amber-400 px-4 text-slate-900 hover:border-amber-600 hover:bg-amber-500"
+                              onClick={() => {
+                                handleEditRow(item);
+                                closePayrollSummaryModal();
+                              }}
+                            >
+                              Edit
+                            </button>
+                          </td>
+                        </tr>
+                      ) : (
+                        <tr key={`employee-${item.employee_id}`}>
+                          <td>{item.employee_code || "-"}</td>
+                          <td>{item.employee_name || "-"}</td>
+                          <td>{item.position_name || "-"}</td>
+                          <td>{item.department_name || "-"}</td>
+                          <td>
+                            <button
+                              type="button"
+                              className="btn btn-xs rounded-full btn-primary px-4"
+                              onClick={() =>
+                                handleSelectMissingPayrollEmployee(item)
+                              }
+                            >
+                              Pilih
+                            </button>
+                          </td>
+                        </tr>
+                      ),
+                    )
+                  ) : (
+                    <tr>
+                      <td
+                        colSpan={payrollSummaryModal.key === "draft" ? 6 : 5}
+                        className="py-8 text-center text-base-content/60"
+                      >
+                        Tidak ada data untuk ditampilkan
+                      </td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </div>
+          <label
+            className="modal-backdrop"
+            onClick={closePayrollSummaryModal}
+          >
+            Close
+          </label>
+        </div>
+      ) : null}
+
+      <input
+        type="checkbox"
+        id="finance-payroll-pdf-modal"
+        className="modal-toggle"
+        checked={!!selectedPayrollPdf}
+        onChange={closePayrollPdfModal}
+      />
+      <div className="modal">
+        <div className="modal-box max-w-4xl">
+          <button
+            type="button"
+            className="btn btn-sm btn-circle absolute right-2 top-2"
+            onClick={closePayrollPdfModal}
+          >
+            x
+          </button>
+          <h3 className="font-semibold text-xl mb-4">
+            {selectedPayrollPdf?.title || "Slip Gaji"}
+          </h3>
+          <div className="w-full min-h-[420px] bg-base-200 rounded-lg overflow-hidden flex items-center justify-center">
+            {selectedPayrollPdf?.url ? (
+              <iframe
+                title="Slip Gaji PDF"
+                src={selectedPayrollPdf.url}
+                className="w-full h-[70vh] border-0"
+              />
+            ) : (
+              <p className="opacity-70">Tidak ada file slip gaji.</p>
+            )}
+          </div>
+        </div>
+        <label
+          className="modal-backdrop"
+          htmlFor="finance-payroll-pdf-modal"
+          onClick={closePayrollPdfModal}
+        >
+          Close
+        </label>
+      </div>
     </>
   );
 }

@@ -1,5 +1,6 @@
 export const ASSESSMENT_START = "[ASSESSMENT_CRITERIA]";
 export const ASSESSMENT_END = "[/ASSESSMENT_CRITERIA]";
+const LEGACY_ASSESSMENT_END = "[/ASSESMENT_CRITERIA]";
 
 export const formatAssessmentWeight = (value) => {
   if (value === null || value === undefined || value === "") return "-";
@@ -15,16 +16,25 @@ export const parseInterviewAssessmentNotes = (notes) => {
   const rawNotes = String(notes || "");
   const startIndex = rawNotes.indexOf(ASSESSMENT_START);
   const endIndex = rawNotes.indexOf(ASSESSMENT_END);
+  const legacyEndIndex = rawNotes.indexOf(LEGACY_ASSESSMENT_END);
+  const resolvedEndIndex =
+    endIndex !== -1 ? endIndex : legacyEndIndex;
+  const resolvedEndTag =
+    endIndex !== -1 ? ASSESSMENT_END : LEGACY_ASSESSMENT_END;
 
-  if (startIndex === -1 || endIndex === -1 || endIndex < startIndex) {
+  if (
+    startIndex === -1 ||
+    resolvedEndIndex === -1 ||
+    resolvedEndIndex < startIndex
+  ) {
     return { notes: rawNotes.trim(), assessment: null };
   }
 
   const cleanNotes = `${rawNotes.slice(0, startIndex)}${rawNotes.slice(
-    endIndex + ASSESSMENT_END.length,
+    resolvedEndIndex + resolvedEndTag.length,
   )}`.trim();
   const assessmentJson = rawNotes
-    .slice(startIndex + ASSESSMENT_START.length, endIndex)
+    .slice(startIndex + ASSESSMENT_START.length, resolvedEndIndex)
     .trim();
 
   try {

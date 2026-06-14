@@ -12,7 +12,7 @@ import useTablePagination from '../../../hooks/useTablePagination'
 import { formatCurrencyInput, normalizeCurrencyInput } from '../../../components/Formatters/CurrencyFormatter'
 
 const statusLabelMap = {
-    draft: 'Draft',
+    draft: 'Draf',
     submitted: 'Siap Diproses',
     approved: 'Disetujui',
     rejected: 'Ditolak',

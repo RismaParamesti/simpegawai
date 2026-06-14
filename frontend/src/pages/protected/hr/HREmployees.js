@@ -117,7 +117,11 @@ const normalizeEmployeeActiveStatus = (employee = {}) => {
   if (["active", "aktif", "enabled", "1", "true"].includes(raw)) {
     return "active";
   }
-  if (["inactive", "nonaktif", "non aktif", "disabled", "0", "false"].includes(raw)) {
+  if (
+    ["inactive", "nonaktif", "non aktif", "disabled", "0", "false"].includes(
+      raw,
+    )
+  ) {
     return "inactive";
   }
 
@@ -292,6 +296,7 @@ function HREmployees() {
   const [editDocuments, setEditDocuments] = useState(INITIAL_DOCUMENTS);
 
   const [viewingEmployee, setViewingEmployee] = useState(null);
+  const [documentPreview, setDocumentPreview] = useState(null);
   const [deleteTarget, setDeleteTarget] = useState(null);
 
   const [filters, setFilters] = useState({
@@ -459,7 +464,8 @@ function HREmployees() {
 
       const employmentStatusMatch =
         !filters.employment_status ||
-        getEmployeeEmploymentStatus(employee) === String(filters.employment_status);
+        getEmployeeEmploymentStatus(employee) ===
+          String(filters.employment_status);
 
       const statusMatch =
         !filters.status ||
@@ -534,6 +540,12 @@ function HREmployees() {
     return value;
   };
 
+  const openDocumentPreview = (title, documentPath) => {
+    const url = getDocumentUrl(documentPath);
+    if (!url) return;
+    setDocumentPreview({ title, url });
+  };
+
   const getDocumentFileName = (pathValue) => {
     if (!pathValue) return "-";
     return String(pathValue).split("/").pop();
@@ -588,7 +600,9 @@ function HREmployees() {
         roles: getRawAutoRolesForForm(
           {
             department_name:
-              employee.department_name || currentPosition?.department_name || "",
+              employee.department_name ||
+              currentPosition?.department_name ||
+              "",
             position_id: currentPositionId,
           },
           positions,
@@ -598,49 +612,56 @@ function HREmployees() {
     [positions],
   );
 
-  const mapCandidateToCreateForm = useCallback((candidate) => {
-    const candidatePositionLabel =
-      candidate?.position_name || candidate?.base_position || candidate?.job_title || "";
-    const matchedPosition = positions.find((position) => {
-      const positionName = normalizeText(position.name);
-      return (
-        positionName === normalizeText(candidatePositionLabel) ||
-        positionName === normalizeText(candidate?.job_title || "")
-      );
-    });
+  const mapCandidateToCreateForm = useCallback(
+    (candidate) => {
+      const candidatePositionLabel =
+        candidate?.position_name ||
+        candidate?.base_position ||
+        candidate?.job_title ||
+        "";
+      const matchedPosition = positions.find((position) => {
+        const positionName = normalizeText(position.name);
+        return (
+          positionName === normalizeText(candidatePositionLabel) ||
+          positionName === normalizeText(candidate?.job_title || "")
+        );
+      });
 
-    const nextForm = {
-      ...INITIAL_FORM,
-      candidate_id: candidate?.candidate_id || "",
-      name: candidate?.name || candidate?.candidate_name || "",
-      email: candidate?.email || candidate?.candidate_email || "",
-      username:
-        String(candidate?.email || candidate?.candidate_email || "").split("@")[0] ||
-        "",
-      phone: candidate?.phone || "",
-      gender: candidate?.gender || "",
-      birth_place: candidate?.birth_place || "",
-      date_of_birth: candidate?.date_of_birth
-        ? String(candidate.date_of_birth).slice(0, 10)
-        : "",
-      marital_status: candidate?.marital_status || "",
-      nationality: candidate?.nationality || "Indonesian",
-      address: candidate?.address || "",
-      nik: candidate?.nik || "",
-      npwp: candidate?.npwp || "",
-      department_name: matchedPosition?.department_name || "",
-      position_id: matchedPosition?.id ? String(matchedPosition.id) : "",
-      join_date: "",
-      user_status: "active",
-      employment_status: matchedPosition?.level === "intern" ? "intern" : "",
-      roles: [],
-    };
+      const nextForm = {
+        ...INITIAL_FORM,
+        candidate_id: candidate?.candidate_id || "",
+        name: candidate?.name || candidate?.candidate_name || "",
+        email: candidate?.email || candidate?.candidate_email || "",
+        username:
+          String(candidate?.email || candidate?.candidate_email || "").split(
+            "@",
+          )[0] || "",
+        phone: candidate?.phone || "",
+        gender: candidate?.gender || "",
+        birth_place: candidate?.birth_place || "",
+        date_of_birth: candidate?.date_of_birth
+          ? String(candidate.date_of_birth).slice(0, 10)
+          : "",
+        marital_status: candidate?.marital_status || "",
+        nationality: candidate?.nationality || "Indonesian",
+        address: candidate?.address || "",
+        nik: candidate?.nik || "",
+        npwp: candidate?.npwp || "",
+        department_name: matchedPosition?.department_name || "",
+        position_id: matchedPosition?.id ? String(matchedPosition.id) : "",
+        join_date: "",
+        user_status: "active",
+        employment_status: matchedPosition?.level === "intern" ? "intern" : "",
+        roles: [],
+      };
 
-    return {
-      ...nextForm,
-      roles: getRawAutoRolesForForm(nextForm, positions),
-    };
-  }, [positions]);
+      return {
+        ...nextForm,
+        roles: getRawAutoRolesForForm(nextForm, positions),
+      };
+    },
+    [positions],
+  );
 
   useEffect(() => {
     const candidateToCreate = location.state?.candidateToCreate;
@@ -704,7 +725,11 @@ function HREmployees() {
         const response = await axios.get("/api/hr/applications", {
           params: { status: "diterima" },
         });
-        setCandidateApplications(Array.isArray(response.data?.applications) ? response.data.applications : []);
+        setCandidateApplications(
+          Array.isArray(response.data?.applications)
+            ? response.data.applications
+            : [],
+        );
       } catch (error) {
         setCandidateApplications([]);
       } finally {
@@ -1599,7 +1624,11 @@ function HREmployees() {
                 <div className="grid grid-cols-1 gap-3">
                   {filteredCandidateApplications.map((candidate) => (
                     <div
-                      key={candidate.application_id || candidate.candidate_id || `${candidate.name}-${candidate.email}`}
+                      key={
+                        candidate.application_id ||
+                        candidate.candidate_id ||
+                        `${candidate.name}-${candidate.email}`
+                      }
                       className="rounded-xl border border-base-300 bg-base-200/40 p-4"
                     >
                       <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
@@ -1608,14 +1637,19 @@ function HREmployees() {
                             {candidate.name || candidate.candidate_name || "-"}
                           </p>
                           <p className="text-xs text-base-content/60 truncate">
-                            {candidate.email || candidate.candidate_email || "-"}
+                            {candidate.email ||
+                              candidate.candidate_email ||
+                              "-"}
                           </p>
                           <div className="mt-2 flex flex-wrap gap-2 text-xs text-base-content/70">
                             <span className="badge badge-outline">
                               {candidate.phone || "Telepon kosong"}
                             </span>
                             <span className="badge badge-outline">
-                              {candidate.position_name || candidate.base_position || candidate.job_title || "Posisi kosong"}
+                              {candidate.position_name ||
+                                candidate.base_position ||
+                                candidate.job_title ||
+                                "Posisi kosong"}
                             </span>
                             <span className="badge badge-outline">
                               {candidate.department_name || "Kandidat lolos"}
@@ -1649,7 +1683,10 @@ function HREmployees() {
         id="view-employee-modal-hr"
         className="modal-toggle"
         checked={!!viewingEmployee}
-        onChange={() => setViewingEmployee(null)}
+        onChange={() => {
+          setViewingEmployee(null);
+          setDocumentPreview(null);
+        }}
       />
       <div className="modal">
         <div className="modal-box max-w-3xl">
@@ -1827,50 +1864,60 @@ function HREmployees() {
                   <div>
                     <span className="font-semibold">Dokumen KTP:</span>{" "}
                     {viewingEmployee.ktp_document ? (
-                      <a
-                        href={getDocumentUrl(viewingEmployee.ktp_document)}
-                        target="_blank"
-                        rel="noreferrer"
-                        className="link link-primary"
+                      <button
+                        type="button"
+                        onClick={() =>
+                          openDocumentPreview(
+                            "Dokumen KTP",
+                            viewingEmployee.ktp_document,
+                          )
+                        }
+                        className="ml-2 inline-flex items-center rounded-lg bg-orange-500 px-3 py-1.5 text-xs font-semibold text-white shadow-sm transition hover:bg-orange-600"
                       >
-                        {getDocumentFileName(viewingEmployee.ktp_document)}
-                      </a>
+                        Lihat
+                      </button>
                     ) : (
-                      "-"
+                      <span className="text-slate-400">-</span>
                     )}
                   </div>
+
                   <div>
                     <span className="font-semibold">Dokumen Ijazah:</span>{" "}
                     {viewingEmployee.diploma_document ? (
-                      <a
-                        href={getDocumentUrl(viewingEmployee.diploma_document)}
-                        target="_blank"
-                        rel="noreferrer"
-                        className="link link-primary"
+                      <button
+                        type="button"
+                        onClick={() =>
+                          openDocumentPreview(
+                            "Dokumen Ijazah",
+                            viewingEmployee.diploma_document,
+                          )
+                        }
+                        className="ml-2 inline-flex items-center rounded-lg bg-orange-500 px-3 py-1.5 text-xs font-semibold text-white shadow-sm transition hover:bg-orange-600"
                       >
-                        {getDocumentFileName(viewingEmployee.diploma_document)}
-                      </a>
+                        Lihat
+                      </button>
                     ) : (
-                      "-"
+                      <span className="text-slate-400">-</span>
                     )}
                   </div>
+
                   <div>
                     <span className="font-semibold">Dokumen Kontrak:</span>{" "}
                     {viewingEmployee.employment_contract_document ? (
-                      <a
-                        href={getDocumentUrl(
-                          viewingEmployee.employment_contract_document,
-                        )}
-                        target="_blank"
-                        rel="noreferrer"
-                        className="link link-primary"
+                      <button
+                        type="button"
+                        onClick={() =>
+                          openDocumentPreview(
+                            "Dokumen Kontrak",
+                            viewingEmployee.employment_contract_document,
+                          )
+                        }
+                        className="ml-2 inline-flex items-center rounded-lg bg-orange-500 px-3 py-1.5 text-xs font-semibold text-white shadow-sm transition hover:bg-orange-600"
                       >
-                        {getDocumentFileName(
-                          viewingEmployee.employment_contract_document,
-                        )}
-                      </a>
+                        Lihat
+                      </button>
                     ) : (
-                      "-"
+                      <span className="text-slate-400">-</span>
                     )}
                   </div>
                 </div>
@@ -1880,13 +1927,63 @@ function HREmployees() {
           <div className="modal-action">
             <button
               className=" btn btn-primary rounded-fullpx-5"
-              onClick={() => setViewingEmployee(null)}
+              onClick={() => {
+                setViewingEmployee(null);
+                setDocumentPreview(null);
+              }}
             >
               Tutup
             </button>
           </div>
         </div>
       </div>
+
+      {documentPreview ? (
+        <div
+          className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/60 p-4"
+          onClick={() => setDocumentPreview(null)}
+        >
+          <div
+            className="flex h-[92vh] w-full max-w-6xl flex-col overflow-hidden rounded-3xl bg-white shadow-2xl"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between border-b px-6 py-4">
+              <div>
+                <h3 className="text-lg font-bold">{documentPreview.title}</h3>
+                <p className="text-sm text-slate-500">
+                  Preview dokumen pegawai
+                </p>
+              </div>
+
+              <button
+                type="button"
+                onClick={() => setDocumentPreview(null)}
+                className="btn btn-circle btn-sm btn-ghost"
+              >
+                ✕
+              </button>
+            </div>
+
+            <div className="flex-1 bg-slate-100 p-4">
+              <iframe
+                title={documentPreview.title}
+                src={documentPreview.url}
+                className="h-full w-full rounded-2xl border bg-white"
+              />
+            </div>
+
+            <div className="border-t px-6 py-4 text-right">
+              <button
+                type="button"
+                onClick={() => setDocumentPreview(null)}
+                className="btn bg-orange-500 text-white hover:bg-orange-600"
+              >
+                Tutup
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
 
       <input
         type="checkbox"

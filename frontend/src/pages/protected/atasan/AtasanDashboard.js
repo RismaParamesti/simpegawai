@@ -83,6 +83,15 @@ const formatSanctionLabel = (value) => {
   return raw.replace(/[-_]+/g, " ");
 };
 
+const formatStatusLabel = (status) => {
+  const normalized = String(status || "").toLowerCase().trim();
+  if (normalized === "pending") return "Menunggu";
+  if (normalized === "approved") return "Disetujui";
+  if (normalized === "rejected") return "Ditolak";
+  if (normalized === "active") return "Aktif";
+  return status || "-";
+};
+
 function AtasanDashboard() {
   const dispatch = useDispatch();
   const navigate = useNavigate();
@@ -338,7 +347,7 @@ function AtasanDashboard() {
       tone: "emerald",
     },
     {
-      title: "Approval Pending",
+      title: "Persetujuan Menunggu",
       value: approvals.total || 0,
       detail: `Cuti/Izin: ${approvals.leave_requests || 0} | Reimbursement: ${approvals.reimbursements || 0}`,
       path: "/app/leave-requests",
@@ -414,7 +423,7 @@ function AtasanDashboard() {
               Ringkasan Tim {scopeInfo.department_name || "Departemen"}
             </h1>
             <p className="mt-2 max-w-2xl text-sm font-medium text-slate-500 dark:text-slate-400">
-              Pantau kehadiran anggota tim, persetujuan pending, pelanggaran aktif,
+              Pantau kehadiran anggota tim, persetujuan yang menunggu, pelanggaran aktif,
               dan riwayat persetujuan dalam satu halaman yang mudah digunakan.
             </p>
           </div>
@@ -558,7 +567,7 @@ function AtasanDashboard() {
                         {formatDateLabel(item.valid_until)}
                         {item.remaining_days !== null ? <div className="text-xs text-slate-500">{item.remaining_days} hari lagi</div> : null}
                       </td>
-                      <td><span className="badge badge-success badge-sm">active</span></td>
+                      <td><span className="badge badge-success badge-sm">{formatStatusLabel("active")}</span></td>
                     </tr>
                   ))}
                 </tbody>
@@ -596,8 +605,8 @@ function AtasanDashboard() {
           </CardTitle>
 
           <CardTitle title="Riwayat Aksi Terbaru" subtitle="Persetujuan cuti dan reimbursement terakhir.">
-            <div className="max-h-[340px] overflow-y-auto rounded-2xl border border-slate-200 dark:border-slate-700">
-              <table className="table table-sm w-full">
+            <div className="max-h-[340px] overflow-x-auto overflow-y-auto rounded-2xl border border-slate-200 dark:border-slate-700">
+              <table className="table table-sm w-full min-w-[620px]">
                 <thead className="sticky top-0 bg-slate-50 text-slate-600 dark:bg-slate-950 dark:text-slate-300">
                   <tr><th>Tipe</th><th>Pegawai</th><th>Status</th><th>Tanggal</th></tr>
                 </thead>
@@ -652,7 +661,7 @@ function AtasanDashboard() {
         </div>
 
         <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
-          <CardTitle title={`Permohonan Cuti/Izin Pending`} subtitle={`${monthLabel(selectedMonth)} ${selectedYear}`}>
+          <CardTitle title="Permohonan Cuti/Izin Menunggu" subtitle={`${monthLabel(selectedMonth)} ${selectedYear}`}>
             <div className="overflow-x-auto rounded-2xl border border-slate-200 dark:border-slate-700">
               <table className="table table-sm w-full">
                 <thead className="bg-slate-50 text-slate-600 dark:bg-slate-950 dark:text-slate-300"><tr><th>Pegawai</th><th>Tipe</th><th>Tanggal</th><th>Status</th></tr></thead>
@@ -662,17 +671,17 @@ function AtasanDashboard() {
                       <td><div className="font-semibold">{item.employee_name}</div><div className="text-xs text-slate-500">{item.employee_code}</div></td>
                       <td>{humanizeType(item.leave_type)}</td>
                       <td>{new Date(item.start_date).toLocaleDateString("id-ID")} - {new Date(item.end_date).toLocaleDateString("id-ID")}</td>
-                      <td><span className="badge badge-warning badge-sm">{item.status}</span></td>
+                      <td><span className="badge badge-warning badge-sm">{formatStatusLabel(item.status)}</span></td>
                     </tr>
                   ))}
-                  {pendingLeaves.length === 0 && <tr><td colSpan={4} className="py-8 text-center text-slate-500">Tidak ada pengajuan cuti/izin pending</td></tr>}
+                  {pendingLeaves.length === 0 && <tr><td colSpan={4} className="py-8 text-center text-slate-500">Tidak ada pengajuan cuti/izin yang menunggu</td></tr>}
                 </tbody>
               </table>
               <SummaryPagination />
             </div>
           </CardTitle>
 
-          <CardTitle title={`Reimbursement Pending`} subtitle={`${monthLabel(selectedMonth)} ${selectedYear}`}>
+          <CardTitle title="Reimbursement Menunggu" subtitle={`${monthLabel(selectedMonth)} ${selectedYear}`}>
             <div className="overflow-x-auto rounded-2xl border border-slate-200 dark:border-slate-700">
               <table className="table table-sm w-full">
                 <thead className="bg-slate-50 text-slate-600 dark:bg-slate-950 dark:text-slate-300"><tr><th>Pegawai</th><th>Jenis</th><th>Jumlah</th><th>Status</th></tr></thead>
@@ -682,10 +691,10 @@ function AtasanDashboard() {
                       <td><div className="font-semibold">{item.employee_name}</div><div className="text-xs text-slate-500">{item.employee_code}</div></td>
                       <td>{item.reimbursement_type || "-"}</td>
                       <td className="font-semibold">Rp {(Number(item.amount) || 0).toLocaleString("id-ID")}</td>
-                      <td><span className="badge badge-warning badge-sm">{item.status}</span></td>
+                      <td><span className="badge badge-warning badge-sm">{formatStatusLabel(item.status)}</span></td>
                     </tr>
                   ))}
-                  {pendingReimbursements.length === 0 && <tr><td colSpan={4} className="py-8 text-center text-slate-500">Tidak ada reimbursement pending</td></tr>}
+                  {pendingReimbursements.length === 0 && <tr><td colSpan={4} className="py-8 text-center text-slate-500">Tidak ada reimbursement yang menunggu</td></tr>}
                 </tbody>
               </table>
               <SummaryPagination />

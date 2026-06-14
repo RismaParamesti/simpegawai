@@ -277,12 +277,13 @@ const financeRoutes = [
   },
   {
     path: "/app/payroll",
-     exact: true,
+    exact: true,
     icon: <CalculatorIcon className={iconClasses} />,
     name: "Kelola Payroll",
   },
   {
     path: "/app/salary-appeals",
+    activePaths: ["/app/payroll/revision"],
     icon: <ReceiptPercentIcon className={iconClasses} />,
     name: "Banding Gaji",
   },

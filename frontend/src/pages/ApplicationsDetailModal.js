@@ -1,6 +1,10 @@
 import React, { useEffect, useState } from "react";
 import axios from "axios";
 import { createPortal } from "react-dom";
+import {
+  formatAssessmentWeight,
+  parseInterviewAssessmentNotes,
+} from "../utils/interviewAssessmentNotes";
 
 export default function ApplicationDetailModal({ isOpen, onClose, app }) {
   const [jobDetail, setJobDetail] = useState(null);
@@ -98,12 +102,12 @@ export default function ApplicationDetailModal({ isOpen, onClose, app }) {
   const getStatusLabel = (status) => {
     const map = {
       submitted: "Terkirim",
-      screening: "Review",
+      screening: "Seleksi",
       lolos_dokumen: "Lolos Dokumen",
-      wawancara: "Interview",
-      interview_rescheduled: "Interview Reschedule",
-      interview_completed: "Interview Selesai",
-      interview_cancelled: "Interview Dibatalkan",
+      wawancara: "Wawancara",
+      interview_rescheduled: "Wawancara Dijadwalkan Ulang",
+      interview_completed: "Wawancara Selesai",
+      interview_cancelled: "Wawancara Dibatalkan",
       diterima: "Diterima",
       ditolak: "Ditolak",
       withdrawn: "Dibatalkan",
@@ -112,6 +116,77 @@ export default function ApplicationDetailModal({ isOpen, onClose, app }) {
   };
 
   const visibleStatus = getVisibleStatus(app);
+  const isFinalStatus = ["diterima", "ditolak"].includes(visibleStatus);
+  const latestInterview = Array.isArray(app?.interviews)
+    ? app.interviews[0]
+    : app?._interview || null;
+  const pickFirstValue = (...values) =>
+    values.find((value) => value !== null && value !== undefined && value !== "");
+  const interviewerNotesSource = pickFirstValue(
+    app?.interviewer_notes,
+    app?.display_interviewer_notes,
+    app?.interview_notes,
+    app?.interviewer_feedback,
+    latestInterview?.interviewer_notes,
+    latestInterview?.display_interviewer_notes,
+    latestInterview?.interview_notes,
+    latestInterview?.interviewer_feedback,
+    latestInterview?.notes,
+  );
+  const parsedInterviewNotes = parseInterviewAssessmentNotes(
+    interviewerNotesSource,
+  );
+  const assessment = parsedInterviewNotes.assessment || {};
+  const assessmentCriteria = Array.isArray(assessment.criteria)
+    ? assessment.criteria
+    : [];
+  const finalScore = pickFirstValue(
+    assessment.total_score,
+    assessment.percentage,
+    assessment.rating,
+    app?.average_rating,
+    app?.rating,
+    latestInterview?.average_rating,
+    latestInterview?.rating,
+  );
+  const finalResult = pickFirstValue(
+    app?.interview_result,
+    latestInterview?.result,
+    visibleStatus === "diterima" ? "passed" : visibleStatus === "ditolak" ? "failed" : "",
+  );
+  const finalRecommendation = pickFirstValue(
+    app?.recommendation,
+    latestInterview?.recommendation,
+  );
+  const finalNotes = parsedInterviewNotes.notes;
+
+  const formatFinalResult = (value) => {
+    const map = {
+      passed: "Lolos",
+      failed: "Tidak Lolos",
+      no_show: "Tidak Hadir",
+      pending: "Menunggu",
+      disqualified: "Digugurkan",
+      diterima: "Diterima",
+      ditolak: "Ditolak",
+    };
+    return map[value] || value || "-";
+  };
+
+  const formatRecommendation = (value) => {
+    const map = {
+      hire: "Direkomendasikan Diterima",
+      consider: "Dipertimbangkan",
+      reject: "Tidak Direkomendasikan",
+    };
+    return map[value] || value || "-";
+  };
+
+  const formatScore = (value) => {
+    if (value === null || value === undefined || value === "") return "-";
+    const number = Number(value);
+    return Number.isFinite(number) ? `${number.toFixed(2).replace(/\.00$/, "")}/100` : value;
+  };
 
   // Progress bar: jika withdrawn, hanya tampil satu step "Dibatalkan"
   let steps, currentStep;
@@ -280,7 +355,7 @@ export default function ApplicationDetailModal({ isOpen, onClose, app }) {
                         {(() => {
                           const map = {
                             submitted: "Terkirim",
-                            screening: "Review",
+                            screening: "Seleksi",
                             lolos_dokumen: "Lolos Dokumen",
                             wawancara: "Wawancara",
                             diterima: "Diterima",
@@ -602,12 +677,94 @@ export default function ApplicationDetailModal({ isOpen, onClose, app }) {
                   {getStatusLabel(visibleStatus)}
                 </span>
               </div>
-              <p>📅 Apply: {formatDate(app.submitted_at)}</p>
+              {isFinalStatus && (
+                <div className="space-y-3 rounded-lg border border-base-300 bg-base-100 p-4">
+                  <div className="grid gap-3 sm:grid-cols-3">
+                    <div>
+                      <p className="text-xs font-semibold text-base-content/60">
+                        Nilai Akhir
+                      </p>
+                      <p className="font-semibold text-base-content">
+                        {formatScore(finalScore)}
+                      </p>
+                    </div>
+                    <div>
+                      <p className="text-xs font-semibold text-base-content/60">
+                        Hasil Wawancara
+                      </p>
+                      <p className="font-semibold text-base-content">
+                        {formatFinalResult(finalResult)}
+                      </p>
+                    </div>
+                    <div>
+                      <p className="text-xs font-semibold text-base-content/60">
+                        Rekomendasi
+                      </p>
+                      <p className="font-semibold text-base-content">
+                        {formatRecommendation(finalRecommendation)}
+                      </p>
+                    </div>
+                  </div>
+
+                  {assessmentCriteria.length > 0 && (
+                    <div>
+                      <p className="mb-2 text-xs font-semibold uppercase text-base-content/60">
+                        Kriteria Penilaian
+                      </p>
+                      <div className="overflow-x-auto rounded-lg border border-base-300">
+                        <table className="table table-zebra table-sm">
+                          <thead>
+                            <tr>
+                              <th>Kriteria</th>
+                              <th>Bobot</th>
+                              <th>Nilai</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {assessmentCriteria.map((item, index) => {
+                              const criterion =
+                                String(item?.criterion || "").trim() ||
+                                `Kriteria ${index + 1}`;
+                              const weight =
+                                item?.weight_percentage ?? item?.score ?? "";
+                              const achievedScore =
+                                item?.achieved_score ?? item?.value ?? "-";
+                              const maximumScore = item?.maximum_score || 100;
+
+                              return (
+                                <tr key={`${criterion}-${index}`}>
+                                  <td className="font-medium">{criterion}</td>
+                                  <td>{formatAssessmentWeight(weight)}</td>
+                                  <td>
+                                    {achievedScore === "-"
+                                      ? "-"
+                                      : `${achievedScore}/${maximumScore}`}
+                                  </td>
+                                </tr>
+                              );
+                            })}
+                          </tbody>
+                        </table>
+                      </div>
+                    </div>
+                  )}
+
+                  <div>
+                    <p className="mb-1 text-xs font-semibold uppercase text-base-content/60">
+                      Catatan Interviewer
+                    </p>
+                    <p className="whitespace-pre-line rounded-lg bg-base-200/60 p-3 text-sm text-base-content">
+                      {finalNotes || "-"}
+                    </p>
+                  </div>
+                </div>
+              )}
+              <p>📅 Melamar: {formatDate(app.submitted_at)}</p>
               {app.reviewed_at && (
-                <p>✔ Review: {formatDate(app.reviewed_at)}</p>
+                <p>✔ Ditinjau: {formatDate(app.reviewed_at)}</p>
               )}
               {app.scheduled_date && (
-                <p>📆 Interview: {formatDate(app.scheduled_date)}</p>
+                <p>📆 Wawancara: {formatDate(app.scheduled_date)}</p>
               )}
             </div>
           </div>

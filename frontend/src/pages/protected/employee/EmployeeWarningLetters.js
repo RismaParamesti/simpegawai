@@ -23,6 +23,34 @@ const makeSanctionBadge = (raw) => {
   return palette[Math.abs(hash) % palette.length];
 };
 
+const summaryCards = [
+  {
+    label: "Sanksi Saat Ini",
+    tone:
+      "border-orange-200 bg-orange-50 text-orange-900 dark:border-orange-900/60 dark:bg-orange-950/30 dark:text-orange-100",
+  },
+  {
+    label: "Alpha Berturut-turut",
+    tone:
+      "border-red-200 bg-red-50 text-red-900 dark:border-red-900/60 dark:bg-red-950/30 dark:text-red-100",
+  },
+  {
+    label: "Alpha Akumulasi",
+    tone:
+      "border-rose-200 bg-rose-50 text-rose-900 dark:border-rose-900/60 dark:bg-rose-950/30 dark:text-rose-100",
+  },
+  {
+    label: "Terlambat Berturut-turut",
+    tone:
+      "border-amber-200 bg-amber-50 text-amber-900 dark:border-amber-900/60 dark:bg-amber-950/30 dark:text-amber-100",
+  },
+  {
+    label: "Terlambat Akumulasi",
+    tone:
+      "border-sky-200 bg-sky-50 text-sky-900 dark:border-sky-900/60 dark:bg-sky-950/30 dark:text-sky-100",
+  },
+];
+
 function EmployeeWarningLetters() {
   const dispatch = useDispatch();
   const [loading, setLoading] = useState(true);
@@ -258,42 +286,48 @@ function EmployeeWarningLetters() {
 
       <TitleCard title="Pelanggaran Kehadiran Saya" topMargin="mt-0">
         <div className="grid md:grid-cols-5 grid-cols-1 gap-4">
-          <div className="p-4 rounded-lg bg-base-200">
-            <p className="text-sm opacity-70">Sanksi Saat Ini</p>
+          <div className={`rounded-2xl border p-4 shadow-sm ${summaryCards[0].tone}`}>
+            <p className="text-sm font-medium opacity-75">Sanksi Saat Ini</p>
             <p className="text-lg font-semibold mt-1">
-              <span className={`badge ${sanctionBadgeClass}`}>
+              <span className="inline-flex rounded-full border border-red-200 bg-red-100 px-3 py-1 text-xs font-bold uppercase tracking-wide text-red-700 dark:border-red-900/70 dark:bg-red-950/50 dark:text-red-200">
                 {sanctionLabel}
               </span>
             </p>
           </div>
-          <div className="p-4 rounded-lg bg-base-200">
-            <p className="text-sm opacity-70">Alpha Berturut-turut</p>
+          <div className={`rounded-2xl border p-4 shadow-sm ${summaryCards[1].tone}`}>
+            <p className="text-sm font-medium opacity-75">
+              Alpha Berturut-turut
+            </p>
             <p className="text-lg font-semibold">
               {Number(discipline.alpha_consecutive_days || 0)} hari
             </p>
           </div>
-          <div className="p-4 rounded-lg bg-base-200">
-            <p className="text-sm opacity-70">Alpha Akumulasi</p>
+          <div className={`rounded-2xl border p-4 shadow-sm ${summaryCards[2].tone}`}>
+            <p className="text-sm font-medium opacity-75">Alpha Akumulasi</p>
             <p className="text-lg font-semibold">
               {Number(discipline.alpha_accumulated_days || 0)} hari
             </p>
           </div>
-          <div className="p-4 rounded-lg bg-base-200">
-            <p className="text-sm opacity-70">Terlambat Berturut-turut</p>
+          <div className={`rounded-2xl border p-4 shadow-sm ${summaryCards[3].tone}`}>
+            <p className="text-sm font-medium opacity-75">
+              Terlambat Berturut-turut
+            </p>
             <p className="text-lg font-semibold">{consecutiveLate} kali</p>
           </div>
-          <div className="p-4 rounded-lg bg-base-200">
-            <p className="text-sm opacity-70">Terlambat Akumulasi</p>
+          <div className={`rounded-2xl border p-4 shadow-sm ${summaryCards[4].tone}`}>
+            <p className="text-sm font-medium opacity-75">
+              Terlambat Akumulasi
+            </p>
             <p className="text-lg font-semibold">{lateCount} kali</p>
           </div>
         </div>
 
-        <div className="mt-6 rounded-2xl border border-base-300 bg-base-100 shadow-sm overflow-hidden">
-          <div className="px-5 py-4 bg-base-200 border-b border-base-300">
+        <div className="mt-6 overflow-hidden rounded-2xl border border-orange-200 bg-orange-50/40 shadow-sm dark:border-orange-900/60 dark:bg-orange-950/20">
+          <div className="border-b border-orange-200 bg-gradient-to-r from-orange-500 to-amber-500 px-5 py-4 text-white dark:border-orange-900/60">
             <h3 className="font-semibold text-base">
               Aturan Peringatan Kehadiran
             </h3>
-            <p className="text-xs opacity-60 mt-1">
+            <p className="text-xs opacity-85 mt-1">
               Ringkasan batas pelanggaran berdasarkan level sanksi.
             </p>
           </div>
@@ -311,7 +345,7 @@ function EmployeeWarningLetters() {
                 return (
                   <div
                     key={rule.id}
-                    className="rounded-2xl border border-base-300 bg-base-100 p-4 shadow-sm hover:shadow-md transition"
+                    className="rounded-2xl border border-orange-100 bg-white p-4 shadow-sm transition hover:-translate-y-0.5 hover:border-orange-200 hover:shadow-md dark:border-orange-900/40 dark:bg-slate-900"
                   >
                     <div className="flex items-start justify-between gap-3 mb-4">
                       <div>
@@ -325,7 +359,7 @@ function EmployeeWarningLetters() {
                     </div>
 
                     <div className="space-y-3">
-                      <div className="rounded-xl bg-base-200 p-3">
+                      <div className="rounded-xl border border-red-100 bg-red-50 p-3 dark:border-red-900/50 dark:bg-red-950/20">
                         <div className="flex items-center justify-between mb-2">
                           <span className="font-semibold text-sm">Alpha</span>
                           <span className="badge badge-error badge-outline badge-sm">
@@ -350,7 +384,7 @@ function EmployeeWarningLetters() {
                         </div>
                       </div>
 
-                      <div className="rounded-xl bg-base-200 p-3">
+                      <div className="rounded-xl border border-amber-100 bg-amber-50 p-3 dark:border-amber-900/50 dark:bg-amber-950/20">
                         <div className="flex items-center justify-between mb-2">
                           <span className="font-semibold text-sm">
                             Terlambat

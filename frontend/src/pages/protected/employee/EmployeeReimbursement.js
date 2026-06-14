@@ -33,10 +33,10 @@ const REIMBURSEMENT_TYPE_LABELS = REIMBURSEMENT_TYPE_OPTIONS.reduce(
 
 const getStatusLabel = (status) => {
   const labels = {
-    pending: "pending",
-    approved: "approved",
-    included_in_payroll: "included payroll",
-    rejected: "rejected",
+    pending: "Menunggu",
+    approved: "Disetujui",
+    included_in_payroll: "Masuk Payroll",
+    rejected: "Ditolak",
   };
 
   return labels[status] || status;
@@ -298,14 +298,19 @@ function EmployeeReimbursement() {
             value={form.description}
             onChange={(e) => updateForm("description", e.target.value)}
           />
-          <input
-            className="file-input file-input-bordered md:col-span-2"
-            type="file"
-            accept=".pdf,.jpg,.jpeg,.png"
-            onChange={(e) =>
-              updateForm("attachment", e.target.files?.[0] || null)
-            }
-          />
+          <label className="form-control md:col-span-2">
+            <div className="label">
+              <span className="label-text font-semibold">Upload Bukti</span>
+            </div>
+            <input
+              className="file-input file-input-bordered w-full"
+              type="file"
+              accept=".pdf,.jpg,.jpeg,.png"
+              onChange={(e) =>
+                updateForm("attachment", e.target.files?.[0] || null)
+              }
+            />
+          </label>
           <div className="md:col-span-2 flex justify-end">
             <button
               className={`btn btn-primary ${submitting ? "loading" : ""}`}
@@ -365,10 +370,10 @@ function EmployeeReimbursement() {
                   }}
                 >
                   <option value="">Semua Status</option>
-                  <option value="pending">pending</option>
-                  <option value="approved">approved</option>
-                  <option value="included_in_payroll">included payroll</option>
-                  <option value="rejected">rejected</option>
+                  <option value="pending">Menunggu</option>
+                  <option value="approved">Disetujui</option>
+                  <option value="included_in_payroll">Masuk Payroll</option>
+                  <option value="rejected">Ditolak</option>
                 </select>
               </div>
 
@@ -380,10 +385,18 @@ function EmployeeReimbursement() {
                 Reset
               </button>
             </div>
-            <div className="overflow-x-auto">
-              <table className="table table-zebra">
+            <div className="w-full overflow-x-auto rounded-2xl border border-base-200">
+              <table className="table table-zebra table-sm w-[1180px] max-w-none table-fixed">
+                <colgroup>
+                  <col className="w-[120px]" />
+                  <col className="w-[190px]" />
+                  <col className="w-[150px]" />
+                  <col className="w-[190px]" />
+                  <col className="w-[110px]" />
+                  <col className="w-[420px]" />
+                </colgroup>
                 <thead>
-                  <tr>
+                  <tr className="bg-base-200/80">
                     <th>Tanggal</th>
                     <th>Jenis</th>
                     <th>Nominal</th>
@@ -394,16 +407,20 @@ function EmployeeReimbursement() {
                 </thead>
                 <tbody>
                   {paginatedItems.map((item) => (
-                    <tr key={item.id}>
-                      <td>
+                    <tr key={item.id} className="align-top">
+                      <td className="whitespace-nowrap">
                         {item.created_at
                           ? new Date(item.created_at).toLocaleDateString(
                               "id-ID",
                             )
                           : "-"}
                       </td>
-                      <td>{getTypeLabel(item)}</td>
                       <td>
+                        <div className="break-words leading-snug">
+                          {getTypeLabel(item)}
+                        </div>
+                      </td>
+                      <td className="whitespace-nowrap">
                         Rp {Number(item.amount || 0).toLocaleString("id-ID")}
                       </td>
                       <td>
@@ -411,28 +428,31 @@ function EmployeeReimbursement() {
                           {getStatusLabel(item.status)}
                         </span>
                       </td>
-                      <td>
+                      <td className="text-center">
                         {item.attachment ? (
                           <button
                             type="button"
                             onClick={() => openAttachmentModal(item.attachment)}
-                            className="
-        px-3 py-1 text-xs
-        bg-gradient-to-b from-blue-400 to-blue-600
-        text-white rounded-full
-        shadow-md hover:shadow-lg
-        border border-blue-600
-        hover:from-blue-500 hover:to-blue-700
-        transition-all duration-200
-      "
-                          >
+                            className="px-3 py-1 text-xs bg-gradient-to-b from-blue-400 to-blue-600 text-white rounded-full shadow-md hover:shadow-lg border border-blue-600 hover:from-blue-500 hover:to-blue-700 transition-all duration-200 whitespace-nowrap">
                             Lihat
                           </button>
                         ) : (
                           "-"
                         )}
                       </td>
-                      <td>{item.description}</td>
+                      <td>
+                        <div
+                          className="overflow-hidden whitespace-normal break-words leading-relaxed"
+                          title={item.description || "-"}
+                          style={{
+                            display: "-webkit-box",
+                            WebkitBoxOrient: "vertical",
+                            WebkitLineClamp: 3,
+                          }}
+                        >
+                          {item.description || "-"}
+                        </div>
+                      </td>
                     </tr>
                   ))}
                   {paginatedItems.length === 0 && (

@@ -43,6 +43,25 @@ const getActionBadge = (action) => {
   }
 };
 
+const getActionLabel = (action) => {
+  const key = String(action || "").toUpperCase().trim();
+  const map = {
+    CREATE: "Tambah",
+    TAMBAH: "Tambah",
+    UPDATE: "Ubah",
+    EDIT: "Ubah",
+    DELETE: "Hapus",
+    HAPUS: "Hapus",
+    LOGIN: "LOGIN",
+    LOGOUT: "LOGOUT",
+    RESTORE: "Pulihkan",
+    APPROVE: "Setujui",
+    REJECT: "Tolak",
+  };
+
+  return map[key] || String(action || "-").replace(/_/g, " ");
+};
+
 const getModuleBadge = (module) => {
   switch (module?.toLowerCase()) {
     case "attendance":
@@ -140,6 +159,24 @@ const getModuleLabel = (module) => {
   };
 
   return fallback[key] || String(module);
+};
+
+const getLogStatusLabel = (status) => {
+  const key = String(status || "").toLowerCase().trim();
+  const map = {
+    success: "Berhasil",
+    failed: "Gagal",
+    pending: "Menunggu",
+  };
+
+  return map[key] || String(status || "-").replace(/_/g, " ");
+};
+
+const getLogStatusBadge = (status) => {
+  const key = String(status || "").toLowerCase().trim();
+  if (key === "success") return "badge-success";
+  if (key === "pending") return "badge-warning";
+  return "badge-error";
 };
 
 function AdminActivityLogs() {
@@ -302,9 +339,9 @@ function AdminActivityLogs() {
               onChange={(e) => handleFilterChange("action", e.target.value)}
             >
               <option value="">Semua Aksi</option>
-              <option value="CREATE">Ditambahkan</option>
-              <option value="UPDATE">Diperbarui</option>
-              <option value="DELETE">Dihapus</option>
+              <option value="CREATE">Tambah</option>
+              <option value="UPDATE">Ubah</option>
+              <option value="DELETE">Hapus</option>
             </select>
           </label>
 
@@ -324,12 +361,12 @@ function AdminActivityLogs() {
             </select>
           </label>
 
-            <button
-            className="btn btn-secondary rounded-full px-6 min-h-12 self-start md:self-end md:mt-6"
-              onClick={handleResetFilters}
-            >
-              Reset Filter
-            </button>
+          <button
+            className="btn btn-secondary min-h-12 rounded-full px-6 self-start md:self-end md:mt-6"
+            onClick={handleResetFilters}
+          >
+            Reset Filter
+          </button>
         </div>
 
         {/* 📊 TABLE */}
@@ -338,7 +375,7 @@ function AdminActivityLogs() {
         ) : (
           <>
             <div className="overflow-x-auto">
-              <table className="table table-zebra">
+              <table className="table table-zebra min-w-[760px]">
                 <thead>
                   <tr>
                     <th>Waktu</th>
@@ -369,15 +406,15 @@ function AdminActivityLogs() {
 
                       <td>
                         <span className={`badge ${getActionBadge(log.action)}`}>
-                          {log.action}
+                          {getActionLabel(log.action)}
                         </span>
                       </td>
 
                       <td>
                         <span
-                          className={`badge ${log.status === "success" ? "badge-success" : "badge-error"}`}
+                          className={`badge ${getLogStatusBadge(log.status)}`}
                         >
-                          {log.status}
+                          {getLogStatusLabel(log.status)}
                         </span>
                       </td>
 
@@ -405,4 +442,3 @@ function AdminActivityLogs() {
 }
 
 export default AdminActivityLogs;
-

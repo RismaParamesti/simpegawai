@@ -271,13 +271,13 @@ function FinancePayrollTransfers() {
         const normalized = String(status || '').toLowerCase().trim()
 
         const map = {
-            draft: 'Draft',
-            claimed: 'Claimed',
-            submitted: 'Pending',
-            published: 'Published',
-            transferred: 'Transferred',
-            approved: 'Approved',
-            rejected: 'Rejected',
+            draft: 'Draf',
+            claimed: 'Diklaim',
+            submitted: 'Menunggu',
+            published: 'Dipublikasikan',
+            transferred: 'Sudah Ditransfer',
+            approved: 'Disetujui',
+            rejected: 'Ditolak',
         }
 
         return map[normalized] || status || '-'
@@ -328,17 +328,17 @@ function FinancePayrollTransfers() {
 
                 <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
                     <div className="rounded-3xl border border-amber-200 bg-amber-50 p-5 shadow-sm dark:border-amber-900/60 dark:bg-amber-950/30">
-                        <p className="text-sm font-bold text-amber-700 dark:text-amber-300">Claimed</p>
+                        <p className="text-sm font-bold text-amber-700 dark:text-amber-300">Diklaim</p>
                         <p className="mt-2 text-3xl font-extrabold text-slate-900 dark:text-slate-50">{summaryStats.claimed}</p>
                         <p className="mt-1 text-xs font-medium text-amber-700/80 dark:text-amber-300/80">Siap dikirim gaji</p>
                     </div>
                     <div className="rounded-3xl border border-orange-200 bg-orange-50 p-5 shadow-sm dark:border-orange-900/60 dark:bg-orange-950/30">
-                        <p className="text-sm font-bold text-orange-700 dark:text-orange-300">Transferred</p>
+                        <p className="text-sm font-bold text-orange-700 dark:text-orange-300">Sudah Ditransfer</p>
                         <p className="mt-2 text-3xl font-extrabold text-slate-900 dark:text-slate-50">{summaryStats.transferred}</p>
                         <p className="mt-1 text-xs font-medium text-orange-700/80 dark:text-orange-300/80">Gaji sudah dikirim</p>
                     </div>
                     <div className="rounded-3xl border border-emerald-200 bg-emerald-50 p-5 shadow-sm dark:border-emerald-900/60 dark:bg-emerald-950/30">
-                        <p className="text-sm font-bold text-emerald-700 dark:text-emerald-300">Published</p>
+                        <p className="text-sm font-bold text-emerald-700 dark:text-emerald-300">Dipublikasikan</p>
                         <p className="mt-2 text-3xl font-extrabold text-slate-900 dark:text-slate-50">{summaryStats.published}</p>
                         <p className="mt-1 text-xs font-medium text-emerald-700/80 dark:text-emerald-300/80">Slip sudah dipublikasikan</p>
                     </div>
@@ -409,10 +409,10 @@ function FinancePayrollTransfers() {
                                 onChange={(event) => setStatusFilter(event.target.value)}
                             >
                                 <option value="">Semua Status</option>
-                                <option value="claimed">Claimed</option>
-                                <option value="transferred">Transferred</option>
-                                <option value="published">Published</option>
-                                <option value="draft">Draft</option>
+                                <option value="claimed">Diklaim</option>
+                                <option value="transferred">Sudah Ditransfer</option>
+                                <option value="published">Dipublikasikan</option>
+                                <option value="draft">Draf</option>
                             </select>
                         </div>
                     </div>

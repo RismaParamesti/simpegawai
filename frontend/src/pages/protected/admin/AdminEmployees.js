@@ -39,6 +39,21 @@ const getDocumentUrl = (documentPath) => {
   return `http://localhost:5000${normalizedPath}`;
 };
 
+const getDocumentFileType = (pathValue) => {
+  if (!pathValue) return "unknown";
+  const lowerPath = String(pathValue).toLowerCase();
+  if (lowerPath.endsWith(".pdf")) return "pdf";
+  if (
+    lowerPath.endsWith(".jpg") ||
+    lowerPath.endsWith(".jpeg") ||
+    lowerPath.endsWith(".png") ||
+    lowerPath.endsWith(".webp")
+  ) {
+    return "image";
+  }
+  return "unknown";
+};
+
 const isManagerLevelPosition = (position) =>
   normalizeText(position?.level) === "manager";
 
@@ -125,6 +140,7 @@ function AdminEmployees() {
   const [editingEmployee, setEditingEmployee] = useState(null);
   const [editDocuments, setEditDocuments] = useState(INITIAL_DOCUMENTS);
   const [viewingEmployee, setViewingEmployee] = useState(null);
+  const [selectedDocument, setSelectedDocument] = useState(null);
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [createForm, setCreateForm] = useState(INITIAL_FORM);
   const [createDocuments, setCreateDocuments] = useState(INITIAL_DOCUMENTS);
@@ -215,12 +231,13 @@ function AdminEmployees() {
       const employeePosition = normalizeText(employee.position_name);
       const matchesSearch =
         !query ||
-        [employee.full_name, employee.name, employee.employee_code].some((value) =>
-          normalizeText(value).includes(query),
+        [employee.full_name, employee.name, employee.employee_code].some(
+          (value) => normalizeText(value).includes(query),
         );
 
       const matchesPosition =
-        !filters.position || employeePosition === normalizeText(filters.position);
+        !filters.position ||
+        employeePosition === normalizeText(filters.position);
 
       const matchesStatus =
         !filters.status || employeeStatus === normalizeText(filters.status);
@@ -278,6 +295,20 @@ function AdminEmployees() {
   const getDocumentFileName = (pathValue) => {
     if (!pathValue) return "-";
     return String(pathValue).split("/").pop();
+  };
+
+  const openDocumentModal = (pathValue, label) => {
+    if (!pathValue) return;
+    setSelectedDocument({
+      title: label,
+      name: getDocumentFileName(pathValue),
+      url: getDocumentUrl(pathValue),
+      type: getDocumentFileType(pathValue),
+    });
+  };
+
+  const closeDocumentModal = () => {
+    setSelectedDocument(null);
   };
 
   const updateCreateForm = (field, value) => {
@@ -734,12 +765,12 @@ function AdminEmployees() {
               <option value="contract">Kontrak</option>
             </select>
           </label>
-            <button
+          <button
             className="btn btn-secondary rounded-full px-6 min-h-12 self-start md:self-end md:mt-6"
-              onClick={handleResetFilters}
-            >
-              Reset Filter
-            </button>
+            onClick={handleResetFilters}
+          >
+            Reset Filter
+          </button>
         </div>
 
         {loading ? (
@@ -760,34 +791,37 @@ function AdminEmployees() {
               <tbody>
                 {filteredEmployees.length === 0 ? (
                   <tr>
-                    <td colSpan="6" className="py-8 text-center text-base-content/60">
+                    <td
+                      colSpan="6"
+                      className="py-8 text-center text-base-content/60"
+                    >
                       Tidak ada data ditemukan
                     </td>
                   </tr>
                 ) : (
                   employeesPagination.paginatedItems.map((employee) => (
-                  <tr key={employee.id}>
-                    <td>{employee.employee_code}</td>
-                    <td>{employee.full_name || employee.name}</td>
-                    <td>{employee.position_name || "-"}</td>
-                    <td>
-                      <span
-                        className={getStatusBadgeClass(
-                          employee.employment_status,
-                        )}
-                      >
-                        {employee.employment_status}
-                      </span>
-                    </td>
-                    <td className="text-center whitespace-nowrap">
-                      {employee.join_date
-                        ? String(employee.join_date).slice(0, 10)
-                        : "-"}
-                    </td>
-                    <td>
-                      <div className="flex items-center gap-2 whitespace-nowrap">
-                        <button
-                          className="
+                    <tr key={employee.id}>
+                      <td>{employee.employee_code}</td>
+                      <td>{employee.full_name || employee.name}</td>
+                      <td>{employee.position_name || "-"}</td>
+                      <td>
+                        <span
+                          className={getStatusBadgeClass(
+                            employee.employment_status,
+                          )}
+                        >
+                          {employee.employment_status}
+                        </span>
+                      </td>
+                      <td className="text-center whitespace-nowrap">
+                        {employee.join_date
+                          ? String(employee.join_date).slice(0, 10)
+                          : "-"}
+                      </td>
+                      <td>
+                        <div className="flex items-center gap-2 whitespace-nowrap">
+                          <button
+                            className="
         px-3 py-1 text-xs
         bg-gradient-to-b from-blue-400 to-blue-600
         text-white rounded-full
@@ -795,12 +829,12 @@ function AdminEmployees() {
         border border-blue-600
         hover:from-blue-500 hover:to-blue-700
         transition-all duration-200"
-                          onClick={() => openViewModal(employee)}
-                        >
-                          Lihat
-                        </button>
-                        <button
-                          className="
+                            onClick={() => openViewModal(employee)}
+                          >
+                            Lihat
+                          </button>
+                          <button
+                            className="
     px-3 py-1 text-xs
     bg-gradient-to-b from-yellow-300 to-yellow-500
     text-black rounded-full
@@ -809,19 +843,19 @@ function AdminEmployees() {
     hover:from-yellow-400 hover:to-yellow-600
     transition-all duration-200
   "
-                          onClick={() => openEditModal(employee)}
-                        >
-                          Ubah
-                        </button>
-                        <button
-                          className="btn btn-xs btn-error text-white rounded-full"
-                          onClick={() => setDeleteTarget(employee)}
-                        >
-                          Hapus
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
+                            onClick={() => openEditModal(employee)}
+                          >
+                            Ubah
+                          </button>
+                          <button
+                            className="btn btn-xs btn-error text-white rounded-full"
+                            onClick={() => setDeleteTarget(employee)}
+                          >
+                            Hapus
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
                   ))
                 )}
               </tbody>
@@ -1353,50 +1387,58 @@ function AdminEmployees() {
                   <div>
                     <span className="font-semibold">Dokumen KTP:</span>{" "}
                     {viewingEmployee.ktp_document ? (
-                      <a
-                        href={getDocumentUrl(viewingEmployee.ktp_document)}
-                        target="_blank"
-                        rel="noreferrer"
-                        className="link link-primary"
+                      <button
+                        type="button"
+                        className="rounded-xl bg-blue-500 px-3 py-2 text-xs font-semibold text-white transition hover:bg-blue-600"
+                        onClick={() =>
+                          openDocumentModal(
+                            viewingEmployee.ktp_document,
+                            "Dokumen KTP",
+                          )
+                        }
                       >
-                        {getDocumentFileName(viewingEmployee.ktp_document)}
-                      </a>
+                        Lihat Dokumen
+                      </button>
                     ) : (
-                      "-"
+                      <span className="text-slate-400">Tidak ada dokumen</span>
                     )}
                   </div>
                   <div>
                     <span className="font-semibold">Dokumen Ijazah:</span>{" "}
                     {viewingEmployee.diploma_document ? (
-                      <a
-                        href={getDocumentUrl(viewingEmployee.diploma_document)}
-                        target="_blank"
-                        rel="noreferrer"
-                        className="link link-primary"
+                      <button
+                        type="button"
+                        className="rounded-xl bg-emerald-500 px-3 py-2 text-xs font-semibold text-white transition hover:bg-emerald-600"
+                        onClick={() =>
+                          openDocumentModal(
+                            viewingEmployee.diploma_document,
+                            "Dokumen Ijazah",
+                          )
+                        }
                       >
-                        {getDocumentFileName(viewingEmployee.diploma_document)}
-                      </a>
+                        Lihat Dokumen
+                      </button>
                     ) : (
-                      "-"
+                      <span className="text-slate-400">Tidak ada dokumen</span>
                     )}
                   </div>
                   <div>
                     <span className="font-semibold">Dokumen Kontrak:</span>{" "}
                     {viewingEmployee.employment_contract_document ? (
-                      <a
-                        href={getDocumentUrl(
-                          viewingEmployee.employment_contract_document,
-                        )}
-                        target="_blank"
-                        rel="noreferrer"
-                        className="link link-primary"
+                      <button
+                        type="button"
+                        className="rounded-xl bg-orange-500 px-3 py-2 text-xs font-semibold text-white transition hover:bg-orange-600"
+                        onClick={() =>
+                          openDocumentModal(
+                            viewingEmployee.employment_contract_document,
+                            "Dokumen Kontrak",
+                          )
+                        }
                       >
-                        {getDocumentFileName(
-                          viewingEmployee.employment_contract_document,
-                        )}
-                      </a>
+                        Lihat Dokumen
+                      </button>
                     ) : (
-                      "-"
+                      <span className="text-slate-400">Tidak ada dokumen</span>
                     )}
                   </div>
                 </div>
@@ -1412,6 +1454,70 @@ function AdminEmployees() {
             </button>
           </div>
         </div>
+      </div>
+
+      <input
+        type="checkbox"
+        id="employee-document-modal"
+        className="modal-toggle"
+        checked={!!selectedDocument}
+        onChange={closeDocumentModal}
+      />
+      <div className="modal z-[10001]">
+        <div className="modal-box relative z-[10002] max-w-4xl">
+          <button
+            type="button"
+            className="btn btn-sm btn-circle absolute right-2 top-2"
+            onClick={closeDocumentModal}
+          >
+            x
+          </button>
+          <h3 className="font-semibold text-xl mb-1">
+            {selectedDocument?.title || "Dokumen Pegawai"}
+          </h3>
+          <p className="text-sm opacity-70 mb-4">
+            {selectedDocument?.name || "-"}
+          </p>
+
+          <div className="w-full min-h-[420px] bg-base-200 rounded-lg overflow-hidden flex items-center justify-center">
+            {selectedDocument?.type === "image" ? (
+              <img
+                src={selectedDocument.url}
+                alt={selectedDocument.title || "Dokumen pegawai"}
+                className="max-h-[70vh] w-auto object-contain"
+              />
+            ) : selectedDocument?.type === "pdf" ? (
+              <iframe
+                title={selectedDocument.title || "Dokumen Pegawai PDF"}
+                src={selectedDocument.url}
+                className="w-full h-[70vh] border-0"
+              />
+            ) : selectedDocument?.url ? (
+              <div className="text-center p-6">
+                <p className="mb-2">
+                  Preview tidak tersedia untuk tipe file ini.
+                </p>
+                <a
+                  href={selectedDocument.url}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="btn btn-primary btn-sm"
+                >
+                  Buka File
+                </a>
+              </div>
+            ) : (
+              <p className="opacity-70">Tidak ada dokumen.</p>
+            )}
+          </div>
+        </div>
+        <label
+          className="modal-backdrop"
+          htmlFor="employee-document-modal"
+          onClick={closeDocumentModal}
+        >
+          Close
+        </label>
       </div>
 
       <input

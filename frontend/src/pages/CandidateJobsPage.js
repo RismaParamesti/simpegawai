@@ -149,8 +149,8 @@ bg-gradient-to-r from-[#F58220] via-orange-500 to-yellow-400
 animate-gradient"
       >
         {/* overlay glow */}
-        <div className="absolute w-[500px] h-[500px] bg-white/10 rounded-full blur-3xl -top-32 -left-32"></div>
-        <div className="absolute w-[400px] h-[400px] bg-yellow-300/20 rounded-full blur-3xl top-20 right-[-120px]"></div>
+        <div className="absolute -left-24 -top-24 h-72 w-72 rounded-full bg-white/10 blur-3xl sm:-left-32 sm:-top-32 sm:h-[500px] sm:w-[500px]"></div>
+        <div className="absolute right-[-80px] top-20 h-64 w-64 rounded-full bg-yellow-300/20 blur-3xl sm:right-[-120px] sm:h-[400px] sm:w-[400px]"></div>
 
         <div className="hero-content text-center flex-col relative z-10">
           <h1 className="text-5xl md:text-6xl font-bold mb-6">

@@ -319,9 +319,9 @@ export default function CandidateJobList() {
     },
     {
       key: "unchanged",
-      title: "Informasi Lowongan Belum Dipublish",
+      title: "Informasi Lowongan Belum Dipublikasikan",
       value: candidateSummary.unchanged,
-      description: "Lowongan belum dipublish",
+      description: "Lowongan belum dipublikasikan",
       icon: Clock3,
       baseClass:
         "border-amber-200 bg-amber-50 text-amber-700 hover:bg-amber-100 dark:border-amber-900/50 dark:bg-amber-950/30 dark:text-amber-200 dark:hover:bg-amber-950/50",

@@ -5,6 +5,7 @@ import TitleCard from "../../../components/Cards/TitleCard";
 import { pegawaiApi } from "../../../features/pegawai/api";
 import Holidays from "date-holidays";
 import Pagination from "../../../components/Pagination/Pagination";
+import useAppPopup from "../../../hooks/useAppPopup";
 
 const INITIAL_FORM = {
   leave_type: "",
@@ -54,6 +55,17 @@ const STATUS_BADGE_CLASS = {
   approved: "badge-success",
   rejected: "badge-error",
   cancelled: "badge-neutral",
+};
+
+const getLeaveStatusLabel = (status) => {
+  const labels = {
+    pending: "Menunggu",
+    approved: "Disetujui",
+    rejected: "Ditolak",
+    cancelled: "Dibatalkan",
+  };
+  const normalized = String(status || "").toLowerCase();
+  return labels[normalized] || status || "-";
 };
 
 const formatDate = (value) => {
@@ -265,6 +277,7 @@ const getLeaveTypesByMode = (mode, leaveTypeOptions) => {
 
 function EmployeeLeave() {
   const dispatch = useDispatch();
+  const { popup, confirmPopup } = useAppPopup();
   const [form, setForm] = useState(INITIAL_FORM);
   const [leaveMode, setLeaveMode] = useState("");
   const [submitting, setSubmitting] = useState(false);
@@ -478,9 +491,16 @@ function EmployeeLeave() {
   const handleCancelLeaveRequest = async (leaveRequest) => {
     if (!leaveRequest?.id) return;
 
-    const confirmed = window.confirm(
-      "Batalkan pengajuan ini? Pengajuan yang sudah dibatalkan tidak bisa diproses atasan.",
-    );
+    const confirmed = await confirmPopup({
+      title: "Batalkan Pengajuan",
+      subtitle: "Pengajuan yang dibatalkan tidak bisa diproses atasan",
+      badge: "Konfirmasi",
+      message:
+        "Batalkan pengajuan ini? Pengajuan yang sudah dibatalkan tidak bisa diproses atasan.",
+      confirmLabel: "Batalkan Pengajuan",
+      cancelLabel: "Kembali",
+      variant: "warning",
+    });
     if (!confirmed) return;
 
     try {
@@ -785,6 +805,7 @@ function EmployeeLeave() {
 
   return (
     <>
+      {popup}
       {error ? (
         <div className="alert alert-error mb-4">
           <span>{error}</span>
@@ -1189,10 +1210,10 @@ function EmployeeLeave() {
       ) : null}
 
       <TitleCard title="Riwayat Pengajuan Cuti / Izin" topMargin="mt-6">
-        <div className="flex justify-right mb-4 items-center gap-2">
+        <div className="mb-4 grid grid-cols-1 gap-3 md:grid-cols-[180px_minmax(180px,1fr)_minmax(180px,1fr)_auto]">
           <input
             type="date"
-            className="input input-bordered input-sm max-w-xs"
+            className="input input-bordered input-sm w-full"
             value={submittedDateFilter}
             onChange={async (e) => {
               const nextDate = e.target.value;
@@ -1203,7 +1224,7 @@ function EmployeeLeave() {
           />
 
           <select
-            className="select select-bordered select-sm w-full max-w-xs"
+            className="select select-bordered select-sm w-full"
             value={typeFilter}
             onChange={async (e) => {
               const nextType = e.target.value;
@@ -1221,7 +1242,7 @@ function EmployeeLeave() {
           </select>
 
           <select
-            className="select select-bordered select-sm w-full max-w-xs"
+            className="select select-bordered select-sm w-full"
             value={statusFilter}
             onChange={async (e) => {
               const nextStatus = e.target.value;
@@ -1231,13 +1252,17 @@ function EmployeeLeave() {
             }}
           >
             <option value="">Semua Status</option>
-            <option value="pending">Pending</option>
-            <option value="approved">Approved</option>
-            <option value="rejected">Rejected</option>
-            <option value="cancelled">Cancelled</option>
+            <option value="pending">Menunggu</option>
+            <option value="approved">Disetujui</option>
+            <option value="rejected">Ditolak</option>
+            <option value="cancelled">Dibatalkan</option>
           </select>
 
-          <button type="button" className="btn btn-secondary btn-sm rounded-full" onClick={resetFilters}>
+          <button
+            type="button"
+            className="btn btn-secondary btn-sm rounded-full md:w-20"
+            onClick={resetFilters}
+          >
             Reset
           </button>
         </div>
@@ -1246,10 +1271,22 @@ function EmployeeLeave() {
           <div>Memuat data pengajuan...</div>
         ) : (
           <>
-            <div className="overflow-x-auto">
-              <table className="table table-zebra">
+            <div className="w-full overflow-x-auto rounded-2xl border border-base-200">
+              <table className="table table-zebra table-sm w-[1490px] max-w-none table-fixed">
+                <colgroup>
+                  <col className="w-[116px]" />
+                  <col className="w-[190px]" />
+                  <col className="w-[210px]" />
+                  <col className="w-[82px]" />
+                  <col className="w-[125px]" />
+                  <col className="w-[130px]" />
+                  <col className="w-[160px]" />
+                  <col className="w-[300px]" />
+                  <col className="w-[92px]" />
+                  <col className="w-[85px]" />
+                </colgroup>
                 <thead>
-                  <tr>
+                  <tr className="bg-base-200/80">
                     <th>Diajukan</th>
                     <th>Periode</th>
                     <th>Jenis</th>
@@ -1257,84 +1294,104 @@ function EmployeeLeave() {
                     <th>Status</th>
                     <th>Disetujui Oleh</th>
                     <th>Waktu Persetujuan</th>
-                    <th>Bukti</th>
                     <th>Alasan</th>
+                    <th>Bukti</th>
                     <th>Aksi</th>
                   </tr>
                 </thead>
                 <tbody>
                   {requests.length > 0 ? (
                     paginatedRequests.map((item) => (
-                    <tr key={item.id}>
-                      <td>{formatDate(item.created_at)}</td>
-                      <td>
-                        {formatDate(item.start_date)} -{" "}
-                        {formatDate(item.end_date)}
-                      </td>
-                      <td>
-                        {getLeaveTypeLabel(item.leave_type, leaveTypeOptions) || item.leave_type}
-                      </td>
-                      <td>{item.total_days || 0}</td>
-                      <td>
-                        <span
-                          className={`badge ${STATUS_BADGE_CLASS[item.status] || "badge-outline"}`}
+                      <tr key={item.id} className="align-top">
+                        <td className="whitespace-nowrap">
+                          {formatDate(item.created_at)}
+                        </td>
+                        <td className="whitespace-nowrap">
+                          {formatDate(item.start_date)} -{" "}
+                          {formatDate(item.end_date)}
+                        </td>
+                        <td>
+                          <div className="break-words leading-snug">
+                            {getLeaveTypeLabel(
+                              item.leave_type,
+                              leaveTypeOptions,
+                            ) || item.leave_type}
+                          </div>
+                        </td>
+                        <td className="text-center">{item.total_days || 0}</td>
+                        <td>
+                          <span
+                          className={`badge badge-sm whitespace-nowrap ${STATUS_BADGE_CLASS[item.status] || "badge-outline"}`}
                         >
-                          {item.status || "-"}
-                        </span>
-                      </td>
-                      <td>{item.approved_by_name || "-"}</td>
-                      <td>{formatDateTime(item.approved_at)}</td>
-                      <td>
-                        {item.bukti ? (
-                          <button
-                            type="button"
-                            className="
-        px-3 py-1 text-xs
-        bg-gradient-to-b from-blue-400 to-blue-600
-        text-white rounded-full
-        shadow-md hover:shadow-lg
-        border border-blue-600
-        hover:from-blue-500 hover:to-blue-700
-        transition-all duration-200
-      "
-                            onClick={() =>
-                              openProofModal(item.bukti, item.leave_type)
-                            }
+                            {getLeaveStatusLabel(item.status)}
+                          </span>
+                        </td>
+                        <td>
+                          <div
+                            className="truncate"
+                            title={item.approved_by_name || "-"}
                           >
-                            Lihat
-                          </button>
-                        ) : (
-                          "-"
-                        )}
-                      </td>
-                      <td className="max-w-xs whitespace-normal">
-                        {item.reason || "-"}
-                      </td>
-                      <td>
-                        {item.status === "pending" ? (
-                          <button
-                            type="button"
-                            className="btn btn-xs btn-error text-white"
-                            onClick={() => handleCancelLeaveRequest(item)}
-                            disabled={cancellingId === item.id}
+                            {item.approved_by_name || "-"}
+                          </div>
+                        </td>
+                        <td className="whitespace-nowrap">
+                          {formatDateTime(item.approved_at)}
+                        </td>
+                        <td>
+                          <div
+                            className="overflow-hidden whitespace-normal break-words leading-relaxed"
+                            title={item.reason || "-"}
+                            style={{
+                              display: "-webkit-box",
+                              WebkitBoxOrient: "vertical",
+                              WebkitLineClamp: 3,
+                            }}
                           >
-                            {cancellingId === item.id ? "Membatalkan..." : "Batal"}
-                          </button>
-                        ) : (
-                          "-"
-                        )}
+                            {item.reason || "-"}
+                          </div>
+                        </td>
+                        <td className="text-center">
+                          {item.bukti ? (
+                            <button
+                              type="button"
+                              className="px-3 py-1 text-xs bg-gradient-to-b from-blue-400 to-blue-600 text-white rounded-full shadow-md hover:shadow-lg border border-blue-600 hover:from-blue-500 hover:to-blue-700 transition-all duration-200 whitespace-nowrap"
+                              onClick={() =>
+                                openProofModal(item.bukti, item.leave_type)
+                              }
+                            >
+                              Lihat
+                            </button>
+                          ) : (
+                            "-"
+                          )}
+                        </td>
+                        <td className="text-center">
+                          {item.status === "pending" ? (
+                            <button
+                              type="button"
+                              className="btn btn-xs btn-error rounded-full px-4 text-white"
+                              onClick={() => handleCancelLeaveRequest(item)}
+                              disabled={cancellingId === item.id}
+                            >
+                              {cancellingId === item.id
+                                ? "Membatalkan..."
+                                : "Batal"}
+                            </button>
+                          ) : (
+                            "-"
+                          )}
+                        </td>
+                      </tr>
+                    ))
+                  ) : (
+                    <tr>
+                      <td colSpan={10} className="text-center opacity-70">
+                        Belum ada data pengajuan cuti/izin
                       </td>
                     </tr>
-                  ))
-                ) : (
-                  <tr>
-                    <td colSpan={11} className="text-center opacity-70">
-                      Belum ada data pengajuan cuti/izin
-                    </td>
-                  </tr>
-                )}
-              </tbody>
-            </table>
+                  )}
+                </tbody>
+              </table>
             </div>
             <Pagination
               page={currentPage}

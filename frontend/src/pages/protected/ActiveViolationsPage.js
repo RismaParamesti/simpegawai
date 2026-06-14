@@ -364,13 +364,8 @@ function ActiveViolationsPage() {
             Tidak ada surat peringatan
           </div>
         ) : (
-          <div
-            style={{
-              overflowX:
-                filteredItems.length > itemsPerPage ? "auto" : "hidden",
-            }}
-          >
-            <table className="table table-zebra table-sm">
+          <div className="overflow-x-auto">
+            <table className="table table-zebra table-sm min-w-[720px]">
               <thead>
                 <tr>
                   <th>Pegawai</th>

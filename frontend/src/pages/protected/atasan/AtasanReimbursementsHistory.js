@@ -8,10 +8,10 @@ import { atasanApi } from '../../../features/atasan/api'
 
 const getStatusLabel = (status) => {
     const labels = {
-        pending: 'pending',
-        approved: 'approved',
-        included_in_payroll: 'included payroll',
-        rejected: 'rejected',
+        pending: 'Menunggu',
+        approved: 'Disetujui',
+        included_in_payroll: 'Masuk Payroll',
+        rejected: 'Ditolak',
     }
 
     return labels[status] || status
@@ -184,9 +184,9 @@ function AtasanReimbursementsHistory() {
                                 onChange={(e) => setFilters((prev) => ({ ...prev, status: e.target.value }))}
                             >
                                 <option value="">Semua Status</option>
-                                <option value="approved">Approved</option>
-                                <option value="included_in_payroll">Included in Payroll</option>
-                                <option value="rejected">Rejected</option>
+                                <option value="approved">Disetujui</option>
+                                <option value="included_in_payroll">Masuk Payroll</option>
+                                <option value="rejected">Ditolak</option>
                             </select>
                             <button className="btn-secondary rounded-full" onClick={resetFilters}>
                                 Reset Filter
