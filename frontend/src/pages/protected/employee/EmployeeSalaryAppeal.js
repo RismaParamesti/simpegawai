@@ -5,6 +5,7 @@ import TitleCard from "../../../components/Cards/TitleCard";
 import Pagination from "../../../components/Pagination/Pagination";
 import { formatCurrency } from "../../../components/Formatters/CurrencyFormatter";
 import { pegawaiApi } from "../../../features/pegawai/api";
+import useAppPopup from "../../../hooks/useAppPopup";
 
 const INITIAL_FORM = {
   payroll_id: "",
@@ -66,6 +67,11 @@ const DEDUCTION_REASON_OPTIONS = [
     payrollField: "absent_deduction",
   },
   {
+    key: "unpaid_leave_deduction",
+    label: "Potongan Cuti Tidak Dibayar",
+    payrollField: "absent_deduction",
+  },
+  {
     key: "bpjs_deduction",
     label: "Potongan BPJS",
     payrollField: "bpjs_deduction",
@@ -85,12 +91,14 @@ const DEDUCTION_REASON_OPTIONS = [
 
 const getAppealStatusLabel = (status) => {
   const normalizedStatus = String(status || "").toLowerCase();
+  const labels = {
+    pending: "Menunggu",
+    approved: "Diproses",
+    rejected: "Ditolak",
+    cancelled: "Dibatalkan",
+  };
 
-  if (normalizedStatus === "approved") {
-    return "diproses";
-  }
-
-  return normalizedStatus || "-";
+  return labels[normalizedStatus] || normalizedStatus || "-";
 };
 
 const APPEAL_STATUS_BADGE_CLASS = {
@@ -187,6 +195,7 @@ const formatDetailWithCurrency = (detail) => {
 
 function EmployeeSalaryAppeal() {
   const dispatch = useDispatch();
+  const { popup, confirmPopup } = useAppPopup();
   const [employeeId, setEmployeeId] = useState(null);
   const [payrolls, setPayrolls] = useState([]);
   const [appeals, setAppeals] = useState([]);
@@ -417,9 +426,15 @@ function EmployeeSalaryAppeal() {
   };
 
   const deleteAppeal = async (appeal) => {
-    const confirmed = window.confirm(
-      `Yakin ingin menghapus riwayat banding gaji ini?\n\nPeriode: ${appeal.period_month}/${appeal.period_year}\nStatus: ${getAppealStatusLabel(appeal.status)}\n\nTindakan ini tidak bisa dibatalkan.`,
-    );
+    const confirmed = await confirmPopup({
+      title: "Hapus Banding Gaji",
+      subtitle: "Tindakan ini tidak bisa dibatalkan",
+      badge: "Konfirmasi",
+      message: `Yakin ingin menghapus riwayat banding gaji ini?\n\nPeriode: ${appeal.period_month}/${appeal.period_year}\nStatus: ${getAppealStatusLabel(appeal.status)}\n\nTindakan ini tidak bisa dibatalkan.`,
+      confirmLabel: "Hapus",
+      cancelLabel: "Batal",
+      variant: "warning",
+    });
     if (!confirmed) return;
 
     try {
@@ -611,6 +626,7 @@ function EmployeeSalaryAppeal() {
 
   return (
     <>
+      {popup}
       {error ? (
         <div className="alert alert-error mb-4">
           <span>{error}</span>
@@ -629,7 +645,8 @@ function EmployeeSalaryAppeal() {
             {editingAppealId ? (
               <div className="alert alert-info md:col-span-2">
                 <span>
-                  Mode edit aktif. Ubah data di form ini lalu klik Simpan Edit.
+                  Mode edit aktif. Selama belum direview HR, komponen banding
+                  masih bisa ditambah, dihapus, atau diubah.
                 </span>
               </div>
             ) : null}
@@ -694,29 +711,28 @@ function EmployeeSalaryAppeal() {
                     }
                   />
                   <div className="md:col-span-2 flex justify-end">
-                    {!editingAppealId ? (
-                      <button
-                        type="button"
-                        className="btn btn-ghost btn-sm"
-                        onClick={() => removeAppealItem(index)}
-                        disabled={submitting}
-                      >
-                        Hapus Baris
-                      </button>
-                    ) : null}
+                    <button
+                      type="button"
+                      className="btn btn-ghost btn-sm"
+                      onClick={() => removeAppealItem(index)}
+                      disabled={submitting}
+                    >
+                      Hapus Baris
+                    </button>
                   </div>
                 </div>
               ))}
-              {!editingAppealId ? (
-                <button
-                  type="button"
-                  className="btn btn-outline btn-sm"
-                  onClick={addAppealItem}
-                  disabled={!form.payroll_id || submitting}
-                >
-                  Tambah Alasan Komponen
-                </button>
-              ) : null}
+              <button
+                type="button"
+                className="btn btn-outline btn-sm"
+                onClick={addAppealItem}
+                disabled={!form.payroll_id || submitting}
+              >
+                Tambah Alasan Komponen
+              </button>
+            </div>
+            <div className="label">
+              <span className="label-text font-semibold">Upload Bukti</span>
             </div>
             <input
               className="file-input file-input-bordered md:col-span-2"

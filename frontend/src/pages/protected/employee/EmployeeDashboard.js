@@ -914,7 +914,7 @@ function EmployeeDashboard() {
         <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
           <div className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-700 dark:bg-slate-900">
             <h2 className="text-xl font-extrabold text-slate-900 dark:text-slate-50">
-              Pending Approval
+              Menunggu Persetujuan
             </h2>
             <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
               Permintaan yang masih perlu diproses.

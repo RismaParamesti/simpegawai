@@ -25,14 +25,14 @@ function TitleCard({ title, subtitle, children, topMargin, TopSideButtons, to, l
       role={clickable ? "button" : undefined}
       tabIndex={clickable ? 0 : undefined}
       className={
-        "app-card w-full rounded-[1.5rem] p-6 " +
+        "app-card w-full rounded-[1.5rem] p-4 sm:p-6 " +
         (topMargin || "mt-6") +
         (clickable ? " cursor-pointer hover:shadow-md transition" : "")
       }
     >
       {/* Title for Card */}
-      <div className="flex items-start justify-between gap-4">
-        <div>
+      <div className="flex flex-col items-stretch gap-3 sm:flex-row sm:items-start sm:justify-between sm:gap-4">
+        <div className="min-w-0">
           <Subtitle styleClass={TopSideButtons ? "inline-block" : ""}>
             {title}
           </Subtitle>
@@ -42,7 +42,11 @@ function TitleCard({ title, subtitle, children, topMargin, TopSideButtons, to, l
         </div>
 
         {/* Top side button, show only if present */}
-        {TopSideButtons && <div className="shrink-0">{TopSideButtons}</div>}
+        {TopSideButtons && (
+          <div className="flex shrink-0 flex-wrap gap-2 sm:justify-end">
+            {TopSideButtons}
+          </div>
+        )}
       </div>
 
       <div className="divider my-4 opacity-70"></div>

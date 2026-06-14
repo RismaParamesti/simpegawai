@@ -6,6 +6,7 @@ import TitleCard from "../../../components/Cards/TitleCard";
 import Pagination from "../../../components/Pagination/Pagination";
 import { adminApi } from "../../../features/admin/api";
 import useTablePagination from "../../../hooks/useTablePagination";
+import useAppPopup from "../../../hooks/useAppPopup";
 
 const API_ORIGIN = (process.env.REACT_APP_BASE_URL || "")
   .replace(/\/api\/?$/, "")
@@ -29,6 +30,21 @@ const getAssetUrl = (pathValue) => {
     : `/${pathValue}`;
   if (API_ORIGIN) return `${API_ORIGIN}${normalizedPath}`;
   return `http://localhost:5000${normalizedPath}`;
+};
+
+const getDocumentFileType = (pathValue) => {
+  if (!pathValue) return "unknown";
+  const lowerPath = String(pathValue).toLowerCase();
+  if (lowerPath.endsWith(".pdf")) return "pdf";
+  if (
+    lowerPath.endsWith(".jpg") ||
+    lowerPath.endsWith(".jpeg") ||
+    lowerPath.endsWith(".png") ||
+    lowerPath.endsWith(".webp")
+  ) {
+    return "image";
+  }
+  return "unknown";
 };
 
 const formatRupiah = (value) =>
@@ -80,6 +96,7 @@ const getEffectiveAutoRolesForEdit = (formState, allPositions) => {
 function AdminUsers() {
   const dispatch = useDispatch();
   const location = useLocation();
+  const { popup, alertPopup } = useAppPopup();
   const [users, setUsers] = useState([]);
   const [employees, setEmployees] = useState([]);
   const [positions, setPositions] = useState([]);
@@ -89,6 +106,7 @@ function AdminUsers() {
   const [submitting, setSubmitting] = useState(false);
   const [editingUser, setEditingUser] = useState(null);
   const [viewingUser, setViewingUser] = useState(null);
+  const [selectedDocument, setSelectedDocument] = useState(null);
   const [filters, setFilters] = useState({
     search: "",
     department: "",
@@ -142,19 +160,25 @@ function AdminUsers() {
     const baseUsers = !isDirector
       ? users
       : users.filter((user) => {
-      const normalizedRoles = Array.isArray(user.roles)
-        ? user.roles.map((role) => String(role).toLowerCase().trim())
-        : [];
+          const normalizedRoles = Array.isArray(user.roles)
+            ? user.roles.map((role) => String(role).toLowerCase().trim())
+            : [];
 
-      return !normalizedRoles.includes("kandidat");
-      });
+          return !normalizedRoles.includes("kandidat");
+        });
 
     return baseUsers.filter((user) => {
       const linkedEmployee = employeeByUserId[String(user.id)];
       const userRoles = Array.isArray(user.roles)
-        ? user.roles.map((role) => String(role || "").toLowerCase().trim())
+        ? user.roles.map((role) =>
+            String(role || "")
+              .toLowerCase()
+              .trim(),
+          )
         : [];
-      const userStatus = String(user.status || "").toLowerCase().trim();
+      const userStatus = String(user.status || "")
+        .toLowerCase()
+        .trim();
 
       const matchesSearch =
         !searchQuery ||
@@ -210,6 +234,20 @@ function AdminUsers() {
       role: "",
       status: "",
     });
+  };
+
+  const openDocumentModal = (pathValue, label) => {
+    if (!pathValue) return;
+    setSelectedDocument({
+      title: label,
+      name: getDocumentFileName(pathValue),
+      url: getAssetUrl(pathValue),
+      type: getDocumentFileType(pathValue),
+    });
+  };
+
+  const closeDocumentModal = () => {
+    setSelectedDocument(null);
   };
 
   const loadData = async () => {
@@ -386,7 +424,14 @@ function AdminUsers() {
     if (missingFields.length > 0) {
       const message = `Silakan isi semua field wajib sebelum menyimpan: ${missingFields.join(", ")}`;
       setError(message);
-      window.alert(message);
+      await alertPopup({
+        title: "Data Belum Lengkap",
+        subtitle: "Lengkapi field wajib sebelum menyimpan",
+        badge: "Validasi",
+        message,
+        confirmLabel: "Mengerti",
+        variant: "warning",
+      });
       return;
     }
 
@@ -432,6 +477,7 @@ function AdminUsers() {
 
   return (
     <>
+      {popup}
       {error ? (
         <div className="alert alert-error mb-4">
           <span>{error}</span>
@@ -526,12 +572,12 @@ function AdminUsers() {
               <option value="inactive">Nonaktif</option>
             </select>
           </label>
-            <button
+          <button
             className="btn btn-secondary rounded-full px-6 min-h-12 self-start md:self-end md:mt-6"
-              onClick={handleResetFilters}
-            >
-              Reset Filter
-            </button>
+            onClick={handleResetFilters}
+          >
+            Reset Filter
+          </button>
         </div>
 
         {loading ? (
@@ -552,29 +598,32 @@ function AdminUsers() {
               <tbody>
                 {tableUsers.length === 0 ? (
                   <tr>
-                    <td colSpan="6" className="py-8 text-center text-base-content/60">
+                    <td
+                      colSpan="6"
+                      className="py-8 text-center text-base-content/60"
+                    >
                       tidak ada data ditemukan
                     </td>
                   </tr>
                 ) : (
                   usersPagination.paginatedItems.map((user) => {
-                  const linkedEmployee = employeeByUserId[String(user.id)];
+                    const linkedEmployee = employeeByUserId[String(user.id)];
 
-                  return (
-                    <tr key={user.id}>
-                      <td>{user.name}</td>
-                      <td>{linkedEmployee?.department_name || "-"}</td>
-                      <td>{linkedEmployee?.position_name || "-"}</td>
-                      <td>{(user.roles || []).join(", ")}</td>
-                      <td>
-                        <span className={getStatusBadgeClass(user.status)}>
-                          {user.status}
-                        </span>
-                      </td>
-                      <td>
-                        <div className="flex items-center gap-2 whitespace-nowrap">
-                          <button
-                            className="
+                    return (
+                      <tr key={user.id}>
+                        <td>{user.name}</td>
+                        <td>{linkedEmployee?.department_name || "-"}</td>
+                        <td>{linkedEmployee?.position_name || "-"}</td>
+                        <td>{(user.roles || []).join(", ")}</td>
+                        <td>
+                          <span className={getStatusBadgeClass(user.status)}>
+                            {user.status}
+                          </span>
+                        </td>
+                        <td>
+                          <div className="flex items-center gap-2 whitespace-nowrap">
+                            <button
+                              className="
       px-3 py-1 text-xs
       bg-gradient-to-b from-blue-400 to-blue-600
       text-white rounded-full
@@ -583,12 +632,12 @@ function AdminUsers() {
       hover:from-blue-500 hover:to-blue-700
       transition-all duration-200
     "
-                            onClick={() => openViewUser(user)}
-                          >
-                            Lihat
-                          </button>
-                          <button
-                            className="
+                              onClick={() => openViewUser(user)}
+                            >
+                              Lihat
+                            </button>
+                            <button
+                              className="
     px-3 py-1 text-xs
     bg-gradient-to-b from-yellow-300 to-yellow-500
     text-black rounded-full
@@ -597,14 +646,14 @@ function AdminUsers() {
     hover:from-yellow-400 hover:to-yellow-600
     transition-all duration-200
   "
-                            onClick={() => openEditUser(user)}
-                          >
-                            Edit
-                          </button>
-                        </div>
-                      </td>
-                    </tr>
-                  );
+                              onClick={() => openEditUser(user)}
+                            >
+                              Edit
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    );
                   })
                 )}
               </tbody>
@@ -876,52 +925,58 @@ function AdminUsers() {
                   <div>
                     <span className="font-semibold">Dokumen KTP:</span>{" "}
                     {viewingUser?.detail?.ktp_document ? (
-                      <a
-                        href={getAssetUrl(viewingUser.detail.ktp_document)}
-                        target="_blank"
-                        rel="noreferrer"
-                        className="link link-primary"
+                      <button
+                        type="button"
+                        className="ml-2 rounded-xl bg-orange-500 px-3 py-1.5 text-xs font-semibold text-white transition hover:bg-orange-600"
+                        onClick={() =>
+                          openDocumentModal(
+                            viewingUser.detail.ktp_document,
+                            "Dokumen KTP",
+                          )
+                        }
                       >
-                        {getDocumentFileName(viewingUser.detail.ktp_document)}
-                      </a>
+                        Lihat
+                      </button>
                     ) : (
-                      "-"
+                      <span className="text-slate-400">-</span>
                     )}
                   </div>
                   <div>
                     <span className="font-semibold">Dokumen Ijazah:</span>{" "}
                     {viewingUser?.detail?.diploma_document ? (
-                      <a
-                        href={getAssetUrl(viewingUser.detail.diploma_document)}
-                        target="_blank"
-                        rel="noreferrer"
-                        className="link link-primary"
+                      <button
+                        type="button"
+                        className="ml-2 rounded-xl bg-orange-500 px-3 py-1.5 text-xs font-semibold text-white transition hover:bg-orange-600"
+                        onClick={() =>
+                          openDocumentModal(
+                            viewingUser.detail.diploma_document,
+                            "Dokumen Ijazah",
+                          )
+                        }
                       >
-                        {getDocumentFileName(
-                          viewingUser.detail.diploma_document,
-                        )}
-                      </a>
+                        Lihat
+                      </button>
                     ) : (
-                      "-"
+                      <span className="text-slate-400">-</span>
                     )}
                   </div>
                   <div>
                     <span className="font-semibold">Dokumen Kontrak:</span>{" "}
                     {viewingUser?.detail?.employment_contract_document ? (
-                      <a
-                        href={getAssetUrl(
-                          viewingUser.detail.employment_contract_document,
-                        )}
-                        target="_blank"
-                        rel="noreferrer"
-                        className="link link-primary"
+                      <button
+                        type="button"
+                        className="ml-2 rounded-xl bg-orange-500 px-3 py-1.5 text-xs font-semibold text-white transition hover:bg-orange-600"
+                        onClick={() =>
+                          openDocumentModal(
+                            viewingUser.detail.employment_contract_document,
+                            "Dokumen Kontrak",
+                          )
+                        }
                       >
-                        {getDocumentFileName(
-                          viewingUser.detail.employment_contract_document,
-                        )}
-                      </a>
+                        Lihat
+                      </button>
                     ) : (
-                      "-"
+                      <span className="text-slate-400">-</span>
                     )}
                   </div>
                 </div>
@@ -938,9 +993,72 @@ function AdminUsers() {
           </div>
         </div>
       </div>
+
+      <input
+        type="checkbox"
+        id="user-document-modal"
+        className="modal-toggle"
+        checked={!!selectedDocument}
+        onChange={closeDocumentModal}
+      />
+      <div className="modal">
+        <div className="modal-box max-w-4xl">
+          <button
+            type="button"
+            className="btn btn-sm btn-circle absolute right-2 top-2"
+            onClick={closeDocumentModal}
+          >
+            x
+          </button>
+          <h3 className="font-semibold text-xl mb-1">
+            {selectedDocument?.title || "Dokumen Pegawai"}
+          </h3>
+          <p className="text-sm opacity-70 mb-4">
+            {selectedDocument?.name || "-"}
+          </p>
+
+          <div className="w-full min-h-[420px] bg-base-200 rounded-lg overflow-hidden flex items-center justify-center">
+            {selectedDocument?.type === "image" ? (
+              <img
+                src={selectedDocument.url}
+                alt={selectedDocument.title || "Dokumen pegawai"}
+                className="max-h-[70vh] w-auto object-contain"
+              />
+            ) : selectedDocument?.type === "pdf" ? (
+              <iframe
+                title={selectedDocument.title || "Dokumen Pegawai PDF"}
+                src={selectedDocument.url}
+                className="w-full h-[70vh] border-0"
+              />
+            ) : selectedDocument?.url ? (
+              <div className="text-center p-6">
+                <p className="mb-2">
+                  Preview tidak tersedia untuk tipe file ini.
+                </p>
+                <a
+                  href={selectedDocument.url}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="btn btn-primary btn-sm"
+                >
+                  Buka File
+                </a>
+              </div>
+            ) : (
+              <p className="opacity-70">Tidak ada dokumen.</p>
+            )}
+          </div>
+        </div>
+        <label
+          className="modal-backdrop"
+          htmlFor="user-document-modal"
+          onClick={closeDocumentModal}
+        >
+          Close
+        </label>
+      </div>
     </>
   );
 }
 
 export default AdminUsers;
-

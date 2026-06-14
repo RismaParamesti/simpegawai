@@ -356,7 +356,7 @@ const HREvaluatedCandidates = () => {
       );
 
       setSuccessMessage(
-        `Lowongan ${jobTitle || ""} berhasil diselesaikan dan hasil interview dipublish.`,
+        `Lowongan ${jobTitle || ""} berhasil diselesaikan dan hasil interview dipublikasikan.`,
       );
       setCompletionConfirm(null);
 
@@ -453,7 +453,7 @@ const HREvaluatedCandidates = () => {
 
   const summaryCards = [
     {
-      label: "Lowongan Belum Dipublish",
+      label: "Lowongan Belum Dipublikasikan",
       value: summary.unpublishedJobs,
       description: "Lowongan yang masih menunggu finalisasi hasil interview",
       icon: BriefcaseBusiness,
@@ -519,7 +519,7 @@ const HREvaluatedCandidates = () => {
             {
               step: "3",
               title: "Selesaikan",
-              text: "Klik Selesaikan jika kandidat sudah final untuk dipublish.",
+              text: "Klik Selesaikan jika kandidat sudah final untuk dipublikasikan.",
             },
           ].map((item) => (
             <div
@@ -694,7 +694,7 @@ const HREvaluatedCandidates = () => {
             <HiredCandidateWarning
               items={hiredCandidateWarnings}
               title="Kandidat ini sudah lolos"
-              description="Ada kandidat pada daftar final review yang sudah tercatat lolos pada lowongan lain. Gunakan aksi Jadikan Tidak Lolos agar hasilnya tidak dipublish sebagai lolos lagi."
+              description="Ada kandidat pada daftar final review yang sudah tercatat lolos pada lowongan lain. Gunakan aksi Jadikan Tidak Lolos agar hasilnya tidak dipublikasikan sebagai lolos lagi."
             />
           )}
 
@@ -1179,7 +1179,7 @@ const HREvaluatedCandidates = () => {
                       Selesaikan Lowongan?
                     </h3>
                     <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
-                      Hasil interview akan dipublish dan lowongan ini masuk ke
+                      Hasil interview akan dipublikasikan dan lowongan ini masuk ke
                       proses akhir.
                     </p>
                   </div>

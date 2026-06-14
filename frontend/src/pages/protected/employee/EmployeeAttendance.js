@@ -694,8 +694,8 @@ function EmployeeAttendance() {
                 <th>Tanggal</th>
                 <th>Status</th>
                 <th>Keterangan</th>
-                <th>Masuk</th>
-                <th>Pulang</th>
+                <th>Jam Masuk</th>
+                <th>Jam Pulang</th>
                 <th>Durasi Kerja</th>
                 <th>Lembur</th>
                 <th>Terlambat</th>

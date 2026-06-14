@@ -104,10 +104,10 @@ function AdminReimbursements() {
                         onChange={(e) => setPendingFilters((prev) => ({ ...prev, status: e.target.value }))}
                     >
                         <option value="">Semua Status</option>
-                        <option value="pending">Pending</option>
-                        <option value="approved">Approved</option>
-                        <option value="rejected">Rejected</option>
-                        <option value="included_in_payroll">Included in Payroll</option>
+                        <option value="pending">Menunggu</option>
+                        <option value="approved">Disetujui</option>
+                        <option value="rejected">Ditolak</option>
+                        <option value="included_in_payroll">Masuk Payroll</option>
                     </select>
                     <button className="btn" onClick={loadData}>Refresh</button>
                 </div>
@@ -206,9 +206,9 @@ function AdminReimbursements() {
                         onChange={(e) => setHistoryFilters((prev) => ({ ...prev, historyStatus: e.target.value }))}
                     >
                         <option value="">Semua Status Riwayat</option>
-                        <option value="approved">Approved</option>
-                        <option value="rejected">Rejected</option>
-                        <option value="included_in_payroll">Included in Payroll</option>
+                        <option value="approved">Disetujui</option>
+                        <option value="rejected">Ditolak</option>
+                        <option value="included_in_payroll">Masuk Payroll</option>
                     </select>
                     <button className="btn" onClick={loadData}>Refresh</button>
                 </div>

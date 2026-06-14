@@ -650,6 +650,90 @@ input[type="submit"],
 }
 
 /* --------------------------------------------------
+   Mobile layout guardrails
+-------------------------------------------------- */
+@media (max-width: 640px) {
+  html,
+  body,
+  #root {
+    max-width: 100%;
+    overflow-x: hidden;
+  }
+
+  body {
+    background-size: auto;
+  }
+
+  .app-card,
+  .card {
+    border-radius: 1rem;
+  }
+
+  .card-body {
+    padding: 1rem;
+  }
+
+  .navbar {
+    min-height: 4rem;
+  }
+
+  .modal {
+    padding: 0.5rem;
+  }
+
+  .modal-box {
+    width: calc(100vw - 1rem);
+    max-width: calc(100vw - 1rem);
+    max-height: calc(100dvh - 1rem);
+    overflow-y: auto;
+    border-radius: 1rem;
+  }
+
+  .modal-action {
+    flex-wrap: wrap;
+    gap: 0.5rem;
+  }
+
+  .modal-action .btn {
+    flex: 1 1 10rem;
+  }
+
+  .overflow-x-auto {
+    -webkit-overflow-scrolling: touch;
+    overscroll-behavior-x: contain;
+  }
+
+  .table {
+    min-width: max-content;
+    font-size: 0.78rem;
+  }
+
+  .table :where(th, td) {
+    padding: 0.65rem 0.75rem;
+    vertical-align: top;
+  }
+
+  .table :where(.btn, .badge) {
+    white-space: nowrap;
+  }
+
+  .btn {
+    min-height: 2.5rem;
+    height: auto;
+    white-space: normal;
+  }
+
+  .input,
+  .select,
+  .textarea,
+  input,
+  select,
+  textarea {
+    max-width: 100%;
+  }
+}
+
+/* --------------------------------------------------
    Unified status chips / badges
 -------------------------------------------------- */
 .badge {

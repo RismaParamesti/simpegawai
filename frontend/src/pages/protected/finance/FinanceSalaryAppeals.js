@@ -230,8 +230,8 @@ const payrollStatusLabel = (status) => {
     const normalized = String(status || '').toLowerCase().trim()
 
     const map = {
-        draft: 'Draft',
-        claimed: 'Claimed',
+        draft: 'Draf',
+        claimed: 'Diklaim',
         submitted: 'Siap Diproses',
         approved: 'Disetujui',
         rejected: 'Ditolak',

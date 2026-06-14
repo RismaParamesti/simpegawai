@@ -4,6 +4,7 @@ const db = require("../config/db");
 const PDFDocument = require("pdfkit");
 const fs = require("fs");
 const path = require("path");
+const Holidays = require("date-holidays");
 const { verifyToken, verifyRole } = require("../middleware/authMiddleware");
 const {
   logActivity,
@@ -51,17 +52,45 @@ const getAllowanceSettings = async () => {
 // HELPER FUNCTIONS
 // ============================
 
+const holidayCalendar = new Holidays("ID");
+
+const isPayrollWorkday = (date) => {
+  const dayOfWeek = date.getDay();
+  return dayOfWeek !== 0 && !holidayCalendar.isHoliday(date);
+};
+
+const calculateWorkdaysInMonth = (month, year) => {
+  const normalizedMonth = Number(month);
+  const normalizedYear = Number(year);
+
+  if (!normalizedMonth || !normalizedYear) {
+    return 30;
+  }
+
+  const daysInMonth = new Date(normalizedYear, normalizedMonth, 0).getDate();
+  let workdays = 0;
+
+  for (let day = 1; day <= daysInMonth; day += 1) {
+    const date = new Date(normalizedYear, normalizedMonth - 1, day);
+    if (isPayrollWorkday(date)) {
+      workdays += 1;
+    }
+  }
+
+  return workdays || 30;
+};
+
 // Calculate late deduction berdasarkan total late minutes dan working hours
 const calculateLateDeduction = (
   totalLateMinutes,
   baseSalary,
   workingHoursPerDay = 8,
   lateDeductionPercentage = DEFAULT_PAYROLL_SETTINGS.late_deduction_percentage,
+  workdaysInPeriod = 30,
 ) => {
   if (!totalLateMinutes || totalLateMinutes === 0) return 0;
 
-  // Kalkulasi dengan percentage dari gaji harian
-  const dailySalary = baseSalary / 30; // Asumsi 30 hari kerja per bulan
+  const dailySalary = baseSalary / workdaysInPeriod;
   const hourlyRate = dailySalary / workingHoursPerDay; // Working hours bisa berbeda per shift
   const deduction =
     (totalLateMinutes / 60) * hourlyRate * lateDeductionPercentage;
@@ -74,10 +103,11 @@ const calculateAbsentDeduction = (
   absentDays,
   baseSalary,
   alphaDeductionPercentage = DEFAULT_PAYROLL_SETTINGS.alpha_deduction_percentage,
+  workdaysInPeriod = 30,
 ) => {
   if (!absentDays || absentDays === 0) return 0;
 
-  const dailySalary = baseSalary / 30; // Asumsi 30 hari kerja per bulan
+  const dailySalary = baseSalary / workdaysInPeriod;
   const deduction = absentDays * dailySalary * alphaDeductionPercentage;
 
   return Math.round(deduction);
@@ -648,6 +678,7 @@ router.post(
 
       // Ambil settings tunjangan dari DB
       const SETTINGS = await getAllowanceSettings();
+      const payrollWorkdays = calculateWorkdaysInMonth(period_month, period_year);
 
       // Hitung hari hadir (check-in) untuk tunjangan harian
       const [presenceResult] = await db.promise().query(
@@ -734,21 +765,25 @@ router.post(
         baseSalary,
         workingHoursPerDay,
         SETTINGS.late_deduction_percentage,
+        payrollWorkdays,
       );
       const absentDeduction = calculateAbsentDeduction(
         totalDeductibleAbsentDays,
         baseSalary,
         SETTINGS.alpha_deduction_percentage,
+        payrollWorkdays,
       );
       const unpaidLeaveDeduction = calculateAbsentDeduction(
         totalUnpaidLeaveDays,
         baseSalary,
         SETTINGS.alpha_deduction_percentage,
+        payrollWorkdays,
       );
       const alphaDeduction = calculateAbsentDeduction(
         totalAlphaDays,
         baseSalary,
         SETTINGS.alpha_deduction_percentage,
+        payrollWorkdays,
       );
 
       // Get reimbursements yang siap dimasukkan payroll untuk periode ini
@@ -944,6 +979,7 @@ router.post(
           total_deduction: totalDeduction,
           net_salary: netSalary,
           attendance_summary: {
+            workdays_in_period: payrollWorkdays,
             total_late_minutes: totalLateMinutes,
             total_alpha_days: totalAlphaDays,
             total_unpaid_leave_days: totalUnpaidLeaveDays,

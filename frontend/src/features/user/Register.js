@@ -66,101 +66,97 @@ function Register() {
   };
 
   return (
-    <div className="min-h-screen bg-base-200 flex items-center justify-center px-4">
-  <div className="w-full max-w-3xl bg-base-100 rounded-2xl shadow-xl p-6 sm:p-8">
-
-    {/* Title */}
-    <div className="text-center mb-6">
-      <h2 className="text-2xl font-semibold">Registrasi Kandidat</h2>
-      <p className="text-sm text-base-content/60">
-        Buat akun untuk melamar pekerjaan
-      </p>
-    </div>
-
-    <form onSubmit={submitForm} className="space-y-5">
-
-      {/* GRID 2 KOLOM */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-
-        <InputText
-          defaultValue={registerObj.name}
-          updateType="name"
-          labelTitle="Nama Lengkap"
-          placeholder="Masukkan nama lengkap"
-          containerStyle="w-full"
-          updateFormValue={updateFormValue}
-        />
-
-        <InputText
-          defaultValue={registerObj.email}
-          updateType="email"
-          labelTitle="Email"
-          placeholder="nama@email.com"
-          containerStyle="w-full"
-          updateFormValue={updateFormValue}
-        />
-
-        <InputText
-          defaultValue={registerObj.username}
-          updateType="username"
-          labelTitle="Username"
-          placeholder="Masukkan username"
-          containerStyle="w-full"
-          updateFormValue={updateFormValue}
-        />
-
-        <InputText
-          defaultValue={registerObj.phone}
-          updateType="phone"
-          labelTitle="Nomor HP"
-          placeholder="08xxxxxxxxxx"
-          containerStyle="w-full"
-          updateFormValue={updateFormValue}
-        />
-
-        {/* Password full width */}
-        <div className="md:col-span-2">
-          <InputText
-            defaultValue={registerObj.password}
-            type="password"
-            updateType="password"
-            labelTitle="Password"
-            placeholder="Masukkan kata sandi"
-            containerStyle="w-full"
-            updateFormValue={updateFormValue}
-          />
+  <div className="min-h-screen bg-base-200 flex items-center justify-center px-4">
+    <div className="card w-full max-w-6xl shadow-xl">
+      <div className="grid grid-cols-1 md:grid-cols-2 bg-base-100 rounded-xl overflow-hidden">
+        
+        {/* Logo / Intro */}
+        <div className="hidden md:block">
+          <LandingIntro />
         </div>
 
+        {/* Form Register */}
+        <div className="py-12 px-8 sm:px-10">
+          <div className="text-center mb-6">
+            <h2 className="text-2xl font-semibold">Registrasi Kandidat</h2>
+            <p className="mt-2 text-sm text-base-content/60">
+              Buat akun untuk melamar pekerjaan
+            </p>
+          </div>
+
+          <form onSubmit={submitForm} className="space-y-5">
+            <InputText
+              defaultValue={registerObj.name}
+              updateType="name"
+              labelTitle="Nama Lengkap"
+              placeholder="Masukkan nama lengkap"
+              containerStyle="w-full"
+              updateFormValue={updateFormValue}
+            />
+
+            <InputText
+              defaultValue={registerObj.email}
+              updateType="email"
+              labelTitle="Email"
+              placeholder="nama@email.com"
+              containerStyle="w-full"
+              updateFormValue={updateFormValue}
+            />
+
+            <InputText
+              defaultValue={registerObj.username}
+              updateType="username"
+              labelTitle="Username"
+              placeholder="Masukkan username"
+              containerStyle="w-full"
+              updateFormValue={updateFormValue}
+            />
+
+            <InputText
+              defaultValue={registerObj.phone}
+              updateType="phone"
+              labelTitle="Nomor HP"
+              placeholder="08xxxxxxxxxx"
+              containerStyle="w-full"
+              updateFormValue={updateFormValue}
+            />
+
+            <InputText
+              defaultValue={registerObj.password}
+              type="password"
+              updateType="password"
+              labelTitle="Password"
+              placeholder="Masukkan kata sandi"
+              containerStyle="w-full"
+              updateFormValue={updateFormValue}
+            />
+
+            <ErrorText>{errorMessage}</ErrorText>
+
+            <button
+              type="submit"
+              className={
+                "btn w-full btn-primary rounded-lg h-11 " +
+                (loading ? " loading" : "")
+              }
+            >
+              {loading ? "Sedang mendaftar..." : "Daftar"}
+            </button>
+
+            <p className="text-center text-sm text-base-content/70">
+              Sudah punya akun?{" "}
+              <Link to="/login?role=kandidat">
+                <span className="text-primary font-medium hover:underline cursor-pointer">
+                  Masuk
+                </span>
+              </Link>
+            </p>
+          </form>
+        </div>
       </div>
-
-      {/* Error */}
-      <ErrorText>{errorMessage}</ErrorText>
-
-      {/* Button */}
-      <button
-        type="submit"
-        className={
-          "btn w-full btn-primary rounded-lg h-11 " +
-          (loading ? " loading" : "")
-        }
-      >
-        {loading ? "Sedang mendaftar..." : "Daftar"}
-      </button>
-
-      {/* Login */}
-      <p className="text-center text-sm text-base-content/70">
-        Sudah punya akun?{" "}
-        <Link to="/login?role=kandidat">
-          <span className="text-primary font-medium hover:underline cursor-pointer">
-            Masuk
-          </span>
-        </Link>
-      </p>
-
-    </form>
+    </div>
   </div>
-</div>
-  );
+);
 }
 
 export default Register;

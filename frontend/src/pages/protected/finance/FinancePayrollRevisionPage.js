@@ -6,7 +6,9 @@ import TitleCard from "../../../components/Cards/TitleCard";
 import Pagination from "../../../components/Pagination/Pagination";
 import { financeApi } from "../../../features/finance/api";
 import { resolveFixedPositionAllowance } from "../../../utils/fixedPositionAllowance";
+import { calculateWorkdaysInMonth } from "../../../utils/attendanceUtils";
 import useTablePagination from "../../../hooks/useTablePagination";
+import useAppPopup from "../../../hooks/useAppPopup";
 
 const getCurrentPeriod = () => {
   const now = new Date();
@@ -21,6 +23,12 @@ const formatCurrency = (value) =>
 
 const formatPercent = (value) =>
   `${new Intl.NumberFormat("id-ID", { maximumFractionDigits: 2 }).format(Number(value || 0) * 100)}%`;
+
+const normalizePercentValue = (value) => {
+  const parsed = Number(value);
+  if (!Number.isFinite(parsed)) return 0;
+  return parsed >= 1 ? parsed / 100 : parsed;
+};
 
 const formatLateDuration = (value) => {
   const minutes = Number(value || 0);
@@ -55,7 +63,6 @@ const statusBadgeClass = {
 };
 
 const AUTO_TAX_RATE = 0.03;
-const LATE_DEDUCTION_HOURLY_PERCENTAGE = 0.02;
 const DEFAULT_WORKING_HOURS_PER_DAY = 8;
 
 const defaultPayrollSettings = {
@@ -63,6 +70,9 @@ const defaultPayrollSettings = {
   meal_per_day: 25000,
   health_percentage: 0.01,
   bpjs_percentage: 0.01,
+  tax: AUTO_TAX_RATE,
+  late_deduction_percentage: 0.02,
+  alpha_deduction_percentage: 1,
 };
 
 const resolvePhotoUrl = (photoPath) => {
@@ -230,10 +240,239 @@ const resolveManualFieldByLabel = (label, reasonKey) => {
   return null;
 };
 
+const revisionComponentDefinitions = [
+  {
+    label: "Gaji Pokok",
+    key: "basicSalary",
+    group: "Pendapatan",
+    reasonKeys: ["basic_salary", "salary", "gaji_pokok"],
+  },
+  {
+    label: "Tunjangan Transport",
+    key: "transportAllowance",
+    group: "Pendapatan",
+    reasonKeys: ["transport_allowance", "transport"],
+  },
+  {
+    label: "Makan",
+    key: "mealAllowance",
+    group: "Pendapatan",
+    reasonKeys: ["meal_allowance", "meal", "makan"],
+  },
+  {
+    label: "Tunjangan Kesehatan",
+    key: "healthAllowance",
+    group: "Pendapatan",
+    reasonKeys: ["health_allowance", "health", "kesehatan"],
+  },
+  {
+    label: "Bonus",
+    key: "bonus",
+    group: "Pendapatan",
+    reasonKeys: ["bonus"],
+  },
+  {
+    label: "Tunjangan Jabatan",
+    key: "otherAllowance",
+    group: "Pendapatan",
+    reasonKeys: ["other_allowance", "position_allowance", "tunjangan_lain"],
+  },
+  {
+    label: "Total Tunjangan",
+    key: "allowanceTotal",
+    group: "Pendapatan",
+    reasonKeys: ["allowance", "total_allowance", "total_tunjangan"],
+  },
+  {
+    label: "Gaji Kotor",
+    key: "grossSalary",
+    group: "Pendapatan",
+    reasonKeys: ["gross_salary", "gaji_kotor"],
+  },
+  {
+    label: "Total Reimbursement",
+    key: "reimbursement",
+    group: "Pendapatan",
+    reasonKeys: ["reimbursement", "reimbursement_total"],
+  },
+  {
+    label: "Potongan Keterlambatan",
+    key: "lateDeduction",
+    group: "Potongan",
+    reasonKeys: ["late_deduction", "late", "keterlambatan"],
+  },
+  {
+    label: "Potongan Alpha",
+    key: "alphaDeduction",
+    group: "Potongan",
+    reasonKeys: ["absent_deduction", "alpha_deduction", "alpha"],
+  },
+  {
+    label: "Potongan Cuti Tidak Dibayar",
+    key: "absentDeduction",
+    group: "Potongan",
+    reasonKeys: ["unpaid_leave_deduction", "unpaid_leave"],
+  },
+  {
+    label: "Potongan BPJS",
+    key: "bpjsDeduction",
+    group: "Potongan",
+    reasonKeys: ["bpjs_deduction", "bpjs"],
+  },
+  {
+    label: "Potongan Pajak",
+    key: "taxDeduction",
+    group: "Potongan",
+    reasonKeys: ["tax_deduction", "tax", "pajak"],
+  },
+  {
+    label: "Potongan Lain",
+    key: "otherDeduction",
+    group: "Potongan",
+    reasonKeys: ["other_deduction", "potongan_lain"],
+  },
+  {
+    label: "Total Potongan",
+    key: "totalDeduction",
+    group: "Potongan",
+    reasonKeys: ["deduction", "total_deduction", "total_potongan"],
+  },
+];
+
+const normalizeRevisionText = (value) =>
+  String(value || "")
+    .toLowerCase()
+    .replace(/_/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+
+const findRevisionComponentDefinition = (item) => {
+  const reasonKey = normalizeRevisionText(item?.reason_key);
+  const label = normalizeRevisionText(item?.label);
+  const manualField = resolveManualFieldByLabel(item?.label, item?.reason_key);
+  const manualFieldKeyMap = {
+    bonus: "bonus",
+    other_allowance: "otherAllowance",
+    other_deduction: "otherDeduction",
+  };
+
+  if (manualFieldKeyMap[manualField]) {
+    return revisionComponentDefinitions.find(
+      (definition) => definition.key === manualFieldKeyMap[manualField],
+    );
+  }
+
+  return revisionComponentDefinitions.find((definition) => {
+    const definitionLabel = normalizeRevisionText(definition.label);
+    const reasonMatch = definition.reasonKeys.some(
+      (key) => normalizeRevisionText(key) === reasonKey,
+    );
+    const labelMatch =
+      label &&
+      (label === definitionLabel ||
+        label.includes(definitionLabel) ||
+        definitionLabel.includes(label));
+
+    return reasonMatch || labelMatch;
+  });
+};
+
+const applyApprovedRevisionAdjustmentsToPreview = (preview, approvedItems) => {
+  if (!preview || !approvedItems?.length) {
+    return preview;
+  }
+
+  const adjustmentMap = approvedItems.reduce((accumulator, item) => {
+    const targetComponent = findRevisionComponentDefinition(item);
+    if (!targetComponent?.key) {
+      return accumulator;
+    }
+
+    const amount = Number(item.adjustment_amount || 0);
+    const currentAdjustment = accumulator[targetComponent.key] || {
+      amount: 0,
+      group: targetComponent.group,
+    };
+
+    accumulator[targetComponent.key] = {
+      ...currentAdjustment,
+      amount:
+        currentAdjustment.amount + (Number.isFinite(amount) ? amount : 0),
+    };
+    return accumulator;
+  }, {});
+
+  if (Object.keys(adjustmentMap).length === 0) {
+    return preview;
+  }
+
+  const next = { ...preview };
+  const hasAdjustment = (key) =>
+    Object.prototype.hasOwnProperty.call(adjustmentMap, key);
+
+  Object.entries(adjustmentMap).forEach(([key, adjustment]) => {
+    const currentValue = Number(preview?.[key] || 0);
+    const amount = Number(adjustment.amount || 0);
+    next[key] =
+      adjustment.group === "Potongan"
+        ? Math.max(0, Number((currentValue - amount).toFixed(2)))
+        : Number((currentValue + amount).toFixed(2));
+  });
+
+  next.allowanceTotal = hasAdjustment("allowanceTotal")
+    ? Number(next.allowanceTotal || 0)
+    : Number(
+        (
+          Number(next.transportAllowance || 0) +
+          Number(next.mealAllowance || 0) +
+          Number(next.healthAllowance || 0) +
+          Number(next.bonus || 0) +
+          Number(next.otherAllowance || 0)
+        ).toFixed(2),
+      );
+
+  next.grossSalary = hasAdjustment("grossSalary")
+    ? Number(next.grossSalary || 0)
+    : Number((Number(next.basicSalary || 0) + next.allowanceTotal).toFixed(2));
+
+  next.totalIncome = Number(
+    (next.grossSalary + Number(next.reimbursement || 0)).toFixed(2),
+  );
+
+  if (
+    !hasAdjustment("absentDeduction") &&
+    (hasAdjustment("alphaDeduction") || hasAdjustment("unpaidLeaveDeduction"))
+  ) {
+    next.absentDeduction = Number(
+      (
+        Number(next.alphaDeduction || 0) +
+        Number(next.unpaidLeaveDeduction || 0)
+      ).toFixed(2),
+    );
+  }
+
+  next.totalDeduction = hasAdjustment("totalDeduction")
+    ? Number(next.totalDeduction || 0)
+    : Number(
+        (
+          Number(next.lateDeduction || 0) +
+          Number(next.absentDeduction || 0) +
+          Number(next.bpjsDeduction || 0) +
+          Number(next.taxDeduction || 0) +
+          Number(next.otherDeduction || 0)
+        ).toFixed(2),
+      );
+
+  next.netSalary = Number((next.totalIncome - next.totalDeduction).toFixed(2));
+
+  return next;
+};
+
 function FinancePayroll({ isRevisionPage = false }) {
   const dispatch = useDispatch();
   const location = useLocation();
   const navigate = useNavigate();
+  const { popup, confirmPopup } = useAppPopup();
 
   const period = getCurrentPeriod();
   const [error, setError] = useState("");
@@ -258,6 +497,7 @@ function FinancePayroll({ isRevisionPage = false }) {
   );
   const [latestGenerated, setLatestGenerated] = useState(null);
   const [monthlyPayrollRows, setMonthlyPayrollRows] = useState([]);
+  const [selectedPayrollPdf, setSelectedPayrollPdf] = useState(null);
   const [employeeReferenceData, setEmployeeReferenceData] = useState([]);
   const [attendanceSummaryData, setAttendanceSummaryData] = useState([]);
   const [reimbursements, setReimbursements] = useState([]);
@@ -612,13 +852,24 @@ function FinancePayroll({ isRevisionPage = false }) {
             payrollSettingsRow?.meal_per_day ??
               defaultPayrollSettings.meal_per_day,
           ),
-          health_percentage: Number(
+          health_percentage: normalizePercentValue(
             payrollSettingsRow?.health_percentage ??
               defaultPayrollSettings.health_percentage,
           ),
-          bpjs_percentage: Number(
+          bpjs_percentage: normalizePercentValue(
             payrollSettingsRow?.bpjs_percentage ??
               defaultPayrollSettings.bpjs_percentage,
+          ),
+          tax: normalizePercentValue(
+            payrollSettingsRow?.tax ?? defaultPayrollSettings.tax,
+          ),
+          late_deduction_percentage: normalizePercentValue(
+            payrollSettingsRow?.late_deduction_percentage ??
+              defaultPayrollSettings.late_deduction_percentage,
+          ),
+          alpha_deduction_percentage: normalizePercentValue(
+            payrollSettingsRow?.alpha_deduction_percentage ??
+              defaultPayrollSettings.alpha_deduction_percentage,
           ),
         });
 
@@ -770,8 +1021,24 @@ function FinancePayroll({ isRevisionPage = false }) {
   ]);
 
   const autoTaxDeduction = useMemo(() => {
-    return Number((selectedBasicSalary * AUTO_TAX_RATE).toFixed(2));
-  }, [selectedBasicSalary]);
+    return Number(
+      (selectedBasicSalary * Number(payrollSettings.tax || AUTO_TAX_RATE)).toFixed(2),
+    );
+  }, [selectedBasicSalary, payrollSettings.tax]);
+
+  const autoLateDeductionPercentage = useMemo(() => {
+    return Number(
+      payrollSettings.late_deduction_percentage ||
+        defaultPayrollSettings.late_deduction_percentage,
+    );
+  }, [payrollSettings.late_deduction_percentage]);
+
+  const autoAlphaDeductionPercentage = useMemo(() => {
+    return Number(
+      payrollSettings.alpha_deduction_percentage ||
+        defaultPayrollSettings.alpha_deduction_percentage,
+    );
+  }, [payrollSettings.alpha_deduction_percentage]);
 
   const autoPayrollId = useMemo(() => {
     if (
@@ -907,6 +1174,17 @@ function FinancePayroll({ isRevisionPage = false }) {
   }, [revisionAppealDetail]);
 
   const payrollPreview = useMemo(() => {
+    const approvedItemsForPreview = isAppealRevisionMode
+      ? getApprovedReviewItemsFromAppeal(revisionAppealDetail)
+      : [];
+    const approvedRevisionTargetKeys = new Set(
+      approvedItemsForPreview
+        .map((item) => findRevisionComponentDefinition(item)?.key)
+        .filter(Boolean),
+    );
+    const shouldUseOriginalValueBeforeRevision = (key) =>
+      isAppealRevisionMode && approvedRevisionTargetKeys.has(key);
+
     const resolveInputValue = (inputValue, fallbackValue) => {
       if (
         inputValue === "" ||
@@ -937,18 +1215,28 @@ function FinancePayroll({ isRevisionPage = false }) {
         const latestReimbursement = Number(
           reimbursementOverview.included || dbPreview.reimbursement || 0,
         );
-        const editedBonus = resolveInputValue(
-          manualInput.bonus,
-          selectedEmployeeCurrentPayroll.bonus,
-        );
-        const editedOtherAllowance = resolveInputValue(
-          manualInput.other_allowance,
-          selectedEmployeeCurrentPayroll.other_allowance,
-        );
-        const editedOtherDeduction = resolveInputValue(
-          manualInput.other_deduction,
-          selectedEmployeeCurrentPayroll.other_deduction,
-        );
+        const editedBonus = shouldUseOriginalValueBeforeRevision("bonus")
+          ? Number(dbPreview.bonus || 0)
+          : resolveInputValue(
+              manualInput.bonus,
+              selectedEmployeeCurrentPayroll.bonus,
+            );
+        const editedOtherAllowance = shouldUseOriginalValueBeforeRevision(
+          "otherAllowance",
+        )
+          ? Number(dbPreview.otherAllowance || 0)
+          : resolveInputValue(
+              manualInput.other_allowance,
+              selectedEmployeeCurrentPayroll.other_allowance,
+            );
+        const editedOtherDeduction = shouldUseOriginalValueBeforeRevision(
+          "otherDeduction",
+        )
+          ? Number(dbPreview.otherDeduction || 0)
+          : resolveInputValue(
+              manualInput.other_deduction,
+              selectedEmployeeCurrentPayroll.other_deduction,
+            );
 
         const allowanceWithoutEditable =
           Number(dbPreview.allowanceTotal || 0) -
@@ -975,110 +1263,118 @@ function FinancePayroll({ isRevisionPage = false }) {
           (deductionWithoutEditable + editedOtherDeduction).toFixed(2),
         );
         const netSalary = Number((totalIncome - totalDeduction).toFixed(2));
-        return {
-          ...dbPreview,
-          totalLateMinutes: latestLateMinutes,
-          reimbursement: latestReimbursement,
-          bonus: editedBonus,
-          otherAllowance: editedOtherAllowance,
-          allowanceTotal,
-          grossSalary,
-          totalIncome,
-          otherDeduction: editedOtherDeduction,
-          totalDeduction,
-          netSalary,
-        };
+        return applyApprovedRevisionAdjustmentsToPreview(
+          {
+            ...dbPreview,
+            totalLateMinutes: latestLateMinutes,
+            reimbursement: latestReimbursement,
+            bonus: editedBonus,
+            otherAllowance: editedOtherAllowance,
+            allowanceTotal,
+            grossSalary,
+            totalIncome,
+            otherDeduction: editedOtherDeduction,
+            totalDeduction,
+            netSalary,
+          },
+          approvedItemsForPreview,
+        );
       }
     }
 
     if (latestGeneratedForSelected?.details) {
-      return {
-        mode: "actual",
-        basicSalary: Number(
-          latestGeneratedForSelected.details.basic_salary || 0,
-        ),
-        transportAllowance: Number(
-          latestGeneratedForSelected.details?.allowances?.transport || 0,
-        ),
-        mealAllowance: Number(
-          latestGeneratedForSelected.details?.allowances?.meal || 0,
-        ),
-        healthAllowance: Number(
-          latestGeneratedForSelected.details?.allowances?.health || 0,
-        ),
-        bonus: Number(
-          latestGeneratedForSelected.details?.allowances?.bonus || 0,
-        ),
-        otherAllowance: Number(
-          latestGeneratedForSelected.details?.allowances?.other || 0,
-        ),
-        allowanceTotal: Number(
-          latestGeneratedForSelected.details?.allowances?.total || 0,
-        ),
-        grossSalary: Number(
-          latestGeneratedForSelected.details?.income?.gross_salary || 0,
-        ),
-        reimbursement: Number(
-          latestGeneratedForSelected.details?.reimbursement_total || 0,
-        ),
-        totalIncome: Number(
-          latestGeneratedForSelected.details?.income?.total_income || 0,
-        ),
-        lateDeduction: Number(
-          latestGeneratedForSelected.details?.late_deduction || 0,
-        ),
-        absentDeduction: Number(
-          latestGeneratedForSelected.details?.absent_deduction || 0,
-        ),
-        bpjsDeduction: Number(
-          latestGeneratedForSelected.details?.bpjs_deduction || 0,
-        ),
-        taxDeduction: Number(
-          latestGeneratedForSelected.details?.tax_deduction || 0,
-        ),
-        otherDeduction: Number(
-          latestGeneratedForSelected.details?.other_deduction || 0,
-        ),
-        totalDeduction: Number(
-          latestGeneratedForSelected.details?.total_deduction || 0,
-        ),
-        netSalary: Number(latestGeneratedForSelected.details?.net_salary || 0),
-        presentDays: Number(
-          latestGeneratedForSelected.details?.present_days || 0,
-        ),
-        alphaDays: Number(
-          latestGeneratedForSelected.details?.attendance_summary
-            ?.total_alpha_days || 0,
-        ),
-        permissionDays: Number(
-          latestGeneratedForSelected.details?.attendance_summary
-            ?.total_izin_days || 0,
-        ),
-        sickDays: Number(
-          latestGeneratedForSelected.details?.attendance_summary
-            ?.total_sakit_days || 0,
-        ),
-        deductibleAbsentDays: Number(
-          latestGeneratedForSelected.details?.attendance_summary
-            ?.total_deductible_absent_days ||
-            Number(
-              latestGeneratedForSelected.details?.attendance_summary
-                ?.total_alpha_days || 0,
-            ) +
+      return applyApprovedRevisionAdjustmentsToPreview(
+        {
+          mode: "actual",
+          basicSalary: Number(
+            latestGeneratedForSelected.details.basic_salary || 0,
+          ),
+          transportAllowance: Number(
+            latestGeneratedForSelected.details?.allowances?.transport || 0,
+          ),
+          mealAllowance: Number(
+            latestGeneratedForSelected.details?.allowances?.meal || 0,
+          ),
+          healthAllowance: Number(
+            latestGeneratedForSelected.details?.allowances?.health || 0,
+          ),
+          bonus: Number(
+            latestGeneratedForSelected.details?.allowances?.bonus || 0,
+          ),
+          otherAllowance: Number(
+            latestGeneratedForSelected.details?.allowances?.other || 0,
+          ),
+          allowanceTotal: Number(
+            latestGeneratedForSelected.details?.allowances?.total || 0,
+          ),
+          grossSalary: Number(
+            latestGeneratedForSelected.details?.income?.gross_salary || 0,
+          ),
+          reimbursement: Number(
+            latestGeneratedForSelected.details?.reimbursement_total || 0,
+          ),
+          totalIncome: Number(
+            latestGeneratedForSelected.details?.income?.total_income || 0,
+          ),
+          lateDeduction: Number(
+            latestGeneratedForSelected.details?.late_deduction || 0,
+          ),
+          absentDeduction: Number(
+            latestGeneratedForSelected.details?.absent_deduction || 0,
+          ),
+          bpjsDeduction: Number(
+            latestGeneratedForSelected.details?.bpjs_deduction || 0,
+          ),
+          taxDeduction: Number(
+            latestGeneratedForSelected.details?.tax_deduction || 0,
+          ),
+          otherDeduction: Number(
+            latestGeneratedForSelected.details?.other_deduction || 0,
+          ),
+          totalDeduction: Number(
+            latestGeneratedForSelected.details?.total_deduction || 0,
+          ),
+          netSalary: Number(
+            latestGeneratedForSelected.details?.net_salary || 0,
+          ),
+          presentDays: Number(
+            latestGeneratedForSelected.details?.present_days || 0,
+          ),
+          alphaDays: Number(
+            latestGeneratedForSelected.details?.attendance_summary
+              ?.total_alpha_days || 0,
+          ),
+          permissionDays: Number(
+            latestGeneratedForSelected.details?.attendance_summary
+              ?.total_izin_days || 0,
+          ),
+          sickDays: Number(
+            latestGeneratedForSelected.details?.attendance_summary
+              ?.total_sakit_days || 0,
+          ),
+          deductibleAbsentDays: Number(
+            latestGeneratedForSelected.details?.attendance_summary
+              ?.total_deductible_absent_days ||
               Number(
                 latestGeneratedForSelected.details?.attendance_summary
-                  ?.total_izin_days || 0,
+                  ?.total_alpha_days || 0,
               ) +
-              Number(
-                latestGeneratedForSelected.details?.attendance_summary
-                  ?.total_sakit_days || 0,
-              ),
-        ),
-        totalLateMinutes: Number(
-          latestGeneratedForSelected.details?.attendance_summary
-            ?.total_late_minutes || 0,
-        ),
-      };
+                Number(
+                  latestGeneratedForSelected.details?.attendance_summary
+                    ?.total_izin_days || 0,
+                ) +
+                Number(
+                  latestGeneratedForSelected.details?.attendance_summary
+                    ?.total_sakit_days || 0,
+                ),
+          ),
+          totalLateMinutes: Number(
+            latestGeneratedForSelected.details?.attendance_summary
+              ?.total_late_minutes || 0,
+          ),
+        },
+        approvedItemsForPreview,
+      );
     }
 
     const presentDays = Number(selectedEmployeeSummary?.present_days || 0);
@@ -1118,14 +1414,24 @@ function FinancePayroll({ isRevisionPage = false }) {
     const reimbursement = Number(reimbursementOverview.included || 0);
     const totalIncome = Number((grossSalary + reimbursement).toFixed(2));
 
-    const dailySalary = basicSalary / 30;
+    const workdaysInPeriod = calculateWorkdaysInMonth(
+      Number(periodMonth),
+      Number(periodYear),
+    );
+    const dailySalary = basicSalary / Math.max(workdaysInPeriod, 1);
     const hourlyRate = dailySalary / DEFAULT_WORKING_HOURS_PER_DAY;
     const lateDeduction = Math.round(
-      (totalLateMinutes / 60) * hourlyRate * LATE_DEDUCTION_HOURLY_PERCENTAGE,
+      (totalLateMinutes / 60) * hourlyRate * autoLateDeductionPercentage,
     );
-    const alphaDeduction = Math.round(alphaDays * dailySalary);
-    const unpaidLeaveDeduction = Math.round(unpaidLeaveDays * dailySalary);
-    const absentDeduction = Math.round(deductibleAbsentDays * dailySalary);
+    const alphaDeduction = Math.round(
+      alphaDays * dailySalary * autoAlphaDeductionPercentage,
+    );
+    const unpaidLeaveDeduction = Math.round(
+      unpaidLeaveDays * dailySalary * autoAlphaDeductionPercentage,
+    );
+    const absentDeduction = Math.round(
+      deductibleAbsentDays * dailySalary * autoAlphaDeductionPercentage,
+    );
     const bpjsDeduction = Number(
       (basicSalary * Number(payrollSettings.bpjs_percentage || 0)).toFixed(2),
     );
@@ -1141,40 +1447,45 @@ function FinancePayroll({ isRevisionPage = false }) {
       ).toFixed(2),
     );
     const netSalary = Number((totalIncome - totalDeduction).toFixed(2));
-    return {
-      mode: "estimated",
-      basicSalary,
-      transportAllowance,
-      mealAllowance,
-      healthAllowance,
-      bonus: manualBonus,
-      otherAllowance: manualOtherAllowance,
-      allowanceTotal,
-      grossSalary,
-      reimbursement,
-      totalIncome,
-      lateDeduction,
-      absentDeduction,
-      alphaDeduction,
-      unpaidLeaveDeduction,
-      bpjsDeduction,
-      taxDeduction,
-      otherDeduction,
-      totalDeduction,
-      netSalary,
-      presentDays,
-      alphaDays,
-      unpaidLeaveDays,
-      permissionDays,
-      sickDays,
-      deductibleAbsentDays,
-      totalLateMinutes,
-    };
+    return applyApprovedRevisionAdjustmentsToPreview(
+      {
+        mode: "estimated",
+        basicSalary,
+        transportAllowance,
+        mealAllowance,
+        healthAllowance,
+        bonus: manualBonus,
+        otherAllowance: manualOtherAllowance,
+        allowanceTotal,
+        grossSalary,
+        reimbursement,
+        totalIncome,
+        lateDeduction,
+        absentDeduction,
+        alphaDeduction,
+        unpaidLeaveDeduction,
+        bpjsDeduction,
+        taxDeduction,
+        otherDeduction,
+        totalDeduction,
+        netSalary,
+        presentDays,
+        alphaDays,
+        unpaidLeaveDays,
+        permissionDays,
+        sickDays,
+        deductibleAbsentDays,
+        totalLateMinutes,
+        workdaysInPeriod,
+      },
+      approvedItemsForPreview,
+    );
   }, [
     latestGenerated,
     selectedEmployeeCurrentPayroll,
     selectedEmployeeId,
     isAppealRevisionMode,
+    revisionAppealDetail,
     totalApprovedAdjustment,
     selectedEmployeeSummary,
     selectedBasicSalary,
@@ -1187,6 +1498,10 @@ function FinancePayroll({ isRevisionPage = false }) {
     manualOtherDeduction,
     reimbursementOverview,
     autoTaxDeduction,
+    autoLateDeductionPercentage,
+    autoAlphaDeductionPercentage,
+    periodMonth,
+    periodYear,
   ]);
 
   const approvedRevisionItems = useMemo(() => {
@@ -1197,6 +1512,79 @@ function FinancePayroll({ isRevisionPage = false }) {
       }),
     );
   }, [revisionAppealDetail]);
+
+  const approvedRevisionItemsWithTarget = useMemo(() => {
+    return approvedRevisionItems.map((item) => {
+      const targetComponent = findRevisionComponentDefinition(item);
+      return {
+        ...item,
+        target_key: targetComponent?.key || "",
+        target_label: targetComponent?.label || item.label || "Komponen Revisi",
+      };
+    });
+  }, [approvedRevisionItems]);
+
+  const originalPayrollPreview = useMemo(
+    () => mapPayrollRowToPreview(selectedEmployeeCurrentPayroll),
+    [selectedEmployeeCurrentPayroll],
+  );
+
+  const revisionTotalComparisons = useMemo(() => {
+    if (!isAppealRevisionMode || !originalPayrollPreview || !payrollPreview) {
+      return [];
+    }
+
+    return [
+      {
+        label: "Gaji Yang Diterima",
+        before: originalPayrollPreview.netSalary,
+        after: payrollPreview.netSalary,
+        highlight: true,
+      },
+      {
+        label: "Total Pendapatan",
+        before: originalPayrollPreview.totalIncome,
+        after: payrollPreview.totalIncome,
+      },
+      {
+        label: "Total Potongan",
+        before: originalPayrollPreview.totalDeduction,
+        after: payrollPreview.totalDeduction,
+      },
+    ].map((item) => ({
+      ...item,
+      difference: Number((Number(item.after || 0) - Number(item.before || 0)).toFixed(2)),
+    }));
+  }, [isAppealRevisionMode, originalPayrollPreview, payrollPreview]);
+
+  const revisionComponentComparisons = useMemo(() => {
+    if (!isAppealRevisionMode || !originalPayrollPreview || !payrollPreview) {
+      return [];
+    }
+
+    return revisionComponentDefinitions.map(({ label, key, group }) => {
+      const before = Number(originalPayrollPreview?.[key] || 0);
+      const after = Number(payrollPreview?.[key] || 0);
+      const approvedItem = approvedRevisionItemsWithTarget.find(
+        (item) => item.target_key === key,
+      );
+
+      return {
+        label,
+        group,
+        before,
+        after,
+        difference: Number((after - before).toFixed(2)),
+        approvedItem,
+        isApprovedRevision: Boolean(approvedItem),
+      };
+    });
+  }, [
+    isAppealRevisionMode,
+    originalPayrollPreview,
+    payrollPreview,
+    approvedRevisionItemsWithTarget,
+  ]);
 
   const isManualFieldDisabled = () => {
     return true;
@@ -1263,7 +1651,7 @@ function FinancePayroll({ isRevisionPage = false }) {
         setCurrentEmployeePayrollRows(refreshedRows || []);
         setLatestGenerated(null);
         setSuccessMessage(
-          "Slip revisi berhasil diperbarui (ID tetap) dan masuk ke rekap draft siap dikirim",
+          "Slip revisi berhasil diperbarui (ID tetap) dan masuk ke rekap draf siap dikirim",
         );
         navigate(
           `/app/payroll?month=${Number(periodMonth)}&year=${Number(periodYear)}`,
@@ -1303,7 +1691,7 @@ function FinancePayroll({ isRevisionPage = false }) {
     );
 
     if (!draftRows.length) {
-      setError("Tidak ada slip draft yang perlu dipublish");
+      setError("Tidak ada slip draf yang perlu dipublikasikan");
       return;
     }
 
@@ -1313,7 +1701,7 @@ function FinancePayroll({ isRevisionPage = false }) {
         draftRows.map((item) => financeApi.publishPayroll(item.id)),
       );
       setSuccessMessage(
-        "Semua slip bulan ini berhasil dipublish ke akun masing-masing pegawai",
+        "Semua slip bulan ini berhasil dipublikasikan ke akun masing-masing pegawai",
       );
 
       const refreshedRows = await financeApi.getPayrollList({
@@ -1329,24 +1717,21 @@ function FinancePayroll({ isRevisionPage = false }) {
   };
 
   const openPayrollPdf = async (payrollId) => {
-    const previewWindow = window.open("about:blank", "_blank");
-
     try {
       setError("");
       const blob = await financeApi.getPayrollPdfBlob(payrollId);
       const url = window.URL.createObjectURL(blob);
-      if (previewWindow) {
-        previewWindow.location.href = url;
-      } else {
-        window.open(url, "_blank");
-      }
-      setTimeout(() => window.URL.revokeObjectURL(url), 60_000);
+      setSelectedPayrollPdf({ url, title: "Slip Gaji" });
     } catch (err) {
-      if (previewWindow && !previewWindow.closed) {
-        previewWindow.close();
-      }
       setError(err.message);
     }
+  };
+
+  const closePayrollPdfModal = () => {
+    if (selectedPayrollPdf?.url) {
+      window.URL.revokeObjectURL(selectedPayrollPdf.url);
+    }
+    setSelectedPayrollPdf(null);
   };
 
   const handleViewRow = (row) => {
@@ -1371,20 +1756,26 @@ function FinancePayroll({ isRevisionPage = false }) {
 
   const handleDeleteRow = async (row) => {
     if (row.status !== "draft") {
-      setError("Hanya slip berstatus draft yang bisa dihapus");
+      setError("Hanya slip berstatus draf yang bisa dihapus");
       return;
     }
 
-    const confirmed = window.confirm(
-      `Hapus slip payroll ID ${row.id} untuk ${row.employee_name}?`,
-    );
+    const confirmed = await confirmPopup({
+      title: "Hapus Slip Payroll",
+      subtitle: "Slip draf akan dihapus dari rekap payroll",
+      badge: "Konfirmasi",
+      message: `Hapus slip payroll ID ${row.id} untuk ${row.employee_name}?`,
+      confirmLabel: "Hapus Slip",
+      cancelLabel: "Batal",
+      variant: "warning",
+    });
 
     if (!confirmed) return;
 
     try {
       setError("");
       await financeApi.deletePayroll(row.id);
-      setSuccessMessage("Slip draft berhasil dihapus");
+      setSuccessMessage("Slip draf berhasil dihapus");
 
       const updatedRows = monthlyPayrollRows.filter(
         (item) => item.id !== row.id,
@@ -1423,6 +1814,7 @@ function FinancePayroll({ isRevisionPage = false }) {
 
   return (
     <>
+      {popup}
       {(error || successMessage) && (
         <div className="mb-4">
           {error && (
@@ -1445,6 +1837,17 @@ function FinancePayroll({ isRevisionPage = false }) {
         <TitleCard
           title={isRevisionPage ? "Revisi Slip Gaji" : "Payroll"}
           topMargin="mt-0"
+          TopSideButtons={
+            isRevisionPage ? (
+              <button
+                type="button"
+                className="btn btn-sm btn-primary rounded-full "
+                onClick={() => navigate("/app/salary-appeals")}
+              >
+                Kembali
+              </button>
+            ) : null
+          }
         >
           <form onSubmit={handleGenerate} className="grid grid-cols-1 gap-4">
             {isAppealRevisionMode ? (
@@ -1615,6 +2018,206 @@ function FinancePayroll({ isRevisionPage = false }) {
                 </div>
               </div>
             )}
+
+            {isAppealRevisionMode && originalPayrollPreview && (
+              <div className="rounded-2xl border border-base-300 bg-base-100 shadow-sm overflow-hidden">
+                <div className="border-b border-base-300 bg-gradient-to-r from-primary/10 via-base-100 to-base-100 px-4 py-3">
+                  <div className="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
+                    <div>
+                      <p className="text-base font-semibold">
+                        Sebelum dan Sesudah Revisi
+                      </p>
+                      <p className="text-xs opacity-70">
+                        Perbandingan slip asal dengan hasil revisi banding gaji.
+                      </p>
+                    </div>
+                    <span className="rounded-full border border-base-300 bg-base-200 px-3 py-1 text-xs font-medium">
+                      Payroll {selectedEmployeeCurrentPayroll?.id || "-"}
+                    </span>
+                  </div>
+                </div>
+
+                <div className="p-4 space-y-4">
+                  <div className="rounded-2xl border border-primary/20 bg-primary/10 p-4">
+                    <div className="mb-3 flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
+                      <div>
+                        <p className="font-semibold">
+                          Komponen Disetujui untuk Direvisi
+                        </p>
+                        <p className="text-xs opacity-70">
+                          Pendapatan ditambah nominal disetujui, potongan dikurangi nominal disetujui.
+                        </p>
+                      </div>
+                      <span className="badge badge-primary badge-sm">
+                        {approvedRevisionItemsWithTarget.length} komponen
+                      </span>
+                    </div>
+
+                    <div className="grid gap-2 md:grid-cols-2">
+                      {approvedRevisionItemsWithTarget.map((item, index) => (
+                        <div
+                          key={`${item.target_label || item.label}-${index}`}
+                          className="rounded-xl border border-primary/20 bg-base-100 px-3 py-3"
+                        >
+                          <div className="flex items-start justify-between gap-3">
+                            <div>
+                              <p className="font-medium">
+                                {item.target_label || item.label || "Komponen Revisi"}
+                              </p>
+                              {item.label &&
+                                item.label !== item.target_label && (
+                                  <p className="mt-1 text-xs opacity-60">
+                                    Pengajuan: {item.label}
+                                  </p>
+                                )}
+                            </div>
+                            <span className="badge badge-primary badge-sm shrink-0">
+                              Direvisi
+                            </span>
+                          </div>
+                          <div className="mt-3 flex items-center justify-between gap-3 border-t border-base-300 pt-2 text-sm">
+                            <span className="opacity-70">
+                              Nominal penyesuaian
+                            </span>
+                            <span className="font-semibold tabular-nums text-right">
+                              {formatCurrency(item.payroll_value || 0)}
+                            </span>
+                          </div>
+                        </div>
+                      ))}
+
+                      {approvedRevisionItemsWithTarget.length === 0 && (
+                        <div className="rounded-xl border border-base-300 bg-base-100 px-3 py-3 text-sm opacity-70 md:col-span-2">
+                          Belum ada komponen yang disetujui HR untuk revisi.
+                        </div>
+                      )}
+                    </div>
+                  </div>
+
+                  <div className="grid gap-3 md:grid-cols-3">
+                    {revisionTotalComparisons.map((item) => (
+                      <div
+                        key={item.label}
+                        className={`rounded-2xl border p-4 ${
+                          item.highlight
+                            ? "border-primary/20 bg-primary/10"
+                            : "border-base-300 bg-base-200/60"
+                        }`}
+                      >
+                        <p className="text-[10px] uppercase tracking-[0.18em] opacity-50">
+                          {item.label}
+                        </p>
+                        <div className="mt-3 space-y-2 text-sm">
+                          <div className="flex items-center justify-between gap-3">
+                            <span className="opacity-70">Sebelum</span>
+                            <span className="font-semibold tabular-nums text-right">
+                              {formatCurrency(item.before)}
+                            </span>
+                          </div>
+                          <div className="flex items-center justify-between gap-3">
+                            <span className="opacity-70">Sesudah</span>
+                            <span className="font-bold tabular-nums text-right">
+                              {formatCurrency(item.after)}
+                            </span>
+                          </div>
+                          <div className="flex items-center justify-between gap-3 border-t border-base-300 pt-2">
+                            <span className="opacity-70">Selisih</span>
+                            <span
+                              className={`font-semibold tabular-nums text-right ${
+                                item.difference > 0
+                                  ? "text-success"
+                                  : item.difference < 0
+                                    ? "text-error"
+                                    : ""
+                              }`}
+                            >
+                              {formatCurrency(item.difference)}
+                            </span>
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+
+                  <div className="overflow-x-auto rounded-2xl border border-base-300">
+                    <table className="table table-zebra w-full text-sm">
+                      <thead>
+                        <tr>
+                          <th>Komponen</th>
+                          <th>Kategori</th>
+                          <th>Status Revisi</th>
+                          <th className="text-right">Sebelum Revisi</th>
+                          <th className="text-right">Sesudah Revisi</th>
+                          <th className="text-right">Selisih</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {revisionComponentComparisons.map((item) => (
+                          <tr
+                            key={`${item.group}-${item.label}`}
+                            className={
+                              item.isApprovedRevision
+                                ? "bg-primary/10"
+                                : item.difference !== 0
+                                  ? "bg-primary/5"
+                                  : ""
+                            }
+                          >
+                            <td className="font-medium">{item.label}</td>
+                            <td>
+                              <span
+                                className={`badge badge-sm ${
+                                  item.group === "Pendapatan"
+                                    ? "badge-success"
+                                    : "badge-error"
+                                }`}
+                              >
+                                {item.group}
+                              </span>
+                            </td>
+                            <td>
+                              {item.isApprovedRevision ? (
+                                <div className="flex flex-col gap-1">
+                                  <span className="badge badge-primary badge-sm w-fit">
+                                    Direvisi
+                                  </span>
+                                  <span className="text-xs opacity-70">
+                                    Penyesuaian:{" "}
+                                    {formatCurrency(
+                                      item.approvedItem?.payroll_value || 0,
+                                    )}
+                                  </span>
+                                </div>
+                              ) : (
+                                <span className="text-xs opacity-50">-</span>
+                              )}
+                            </td>
+                            <td className="text-right tabular-nums">
+                              {formatCurrency(item.before)}
+                            </td>
+                            <td className="text-right font-semibold tabular-nums">
+                              {formatCurrency(item.after)}
+                            </td>
+                            <td
+                              className={`text-right font-semibold tabular-nums ${
+                                item.difference > 0
+                                  ? "text-success"
+                                  : item.difference < 0
+                                    ? "text-error"
+                                    : ""
+                              }`}
+                            >
+                              {formatCurrency(item.difference)}
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              </div>
+            )}
+
             {selectedEmployeeSummary && (
               <div className="rounded-2xl border border-base-300 bg-base-100 shadow-sm overflow-hidden">
                 <div className="border-b border-base-300 bg-gradient-to-r from-primary/10 via-base-100 to-base-100 px-4 py-3">
@@ -2157,7 +2760,7 @@ function FinancePayroll({ isRevisionPage = false }) {
                 {employeeReferenceData.length}
               </span>
               <span className="badge badge-info">
-                Draft:{" "}
+                Draf:{" "}
                 {
                   monthlyPayrollRows.filter((item) => item.status === "draft")
                     .length
@@ -2277,7 +2880,7 @@ function FinancePayroll({ isRevisionPage = false }) {
               onClick={handlePublishAll}
               disabled={!hasDraftToPublish || loadingPublishAll}
             >
-              Publish Semua Slip Bulan Ini
+              Publikasikan Semua Slip Bulan Ini
             </button>
           </TitleCard>
         )}
@@ -2398,6 +3001,46 @@ function FinancePayroll({ isRevisionPage = false }) {
           </div>
         </TitleCard>
       )}
+
+      <input
+        type="checkbox"
+        id="finance-revision-payroll-pdf-modal"
+        className="modal-toggle"
+        checked={!!selectedPayrollPdf}
+        onChange={closePayrollPdfModal}
+      />
+      <div className="modal">
+        <div className="modal-box max-w-4xl">
+          <button
+            type="button"
+            className="btn btn-sm btn-circle absolute right-2 top-2"
+            onClick={closePayrollPdfModal}
+          >
+            x
+          </button>
+          <h3 className="font-semibold text-xl mb-4">
+            {selectedPayrollPdf?.title || "Slip Gaji"}
+          </h3>
+          <div className="w-full min-h-[420px] bg-base-200 rounded-lg overflow-hidden flex items-center justify-center">
+            {selectedPayrollPdf?.url ? (
+              <iframe
+                title="Slip Gaji PDF"
+                src={selectedPayrollPdf.url}
+                className="w-full h-[70vh] border-0"
+              />
+            ) : (
+              <p className="opacity-70">Tidak ada file slip gaji.</p>
+            )}
+          </div>
+        </div>
+        <label
+          className="modal-backdrop"
+          htmlFor="finance-revision-payroll-pdf-modal"
+          onClick={closePayrollPdfModal}
+        >
+          Close
+        </label>
+      </div>
     </>
   );
 }

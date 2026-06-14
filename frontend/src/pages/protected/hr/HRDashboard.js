@@ -63,6 +63,15 @@ const formatSanctionLabel = (value) => {
   return raw.replace(/[-_]+/g, " ");
 };
 
+const formatStatusLabel = (status) => {
+  const normalized = String(status || "").toLowerCase().trim();
+  if (normalized === "pending") return "Menunggu";
+  if (normalized === "approved") return "Disetujui";
+  if (normalized === "rejected") return "Ditolak";
+  if (normalized === "active") return "Aktif";
+  return status || "-";
+};
+
 const EmptyState = ({ message }) => (
   <div className="flex min-h-[130px] flex-col items-center justify-center rounded-2xl border border-dashed border-slate-200 dark:border-slate-700 bg-slate-50/70 dark:bg-slate-800/60 px-4 py-8 text-center">
     <div className="mb-3 flex h-11 w-11 items-center justify-center rounded-full bg-white dark:bg-slate-700 text-slate-400 dark:text-slate-300 shadow-sm">
@@ -262,7 +271,7 @@ function HRDashboard() {
       path: "/app/employees",
     },
     {
-      title: "Banding Gaji Pending",
+      title: "Banding Gaji Menunggu",
       value: salaryAppeals.stats?.pending || 0,
       icon: CheckCircleIcon,
       iconBox: "bg-emerald-50 text-emerald-600",
@@ -503,7 +512,7 @@ function HRDashboard() {
                       </td>
                       <td>
                         <span className="badge badge-success badge-sm rounded-full">
-                          active
+                          {formatStatusLabel("active")}
                         </span>
                       </td>
                     </tr>
@@ -518,7 +527,7 @@ function HRDashboard() {
         </DashboardSection>
         <div className="grid grid-cols-1 gap-6 xl:grid-cols-2">
           <DashboardSection
-            title="Permohonan Cuti/Izin Pending"
+            title="Permohonan Cuti/Izin Menunggu"
             subtitle="Daftar pengajuan cuti atau izin yang masih membutuhkan keputusan."
             icon={DocumentTextIcon}
             actionTo={
@@ -529,7 +538,7 @@ function HRDashboard() {
           >
             <div className="mb-4 flex flex-wrap gap-2 text-xs">
               <span className="rounded-full bg-amber-50 px-3 py-1 font-bold text-amber-700 dark:bg-amber-900/20 dark:text-amber-300">
-                Pending: {leaveManagement.stats?.pending || 0}
+                Menunggu: {leaveManagement.stats?.pending || 0}
               </span>
               <span className="rounded-full bg-emerald-50 px-3 py-1 font-bold text-emerald-700 dark:bg-emerald-900/20 dark:text-emerald-300">
                 Disetujui: {leaveManagement.stats?.approved || 0}
@@ -579,7 +588,7 @@ function HRDashboard() {
                           </td>
                           <td>
                             <span className="badge badge-warning badge-sm rounded-full">
-                              {item.status}
+                              {formatStatusLabel(item.status)}
                             </span>
                           </td>
                         </tr>
@@ -589,7 +598,7 @@ function HRDashboard() {
                 <SummaryPagination />
               </div>
             ) : (
-              <EmptyState message="Tidak ada permohonan cuti/izin pending" />
+              <EmptyState message="Tidak ada permohonan cuti/izin yang menunggu" />
             )}
           </DashboardSection>
 
@@ -643,7 +652,7 @@ function HRDashboard() {
                           </td>
                           <td>
                             <span className="badge badge-info badge-sm rounded-full dark:bg-slate-700 dark:text-slate-300">
-                              {item.status}
+                              {formatStatusLabel(item.status)}
                             </span>
                           </td>
                         </tr>
@@ -660,7 +669,7 @@ function HRDashboard() {
 
         <div className="grid grid-cols-1 gap-6 xl:grid-cols-2">
           <DashboardSection
-            title="Banding Gaji Pending Review"
+            title="Banding Gaji Menunggu Review"
             subtitle="Banding gaji yang masih perlu ditinjau dan diproses."
             icon={CheckCircleIcon}
             actionTo={
@@ -671,7 +680,7 @@ function HRDashboard() {
           >
             <div className="mb-4 flex flex-wrap gap-2 text-xs">
               <span className="rounded-full bg-amber-50 px-3 py-1 font-bold text-amber-700 dark:bg-amber-900/20 dark:text-amber-300">
-                Pending: {salaryAppeals.stats?.pending || 0}
+                Menunggu: {salaryAppeals.stats?.pending || 0}
               </span>
               <span className="rounded-full bg-emerald-50 px-3 py-1 font-bold text-emerald-700 dark:bg-emerald-900/20 dark:text-emerald-300">
                 Disetujui: {salaryAppeals.stats?.approved || 0}
@@ -713,7 +722,7 @@ function HRDashboard() {
                           </td>
                           <td>
                             <span className="badge badge-warning badge-sm rounded-full dark:bg-slate-700 dark:text-slate-300">
-                              {item.status}
+                              {formatStatusLabel(item.status)}
                             </span>
                           </td>
                         </tr>

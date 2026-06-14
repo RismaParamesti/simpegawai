@@ -263,7 +263,7 @@ function ApproveHRAllowance() {
       {/* ================== MODAL ================== */}
       {selected && (
         <div className="fixed inset-0 bg-black bg-opacity-40 flex justify-center items-center z-50">
-          <div className="bg-white p-6 rounded-xl w-[450px] max-h-[80vh] overflow-y-auto">
+          <div className="w-[calc(100vw-2rem)] max-w-[450px] max-h-[80vh] overflow-y-auto rounded-xl bg-white p-4 sm:p-6">
             <h3 className="font-bold text-lg mb-4">Detail Tunjangan</h3>
 
             <div className="space-y-2 text-sm mb-6">

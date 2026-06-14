@@ -8,12 +8,18 @@ function LeftSidebar() {
   const activeRole = localStorage.getItem("activeRole") || "";
   const routes = getSidebarByRole(activeRole);
   const isRouteActive = (route) => {
-    const paths = [route.path, ...(route.activePaths || [])].filter(Boolean);
-    if (route.exact) return location.pathname === route.path;
-    return paths.some(
+    const isActiveAlias = (route.activePaths || []).some(
       (path) =>
         location.pathname === path ||
-        location.pathname.startsWith(`${path}/`)
+        location.pathname.startsWith(`${path}/`),
+    );
+
+    if (isActiveAlias) return true;
+    if (route.exact) return location.pathname === route.path;
+
+    return (
+      location.pathname === route.path ||
+      location.pathname.startsWith(`${route.path}/`)
     );
   };
   const close = (e) => {

@@ -24,6 +24,7 @@ import { useDispatch } from "react-redux";
 import Pagination from "../../../components/Pagination/Pagination";
 import { setPageTitle } from "../../../features/common/headerSlice";
 import api from "../../../lib/api";
+import useAppPopup from "../../../hooks/useAppPopup";
 import CheckBadgeIcon from "@heroicons/react/24/outline/UserPlusIcon";
 import { getStatusLabel } from "../../../utils/statusLabels";
 import {
@@ -194,6 +195,7 @@ function isExternalLink(value) {
 }
 
 export default function HRRecruitmentProcessDetail() {
+  const { popup, alertPopup } = useAppPopup();
   // Untuk popup Tolak
   const [showRejectPopup, setShowRejectPopup] = useState(false);
   const [rejectNotes, setRejectNotes] = useState("");
@@ -342,7 +344,14 @@ export default function HRRecruitmentProcessDetail() {
       setActiveTab("screening");
       setView("list");
     } catch (err) {
-      alert("Gagal menyimpan perubahan status pelamar");
+      await alertPopup({
+        title: "Gagal Menyimpan",
+        subtitle: "Perubahan status pelamar belum tersimpan",
+        badge: "Error",
+        message: "Gagal menyimpan perubahan status pelamar",
+        confirmLabel: "Mengerti",
+        variant: "warning",
+      });
     }
   };
 
@@ -374,7 +383,14 @@ export default function HRRecruitmentProcessDetail() {
       setActiveTab("screening");
       setView("list");
     } catch (err) {
-      alert("Gagal menyimpan penolakan");
+      await alertPopup({
+        title: "Gagal Menyimpan",
+        subtitle: "Penolakan belum tersimpan",
+        badge: "Error",
+        message: "Gagal menyimpan penolakan",
+        confirmLabel: "Mengerti",
+        variant: "warning",
+      });
     }
   };
 
@@ -474,7 +490,14 @@ export default function HRRecruitmentProcessDetail() {
       setShowMassUpdatePopup(false);
       await fetchApplications();
     } catch (err) {
-      alert("Gagal update status massal");
+      await alertPopup({
+        title: "Gagal Update",
+        subtitle: "Status massal belum berhasil diperbarui",
+        badge: "Error",
+        message: "Gagal update status massal",
+        confirmLabel: "Mengerti",
+        variant: "warning",
+      });
     }
   };
 
@@ -886,6 +909,7 @@ export default function HRRecruitmentProcessDetail() {
 
   return (
     <>
+      {popup}
       {view === "list" && (
         <div className="mt-4 overflow-hidden rounded-[1.5rem] border border-slate-200/80 bg-white p-4 shadow-[0_20px_70px_rgba(15,23,42,0.07)] dark:border-slate-700 dark:bg-slate-950 dark:shadow-[0_20px_70px_rgba(2,6,23,0.45)] sm:p-7">
           <div className="space-y-6">
@@ -997,7 +1021,7 @@ export default function HRRecruitmentProcessDetail() {
                     {menu.find((item) => item.key === activeTab)?.label}
                   </h2>
                   <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
-                    Publish hasil screening untuk kandidat yang lolos dokumen dan lanjut ke tahap interview.
+                    Publikasikan hasil screening untuk kandidat yang lolos dokumen dan lanjut ke tahap interview.
                   </p>
                 </div>
 
@@ -1008,7 +1032,7 @@ export default function HRRecruitmentProcessDetail() {
                     onClick={() => setShowMassUpdatePopup(true)}
                   >
                     <ShieldCheck className="h-4 w-4" />
-                    Publish Hasil
+                    Publikasikan Hasil
                   </button>
                 )}
               </div>
@@ -1401,8 +1425,8 @@ export default function HRRecruitmentProcessDetail() {
         open={showMassUpdatePopup}
         onClose={() => setShowMassUpdatePopup(false)}
         onSubmit={handleMassUpdateSubmit}
-        title="Konfirmasi Publish Hasil"
-        submitLabel="Ya, Publish"
+        title="Konfirmasi Publikasi Hasil"
+        submitLabel="Ya, Publikasikan"
         submitButtonClassName={gradientBlueButtonClass}
       >
         <div className="space-y-4">
@@ -1412,16 +1436,16 @@ export default function HRRecruitmentProcessDetail() {
             </div>
             <div>
               <h4 className="text-base font-extrabold text-slate-900 dark:text-slate-50">
-                Publish hasil screening kandidat?
+                Publikasikan hasil screening kandidat?
               </h4>
               <p className="mt-2 text-sm leading-relaxed text-slate-600 dark:text-slate-300">
-                Semua kandidat pada tab Shortlisted akan dipublish hasilnya,
+                Semua kandidat pada tab Shortlisted akan dipublikasikan hasilnya,
                 termasuk kandidat yang ditolak dan kandidat yang lolos dokumen.
               </p>
             </div>
           </div>
           <div className="rounded-xl border border-slate-200 bg-slate-50 p-4 text-sm text-slate-600 dark:border-slate-700 dark:bg-slate-950/50 dark:text-slate-300">
-            Pastikan seluruh hasil screening sudah final sebelum mempublish.
+            Pastikan seluruh hasil screening sudah final sebelum dipublikasikan.
           </div>
         </div>
       </Modal>

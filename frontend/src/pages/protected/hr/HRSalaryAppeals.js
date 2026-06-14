@@ -9,6 +9,8 @@ import useTablePagination from '../../../hooks/useTablePagination'
 import { formatCurrencyInput, normalizeCurrencyInput } from '../../../components/Formatters/CurrencyFormatter'
 
 const formatCurrency = (value) => `Rp ${(parseFloat(value) || 0).toLocaleString('id-ID')}`
+const DEFAULT_WORKING_HOURS_PER_DAY = 8
+const DEFAULT_LATE_DEDUCTION_HOURLY_PERCENTAGE = 0.02
 
 const resolvePhotoUrl = (photoPath) => {
     if (!photoPath) return null
@@ -63,6 +65,190 @@ const isRejectedAppeal = (item = {}) => {
     return status === 'rejected' || status === 'ditolak'
 }
 
+const normalizeComponentText = (value) =>
+    String(value || '')
+        .toLowerCase()
+        .replace(/_/g, ' ')
+        .replace(/\s+/g, ' ')
+        .trim()
+
+const appealComponentGroups = [
+    {
+        group: 'Pendapatan',
+        keywords: [
+            'basic salary',
+            'salary',
+            'gaji pokok',
+            'transport allowance',
+            'transport',
+            'meal allowance',
+            'makan',
+            'health allowance',
+            'kesehatan',
+            'bonus',
+            'other allowance',
+            'position allowance',
+            'tunjangan',
+            'allowance',
+            'gross salary',
+            'gaji kotor',
+            'reimbursement',
+        ],
+    },
+    {
+        group: 'Potongan',
+        keywords: [
+            'late deduction',
+            'late',
+            'keterlambatan',
+            'alpha deduction',
+            'alpha',
+            'unpaid leave deduction',
+            'unpaid leave',
+            'cuti tidak dibayar',
+            'bpjs deduction',
+            'bpjs',
+            'tax deduction',
+            'tax',
+            'pajak',
+            'other deduction',
+            'potongan lain',
+            'deduction',
+            'potongan',
+        ],
+    },
+]
+
+const getAppealComponentGroup = (item = {}) => {
+    const text = normalizeComponentText(
+        [
+            item.appeal_reason_item,
+            item.appeal_reason_label,
+            item.component,
+        ].filter(Boolean).join(' '),
+    )
+
+    if (!text) return 'Penyesuaian'
+
+    const matched = appealComponentGroups.find((definition) =>
+        definition.keywords.some((keyword) => text.includes(normalizeComponentText(keyword))),
+    )
+
+    return matched?.group || 'Penyesuaian'
+}
+
+const getAdjustmentHelpText = (group) => {
+    if (group === 'Pendapatan') {
+        return 'Nominal perbaikan akan ditambahkan ke komponen pendapatan.'
+    }
+
+    if (group === 'Potongan') {
+        return 'Nominal perbaikan akan mengurangi komponen potongan.'
+    }
+
+    return 'Nominal perbaikan dipakai sebagai penyesuaian saat revisi payroll.'
+}
+
+const getAdjustmentExampleText = (group) => {
+    if (group === 'Pendapatan') {
+        return 'Contoh: pendapatan Rp3.000, input Rp2.000, hasil revisi Rp5.000.'
+    }
+
+    if (group === 'Potongan') {
+        return 'Contoh: potongan Rp3.000, input Rp2.000, sisa potongan Rp1.000.'
+    }
+
+    return 'Isi nominal koreksi yang disetujui HR untuk komponen ini.'
+}
+
+const getComponentGroupBadgeClass = (group) => {
+    if (group === 'Pendapatan') return 'badge-success'
+    if (group === 'Potongan') return 'badge-error'
+    return 'badge-info'
+}
+
+const getAppealComponentKey = (item = {}) => normalizeComponentText(item.appeal_reason_item || item.component || item.appeal_reason_label)
+
+const getCurrentComponentAmount = (componentKey, payroll = {}) => {
+    const amountMap = {
+        transport_allowance: payroll.transport_allowance,
+        meal_allowance: payroll.meal_allowance,
+        late_deduction: payroll.late_deduction,
+        absent_deduction: payroll.absent_deduction,
+        alpha_deduction: payroll.absent_deduction,
+        unpaid_leave_deduction: payroll.unpaid_leave_deduction || payroll.absent_deduction,
+    }
+
+    return Number(amountMap[componentKey] || 0)
+}
+
+const getRevisionUnitCalculator = (item = {}, payroll = {}) => {
+    const componentKey = getAppealComponentKey(item).replace(/\s+/g, '_')
+    const presentDays = Number(payroll.present_days || 0)
+    const basicSalary = Number(payroll.basic_salary || 0)
+    const dailySalary = basicSalary / 30
+    const lateHourlyRate = (dailySalary / DEFAULT_WORKING_HOURS_PER_DAY) * DEFAULT_LATE_DEDUCTION_HOURLY_PERCENTAGE
+    const currentAmount = getCurrentComponentAmount(componentKey, payroll)
+
+    if (componentKey === 'transport_allowance') {
+        return {
+            unit: 'hari',
+            quantityLabel: 'Jumlah hari transport yang dikoreksi',
+            rate: presentDays > 0 ? Number(payroll.transport_allowance || 0) / presentDays : 0,
+            currentAmount,
+            description: 'Tarif dihitung dari total tunjangan transport dibagi jumlah hari hadir pada slip.',
+        }
+    }
+
+    if (componentKey === 'meal_allowance') {
+        return {
+            unit: 'hari',
+            quantityLabel: 'Jumlah hari makan yang dikoreksi',
+            rate: presentDays > 0 ? Number(payroll.meal_allowance || 0) / presentDays : 0,
+            currentAmount,
+            description: 'Tarif dihitung dari total tunjangan makan dibagi jumlah hari hadir pada slip.',
+        }
+    }
+
+    if (
+        componentKey === 'absent_deduction' ||
+        componentKey === 'alpha_deduction' ||
+        componentKey === 'unpaid_leave_deduction'
+    ) {
+        return {
+            unit: 'hari',
+            quantityLabel: componentKey === 'unpaid_leave_deduction'
+                ? 'Jumlah hari cuti tidak dibayar yang dikoreksi'
+                : 'Jumlah hari alpha yang dikoreksi',
+            rate: dailySalary,
+            currentAmount,
+            description: 'Tarif dihitung dari gaji pokok dibagi 30 hari.',
+        }
+    }
+
+    if (componentKey === 'late_deduction') {
+        return {
+            unit: 'jam',
+            quantityLabel: 'Jumlah jam keterlambatan yang dikoreksi',
+            rate: lateHourlyRate,
+            currentAmount,
+            description: 'Tarif estimasi dihitung dari gaji harian dibagi 8 jam dikali persentase potongan telat.',
+        }
+    }
+
+    return null
+}
+
+const calculateAdjustmentFromUnit = (calculator, quantity) => {
+    const parsedQuantity = Number(quantity || 0)
+    const parsedRate = Number(calculator?.rate || 0)
+    if (!Number.isFinite(parsedQuantity) || parsedQuantity < 0 || !Number.isFinite(parsedRate)) {
+        return 0
+    }
+
+    return Math.round(parsedQuantity * parsedRate)
+}
+
 const buildEmployeeSearchOptions = (items) => {
     const map = new Map()
 
@@ -93,7 +279,7 @@ const buildEmployeeSearchOptions = (items) => {
 }
 
 const statusLabelMap = {
-    pending: 'Pending',
+    pending: 'Menunggu',
     approved: 'Disetujui',
     rejected: 'Ditolak',
     ditolak: 'Ditolak',
@@ -114,6 +300,7 @@ function HRSalaryAppeals() {
     const [processing, setProcessing] = useState(false)
     const [isReviewCardOpen, setIsReviewCardOpen] = useState(false)
     const [isHistoryCardOpen, setIsHistoryCardOpen] = useState(false)
+    const [selectedPayrollPdf, setSelectedPayrollPdf] = useState(null)
     const historyCardRef = useRef(null)
 
     const [filters, setFilters] = useState({
@@ -241,6 +428,7 @@ function HRSalaryAppeals() {
             reason: appealItem.reason,
             decision: type === 'reject' ? 'reject' : 'approve',
             adjustment_amount: '',
+            adjustment_quantity: '',
             rejection_note: '',
         }))
     }
@@ -349,19 +537,37 @@ function HRSalaryAppeals() {
         updateReviewItem(index, key, normalizeCurrencyInput(value))
     }
 
-    const openPayrollPdf = async (payrollId) => {
-        const previewWindow = window.open('about:blank', '_blank')
+    const updateReviewQuantityItem = (index, value) => {
+        const normalizedValue = String(value || '').replace(/[^0-9.,]/g, '').replace(',', '.')
 
+        setReviewItems((prev) => prev.map((item, itemIndex) => {
+            if (itemIndex !== index) return item
+
+            const calculator = getRevisionUnitCalculator(item, selectedItem)
+            const calculatedAmount = calculateAdjustmentFromUnit(calculator, normalizedValue)
+            return {
+                ...item,
+                adjustment_quantity: normalizedValue,
+                adjustment_amount: calculatedAmount ? String(calculatedAmount) : '',
+            }
+        }))
+    }
+
+    const openPayrollPdf = async (payrollId) => {
         try {
             const blob = await hrApi.getPayrollPdfBlob(payrollId)
             const url = window.URL.createObjectURL(blob)
-            if (previewWindow) previewWindow.location.href = url
-            else window.open(url, '_blank')
-            setTimeout(() => window.URL.revokeObjectURL(url), 60_000)
+            setSelectedPayrollPdf({ url, title: 'Slip Gaji' })
         } catch (err) {
-            if (previewWindow && !previewWindow.closed) previewWindow.close()
             dispatch(showNotification({ message: err.message, status: 0 }))
         }
+    }
+
+    const closePayrollPdfModal = () => {
+        if (selectedPayrollPdf?.url) {
+            window.URL.revokeObjectURL(selectedPayrollPdf.url)
+        }
+        setSelectedPayrollPdf(null)
     }
 
     const resetReviewFilters = () => {
@@ -410,7 +616,7 @@ function HRSalaryAppeals() {
                         onChange={(e) => onFilterChange('status', e.target.value)}
                     >
                         <option value="">Semua Status</option>
-                        {!isHistory && <option value="pending">Pending</option>}
+                        {!isHistory && <option value="pending">Menunggu</option>}
                         <option value="approved">Disetujui</option>
                         <option value="rejected">Ditolak</option>
                     </select>
@@ -683,20 +889,30 @@ function HRSalaryAppeals() {
                                                 <thead className="bg-slate-50 text-slate-500 dark:bg-slate-950 dark:text-slate-400">
                                                     <tr>
                                                         <th>Komponen Slip</th>
+                                                        <th>Jenis</th>
                                                         <th>Alasan</th>
                                                     </tr>
                                                 </thead>
                                                 <tbody>
                                                     {getAppealItems(selectedItem).length > 0 ? (
-                                                        getAppealItems(selectedItem).map((appealItem, index) => (
-                                                            <tr key={`${appealItem.appeal_reason_item || 'item'}-${index}`}>
-                                                                <td className="font-semibold">{appealItem.appeal_reason_label || appealItem.appeal_reason_item || '-'}</td>
-                                                                <td>{appealItem.reason || '-'}</td>
-                                                            </tr>
-                                                        ))
+                                                        getAppealItems(selectedItem).map((appealItem, index) => {
+                                                            const componentGroup = getAppealComponentGroup(appealItem)
+
+                                                            return (
+                                                                <tr key={`${appealItem.appeal_reason_item || 'item'}-${index}`}>
+                                                                    <td className="font-semibold">{appealItem.appeal_reason_label || appealItem.appeal_reason_item || '-'}</td>
+                                                                    <td>
+                                                                        <span className={`badge badge-sm ${getComponentGroupBadgeClass(componentGroup)}`}>
+                                                                            {componentGroup}
+                                                                        </span>
+                                                                    </td>
+                                                                    <td>{appealItem.reason || '-'}</td>
+                                                                </tr>
+                                                            )
+                                                        })
                                                     ) : (
                                                         <tr>
-                                                            <td colSpan={2} className="py-6 text-center text-slate-500">Tidak ada detail alasan</td>
+                                                            <td colSpan={3} className="py-6 text-center text-slate-500">Tidak ada detail alasan</td>
                                                         </tr>
                                                     )}
                                                 </tbody>
@@ -729,20 +945,35 @@ function HRSalaryAppeals() {
                                                             <thead className="bg-slate-50 text-slate-500 dark:bg-slate-950 dark:text-slate-400">
                                                                 <tr>
                                                                     <th>Komponen</th>
+                                                                    <th>Jenis</th>
                                                                     <th>Keputusan</th>
                                                                     <th>Jenis Catatan</th>
                                                                     <th>Detail</th>
+                                                                    <th>Efek Revisi</th>
                                                                 </tr>
                                                             </thead>
                                                             <tbody>
-                                                                {parseReviewNotes(selectedItem.review_notes).map((note, index) => (
-                                                                    <tr key={`review-note-${index}`}>
-                                                                        <td>{note.component || '-'}</td>
-                                                                        <td>{renderStatusBadge(note.decision === 'disetujui' ? 'approved' : 'rejected')}</td>
-                                                                        <td className="capitalize">{note.detailType || '-'}</td>
-                                                                        <td>{note.detailValue || '-'}</td>
-                                                                    </tr>
-                                                                ))}
+                                                                {parseReviewNotes(selectedItem.review_notes).map((note, index) => {
+                                                                    const componentGroup = getAppealComponentGroup(note)
+                                                                    const isApproved = note.decision === 'disetujui'
+
+                                                                    return (
+                                                                        <tr key={`review-note-${index}`}>
+                                                                            <td>{note.component || '-'}</td>
+                                                                            <td>
+                                                                                <span className={`badge badge-sm ${getComponentGroupBadgeClass(componentGroup)}`}>
+                                                                                    {componentGroup}
+                                                                                </span>
+                                                                            </td>
+                                                                            <td>{renderStatusBadge(isApproved ? 'approved' : 'rejected')}</td>
+                                                                            <td className="capitalize">{note.detailType || '-'}</td>
+                                                                            <td>{note.detailValue || '-'}</td>
+                                                                            <td className="text-xs text-slate-500 dark:text-slate-400">
+                                                                                {isApproved ? getAdjustmentHelpText(componentGroup) : '-'}
+                                                                            </td>
+                                                                        </tr>
+                                                                    )
+                                                                })}
                                                             </tbody>
                                                         </table>
                                                     </div>
@@ -757,12 +988,25 @@ function HRSalaryAppeals() {
                                 {actionType !== 'view' && (
                                     <div className="rounded-3xl border border-slate-200 bg-white p-5 dark:border-slate-700 dark:bg-slate-900">
                                         <h4 className="mb-4 font-extrabold text-slate-900 dark:text-slate-50">Keputusan HR</h4>
+                                        <div className="mb-4 rounded-2xl border border-blue-200 bg-blue-50 p-4 text-sm text-blue-800 dark:border-blue-900/50 dark:bg-blue-950/30 dark:text-blue-200">
+                                            <p className="font-bold">Aturan nominal perbaikan</p>
+                                            <p className="mt-1">
+                                                Untuk komponen pendapatan, nominal perbaikan akan ditambahkan. Untuk komponen potongan, nominal perbaikan akan mengurangi potongan.
+                                            </p>
+                                            <p className="mt-1 text-xs opacity-80">
+                                                Contoh potongan: Rp3.000 input Rp2.000 menjadi sisa potongan Rp1.000. Contoh pendapatan: Rp3.000 input Rp2.000 menjadi Rp5.000.
+                                            </p>
+                                            <p className="mt-1 text-xs opacity-80">
+                                                Untuk transport, makan, alpha, cuti tidak dibayar, dan keterlambatan, isi jumlah hari/jam yang dikoreksi agar nominal perbaikan dihitung otomatis.
+                                            </p>
+                                        </div>
                                         <div className="overflow-hidden rounded-2xl border border-slate-200 dark:border-slate-700">
                                             <div className="overflow-x-auto">
-                                                <table className="table table-sm min-w-[900px]">
+                                                <table className="table table-sm min-w-[1000px]">
                                                     <thead className="bg-slate-50 text-slate-500 dark:bg-slate-950 dark:text-slate-400">
                                                         <tr>
                                                             <th>Komponen</th>
+                                                            <th>Jenis</th>
                                                             <th>Alasan Pegawai</th>
                                                             <th>Keputusan HR</th>
                                                             <th>Nominal Perbaikan</th>
@@ -770,36 +1014,84 @@ function HRSalaryAppeals() {
                                                         </tr>
                                                     </thead>
                                                     <tbody>
-                                                        {reviewItems.map((item, index) => (
-                                                            <tr key={`${item.appeal_reason_item || 'review'}-${index}`}>
-                                                                <td className="font-semibold">{item.appeal_reason_label || item.appeal_reason_item || '-'}</td>
-                                                                <td>{item.reason || '-'}</td>
-                                                                <td>
-                                                                    <select className="select select-bordered select-sm rounded-xl" value={item.decision} onChange={(e) => updateReviewItem(index, 'decision', e.target.value)}>
-                                                                        <option value="approve">Setujui</option>
-                                                                        <option value="reject">Tolak</option>
-                                                                    </select>
-                                                                </td>
-                                                                <td>
-                                                                    {item.decision === 'approve' ? (
-                                                                        item.appeal_reason_item === AUTO_REIMBURSE_REASON_KEY ? (
-                                                                            <input className="input input-bordered input-sm w-full rounded-xl" value="Otomatis dari reimbursement disetujui" disabled />
+                                                        {reviewItems.map((item, index) => {
+                                                            const componentGroup = getAppealComponentGroup(item)
+                                                            const unitCalculator = getRevisionUnitCalculator(item, selectedItem)
+                                                            const calculatedAmount = calculateAdjustmentFromUnit(unitCalculator, item.adjustment_quantity)
+
+                                                            return (
+                                                                <tr key={`${item.appeal_reason_item || 'review'}-${index}`}>
+                                                                    <td className="font-semibold">{item.appeal_reason_label || item.appeal_reason_item || '-'}</td>
+                                                                    <td>
+                                                                        <div className="flex flex-col gap-1">
+                                                                            <span className={`badge badge-sm w-fit ${getComponentGroupBadgeClass(componentGroup)}`}>
+                                                                                {componentGroup}
+                                                                            </span>
+                                                                            <span className="max-w-[220px] text-xs leading-snug text-slate-500 dark:text-slate-400">
+                                                                                {getAdjustmentHelpText(componentGroup)}
+                                                                            </span>
+                                                                        </div>
+                                                                    </td>
+                                                                    <td>{item.reason || '-'}</td>
+                                                                    <td>
+                                                                        <select className="select select-bordered select-sm rounded-xl" value={item.decision} onChange={(e) => updateReviewItem(index, 'decision', e.target.value)}>
+                                                                            <option value="approve">Setujui</option>
+                                                                            <option value="reject">Tolak</option>
+                                                                        </select>
+                                                                    </td>
+                                                                    <td>
+                                                                        {item.decision === 'approve' ? (
+                                                                            item.appeal_reason_item === AUTO_REIMBURSE_REASON_KEY ? (
+                                                                                <input className="input input-bordered input-sm w-full rounded-xl" value="Otomatis dari reimbursement disetujui" disabled />
+                                                                            ) : (
+                                                                                <div className="space-y-1">
+                                                                                    {unitCalculator && (
+                                                                                        <div className="rounded-xl border border-blue-100 bg-blue-50 p-2 dark:border-blue-900/50 dark:bg-blue-950/30">
+                                                                                            <label className="text-xs font-semibold text-blue-800 dark:text-blue-200">
+                                                                                                {unitCalculator.quantityLabel}
+                                                                                            </label>
+                                                                                            <div className="mt-1 flex flex-col gap-2 sm:flex-row">
+                                                                                                <input
+                                                                                                    type="text"
+                                                                                                    inputMode="decimal"
+                                                                                                    className="input input-bordered input-sm w-full rounded-xl"
+                                                                                                    placeholder={`0 ${unitCalculator.unit}`}
+                                                                                                    value={item.adjustment_quantity || ''}
+                                                                                                    onChange={(e) => updateReviewQuantityItem(index, e.target.value)}
+                                                                                                />
+                                                                                                <div className="rounded-xl bg-white px-3 py-2 text-xs text-blue-800 dark:bg-slate-900 dark:text-blue-200 sm:min-w-[190px]">
+                                                                                                    <div>Tarif: {formatCurrency(unitCalculator.rate)} / {unitCalculator.unit}</div>
+                                                                                                    <div>Hasil: {formatCurrency(calculatedAmount)}</div>
+                                                                                                </div>
+                                                                                            </div>
+                                                                                            <p className="mt-1 text-xs leading-snug text-blue-700 dark:text-blue-200">
+                                                                                                {unitCalculator.description}
+                                                                                            </p>
+                                                                                            <p className="mt-1 text-xs leading-snug text-blue-700 dark:text-blue-200">
+                                                                                                Nominal hasil kalkulator otomatis mengisi nominal perbaikan.
+                                                                                            </p>
+                                                                                        </div>
+                                                                                    )}
+                                                                                    <input type="text" inputMode="numeric" className="input input-bordered input-sm w-full rounded-xl" placeholder="Rp" value={formatCurrencyInput(item.adjustment_amount)} onChange={(e) => updateReviewCurrencyItem(index, 'adjustment_amount', e.target.value)} />
+                                                                                    <p className="max-w-[260px] text-xs leading-snug text-slate-500 dark:text-slate-400">
+                                                                                        {getAdjustmentExampleText(componentGroup)}
+                                                                                    </p>
+                                                                                </div>
+                                                                            )
                                                                         ) : (
-                                                                            <input type="text" inputMode="numeric" className="input input-bordered input-sm w-full rounded-xl" placeholder="Rp" value={formatCurrencyInput(item.adjustment_amount)} onChange={(e) => updateReviewCurrencyItem(index, 'adjustment_amount', e.target.value)} />
-                                                                        )
-                                                                    ) : (
-                                                                        <span className="text-slate-400">-</span>
-                                                                    )}
-                                                                </td>
-                                                                <td>
-                                                                    {item.decision === 'reject' ? (
-                                                                        <textarea className="textarea textarea-bordered textarea-sm w-full rounded-xl" placeholder="Alasan penolakan" value={item.rejection_note} onChange={(e) => updateReviewItem(index, 'rejection_note', e.target.value)} />
-                                                                    ) : (
-                                                                        <span className="text-slate-400">-</span>
-                                                                    )}
-                                                                </td>
-                                                            </tr>
-                                                        ))}
+                                                                            <span className="text-slate-400">-</span>
+                                                                        )}
+                                                                    </td>
+                                                                    <td>
+                                                                        {item.decision === 'reject' ? (
+                                                                            <textarea className="textarea textarea-bordered textarea-sm w-full rounded-xl" placeholder="Alasan penolakan" value={item.rejection_note} onChange={(e) => updateReviewItem(index, 'rejection_note', e.target.value)} />
+                                                                        ) : (
+                                                                            <span className="text-slate-400">-</span>
+                                                                        )}
+                                                                    </td>
+                                                                </tr>
+                                                            )
+                                                        })}
                                                     </tbody>
                                                 </table>
                                             </div>
@@ -819,6 +1111,33 @@ function HRSalaryAppeals() {
                                 )}
                             </div>
                         </div>
+                    </div>
+                )}
+
+                {selectedPayrollPdf && (
+                    <div className="modal modal-open z-[60]">
+                        <div className="modal-box max-w-4xl">
+                            <button
+                                type="button"
+                                className="btn btn-sm btn-circle absolute right-2 top-2"
+                                onClick={closePayrollPdfModal}
+                            >
+                                x
+                            </button>
+                            <h3 className="mb-4 text-xl font-semibold">
+                                {selectedPayrollPdf.title || 'Slip Gaji'}
+                            </h3>
+                            <div className="flex min-h-[420px] w-full items-center justify-center overflow-hidden rounded-lg bg-base-200">
+                                <iframe
+                                    title="Slip Gaji PDF"
+                                    src={selectedPayrollPdf.url}
+                                    className="h-[70vh] w-full border-0"
+                                />
+                            </div>
+                        </div>
+                        <label className="modal-backdrop" onClick={closePayrollPdfModal}>
+                            Close
+                        </label>
                     </div>
                 )}
             </div>

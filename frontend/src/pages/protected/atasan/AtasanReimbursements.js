@@ -8,10 +8,10 @@ import { atasanApi } from '../../../features/atasan/api'
 
 const getStatusLabel = (status) => {
     const labels = {
-        pending: 'pending',
-        approved: 'approved',
-        included_in_payroll: 'included payroll',
-        rejected: 'rejected',
+        pending: 'Menunggu',
+        approved: 'Disetujui',
+        included_in_payroll: 'Masuk Payroll',
+        rejected: 'Ditolak',
     }
 
     return labels[status] || status

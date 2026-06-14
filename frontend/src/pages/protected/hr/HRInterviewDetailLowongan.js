@@ -187,7 +187,7 @@ export default function JobDetail() {
                   : job.status === "closed"
                     ? "Ditutup"
                     : job.status === "draft"
-                      ? "Draft"
+                      ? "Draf"
                       : job.status}
               </span>
             </div>

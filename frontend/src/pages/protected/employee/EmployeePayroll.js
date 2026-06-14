@@ -9,12 +9,17 @@ import Pagination from "../../../components/Pagination/Pagination";
 
 const getPayrollStatusLabel = (status) => {
   const normalizedStatus = String(status || "").toLowerCase();
+  const labels = {
+    draft: "Draf",
+    published: "Dipublikasikan",
+    claimed: "Diklaim",
+    transferred: "Sudah Ditransfer",
+    rejected: "Ditolak",
+    pending: "Menunggu",
+    approved: "Disetujui",
+  };
 
-  if (normalizedStatus === "transferred") {
-    return "telah dikirim ke rekening";
-  }
-
-  return normalizedStatus || "-";
+  return labels[normalizedStatus] || normalizedStatus || "-";
 };
 
 const PAYROLL_BADGE_CLASS = {

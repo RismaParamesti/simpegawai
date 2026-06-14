@@ -210,19 +210,19 @@ function FinanceReports() {
 
     switch (s) {
       case "draft":
-        return "Draft";
+        return "Draf";
       case "claimed":
-        return "Claimed";
+        return "Diklaim";
       case "submitted":
-        return "Submitted";
+        return "Menunggu";
       case "approved":
         return "Disetujui";
       case "published":
-        return "Published";
+        return "Dipublikasikan";
       case "transferred":
-        return "Transferred";
+        return "Sudah Ditransfer";
       case "done":
-        return "Done";
+        return "Selesai";
       case "rejected":
         return "Ditolak";
       default:

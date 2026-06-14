@@ -13,7 +13,41 @@ const HRHiredCandidateDetail = () => {
 
   const [candidate, setCandidate] = useState(null);
   const [invitationLetterFile, setInvitationLetterFile] = useState("");
+  const [selectedDocument, setSelectedDocument] = useState(null);
   const [loading, setLoading] = useState(true);
+
+  const getFileUrl = (filePath) => {
+    if (!filePath) return "";
+    if (filePath.startsWith("http")) return filePath;
+    return `http://localhost:5000/${filePath.replace(/^\//, "")}`;
+  };
+
+  const getFileType = (filePath) => {
+    const lowerPath = String(filePath || "").toLowerCase();
+    if (lowerPath.endsWith(".pdf")) return "pdf";
+    if (
+      lowerPath.endsWith(".jpg") ||
+      lowerPath.endsWith(".jpeg") ||
+      lowerPath.endsWith(".png") ||
+      lowerPath.endsWith(".webp")
+    ) {
+      return "image";
+    }
+    return "unknown";
+  };
+
+  const openDocumentModal = (filePath, title) => {
+    if (!filePath) return;
+    setSelectedDocument({
+      title,
+      url: getFileUrl(filePath),
+      type: getFileType(filePath),
+    });
+  };
+
+  const closeDocumentModal = () => {
+    setSelectedDocument(null);
+  };
 
   useEffect(() => {
     dispatch(setPageTitle({ title: "Detail Calon Pegawai" }));
@@ -236,12 +270,9 @@ const HRHiredCandidateDetail = () => {
             <button
               className="btn btn-outline btn-primary w-full sm:w-auto"
               disabled={!invitationLetterFile}
-              onClick={() => {
-                const url = invitationLetterFile.startsWith("http")
-                  ? invitationLetterFile
-                  : `http://localhost:5000/${invitationLetterFile.replace(/^\//, "")}`;
-                window.open(url, "_blank");
-              }}
+              onClick={() =>
+                openDocumentModal(invitationLetterFile, "Surat Undangan")
+              }
             >
               Cetak Surat
             </button>
@@ -261,6 +292,55 @@ const HRHiredCandidateDetail = () => {
           </button>
         </div>
       </div>
+
+      {selectedDocument && (
+        <div className="modal modal-open">
+          <div className="modal-box max-w-4xl">
+            <button
+              type="button"
+              className="btn btn-sm btn-circle absolute right-2 top-2"
+              onClick={closeDocumentModal}
+            >
+              x
+            </button>
+            <h3 className="font-semibold text-xl mb-4">
+              {selectedDocument.title || "Dokumen"}
+            </h3>
+            <div className="w-full min-h-[420px] bg-base-200 rounded-lg overflow-hidden flex items-center justify-center">
+              {selectedDocument.type === "image" ? (
+                <img
+                  src={selectedDocument.url}
+                  alt={selectedDocument.title || "Dokumen"}
+                  className="max-h-[70vh] w-auto object-contain"
+                />
+              ) : selectedDocument.type === "pdf" ? (
+                <iframe
+                  title={selectedDocument.title || "Dokumen PDF"}
+                  src={selectedDocument.url}
+                  className="w-full h-[70vh] border-0"
+                />
+              ) : (
+                <div className="text-center p-6">
+                  <p className="mb-2">
+                    Preview tidak tersedia untuk tipe file ini.
+                  </p>
+                  <a
+                    href={selectedDocument.url}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="btn btn-primary btn-sm"
+                  >
+                    Buka File
+                  </a>
+                </div>
+              )}
+            </div>
+          </div>
+          <label className="modal-backdrop" onClick={closeDocumentModal}>
+            Close
+          </label>
+        </div>
+      )}
     </TitleCard>
   );
 };

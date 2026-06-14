@@ -241,7 +241,7 @@ function HRLeaveRequests() {
                             onChange={(e) => handleFilterChange('status', e.target.value)}
                         >
                             <option value="">Semua Status</option>
-                            <option value="pending">Pending</option>
+                            <option value="pending">Menunggu</option>
                             <option value="approved">Disetujui</option>
                             <option value="rejected">Ditolak</option>
                         </select>

@@ -10,7 +10,7 @@ import useTablePagination from '../../../hooks/useTablePagination'
 import { formatCurrencyInput, normalizeCurrencyInput } from '../../../components/Formatters/CurrencyFormatter'
 
 const statusLabelMap = {
-    draft: 'Draft',
+    draft: 'Draf',
     submitted: 'Aktif untuk Payroll',
     approved: 'Aktif untuk Payroll',
     rejected: 'Nonaktif',
@@ -311,7 +311,7 @@ function AdminPayrollManagerAdjustments() {
                         onChange={(e) => setHistoryFilters((prev) => ({ ...prev, status: e.target.value }))}
                     >
                         <option value="">Semua Status</option>
-                        <option value="draft">Draft</option>
+                        <option value="draft">Draf</option>
                         <option value="submitted">Aktif untuk Payroll</option>
                         <option value="approved">Aktif untuk Payroll</option>
                         <option value="rejected">Nonaktif</option>

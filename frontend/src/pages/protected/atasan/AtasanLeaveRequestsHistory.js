@@ -273,8 +273,8 @@ function AtasanLeaveRequestsHistory() {
                         onChange={(e) => setHistoryFilters((prev) => ({ ...prev, status: e.target.value }))}
                     >
                         <option value="">Semua Status</option>
-                        <option value="approved">Approved</option>
-                        <option value="rejected">Rejected</option>
+                        <option value="approved">Disetujui</option>
+                        <option value="rejected">Ditolak</option>
                     </select>
                     <button
                         className="btn-secondary rounded-full"
