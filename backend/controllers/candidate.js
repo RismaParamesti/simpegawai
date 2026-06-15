@@ -83,7 +83,7 @@ router.get(
 );
 
 // ============================
-// GET INTERVIEW COMPLETED, DISQUALIFIED & APPLICATIONS CANCELED BY COMPANY (HR/Admin)
+// GET INTERVIEW COMPLETED, DISQUALIFIED & APPLICATIONS CANCELED BY COMPANY (HR)
 // ============================
 router.get(
   "/admin/interviews/history-combined",
@@ -120,7 +120,7 @@ router.get(
   }
 );
 // ============================
-// UPDATE INTERVIEW (HR/Admin)
+// UPDATE INTERVIEW (HR)
 // ============================
 router.put(
   "/admin/interviews/:id",
@@ -177,7 +177,7 @@ router.put(
   }
 );
 // ============================
-// GET LOLOS DOKUMEN + APLIKASI YANG PERNAH INTERVIEW CANCELED (HR/Admin)
+// GET LOLOS DOKUMEN + APLIKASI YANG PERNAH INTERVIEW CANCELED (HR)
 // ============================
 router.get(
   "/admin/interviews/canceled-applications",
@@ -218,7 +218,7 @@ router.get(
   },
 );
 // ============================
-// CANCEL ALL APPLICATIONS BY JOB (HR/Admin)
+// CANCEL ALL APPLICATIONS BY JOB (HR)
 // ============================
 router.put(
   "/admin/applications/cancel-by-job",
@@ -255,7 +255,7 @@ router.put(
 );
 
 // ============================
-// GET ALL INTERVIEWS (HR/Admin)
+// GET ALL INTERVIEWS (HR)
 // ============================
 // Jadwal aktif (scheduled/rescheduled)
 router.get(
@@ -753,7 +753,7 @@ router.get(
 
 
 // ============================
-// CANCEL INTERVIEW (HR/Admin)
+// CANCEL INTERVIEW (HR)
 // ============================
 router.put(
   "/admin/interviews/:id/cancel",
@@ -1568,7 +1568,7 @@ router.put(
 // ========================================
 
 // ============================
-// GET ALL APPLICATIONS (HR/Admin)
+// GET ALL APPLICATIONS (HR)
 // ============================
 router.get(
   "/admin/applications",
@@ -1673,7 +1673,7 @@ LEFT JOIN employees e ON a.reviewed_by = e.id
 );
 
 // ============================
-// UPDATE APPLICATION STATUS (HR/Admin)
+// UPDATE APPLICATION STATUS (HR)
 // ============================
 router.put(
   "/admin/applications/:id/status",
@@ -1803,7 +1803,7 @@ router.put(
 );
 
 // ============================
-// SCHEDULE INTERVIEW (HR/Admin)
+// SCHEDULE INTERVIEW (HR)
 // ============================
 router.post(
   "/admin/applications/:id/schedule-interview",
@@ -1900,7 +1900,7 @@ router.post(
 );
 
 // ============================
-// UPDATE INTERVIEW RESULT (HR/Admin)
+// UPDATE INTERVIEW RESULT (HR)
 // ============================
 router.put(
   "/admin/interviews/:id/result",
@@ -1939,7 +1939,7 @@ router.put(
 );
 
 // ============================
-// GET ALL CANDIDATES (HR/Admin)
+// GET ALL CANDIDATES (HR)
 // ============================
 router.get(
   "/admin/candidates",
@@ -1970,7 +1970,7 @@ router.get(
 );
 
 // ============================
-// GET SINGLE CANDIDATE (HR/Admin)
+// GET SINGLE CANDIDATE (HR)
 // ============================
 router.get(
   "/admin/candidates/:id",
@@ -2008,7 +2008,7 @@ router.get(
 );
 
 // ============================
-// CONVERT CANDIDATE TO EMPLOYEE (HR/Admin)
+// CONVERT CANDIDATE TO EMPLOYEE (HR)
 // ============================
 router.post(
   "/admin/candidates/:id/convert",

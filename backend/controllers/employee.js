@@ -602,12 +602,12 @@ router.delete(
 );
 
 // ============================
-// GET LEAVE QUOTA (Admin/HR/Pegawai)
+// GET LEAVE QUOTA (HR/Pegawai)
 // ============================
 router.get(
   "/:id/leave-quota",
   verifyToken,
-  verifyRole(["admin", "hr", "pegawai"]),
+  verifyRole(["hr", "pegawai"]),
   async (req, res) => {
     const { id } = req.params;
 
@@ -648,12 +648,12 @@ router.get(
 );
 
 // ============================
-// RESET LEAVE QUOTA (Admin/HR only)
+// RESET LEAVE QUOTA (HR only)
 // ============================
 router.put(
   "/:id/reset-quota",
   verifyToken,
-  verifyRole(["admin", "hr"]),
+  verifyRole(["hr"]),
   async (req, res) => {
     const { id } = req.params;
     const { annual_leave_quota } = req.body;
@@ -703,12 +703,12 @@ router.put(
 );
 
 // ============================
-// GET ALL POSITIONS (Finance/HR/Admin - for salary management)
+// GET ALL POSITIONS (Finance/HR - for salary management)
 // ============================
 router.get(
   "/positions/list/all",
   verifyToken,
-  verifyRole(["admin", "hr", "finance"]),
+  verifyRole(["hr", "finance"]),
   async (req, res) => {
     try {
       const [positions] = await db.promise().query(`
@@ -741,12 +741,12 @@ router.get(
 );
 
 // ============================
-// UPDATE POSITION SALARY (Finance/HR/Admin - for salary management)
+// UPDATE POSITION SALARY (Finance/HR - for salary management)
 // ============================
 router.put(
   "/positions/update/:id",
   verifyToken,
-  verifyRole(["admin", "hr", "finance"]),
+  verifyRole(["hr", "finance"]),
   async (req, res) => {
     const { id } = req.params;
     const { base_salary, position_allowance } = req.body;

@@ -165,7 +165,7 @@ router.get("/list/all", verifyToken, verifyRole(["admin", "hr", "finance"]), asy
 // ============================
 // UPDATE position salary/allowance
 // ============================
-router.put("/update/:id", verifyToken, verifyRole(["admin", "hr", "finance"]), async (req, res) => {
+router.put("/update/:id", verifyToken, verifyRole(["hr", "finance"]), async (req, res) => {
   try {
     const { id } = req.params;
     const { base_salary, position_allowance } = req.body;
@@ -258,9 +258,9 @@ router.get("/:id", verifyToken, verifyRole(["admin", "hr"]), async (req, res) =>
 });
 
 // ============================
-// POST create new position (admin/HR only)
+// POST create new position (HR, admin only)
 // ============================
-router.post("/", verifyToken, verifyRole(["admin", "hr"]), async (req, res) => {
+router.post("/", verifyToken, verifyRole(["admin","hr"]), async (req, res) => {
   try {
     const { department_id, name, level, base_salary, position_allowance, status } = req.body;
 

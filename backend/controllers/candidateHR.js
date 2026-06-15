@@ -84,7 +84,7 @@ const applicationsTableHasCoverLetterFile = async () => {
 };
 
 // ============================
-// GET INTERVIEW COMPLETED, DISQUALIFIED & APPLICATIONS CANCELED BY COMPANY (HR/Admin)
+// GET INTERVIEW COMPLETED, DISQUALIFIED & APPLICATIONS CANCELED BY COMPANY (HR)
 // ============================
 router.get(
   "/interviews/history-combined",
@@ -129,7 +129,7 @@ router.get(
 );
 
 // ============================
-// GET ALL INTERVIEWS (HR/Admin)
+// GET ALL INTERVIEWS (HR)
 // ============================
 // Jadwal aktif (scheduled/rescheduled)
 router.get(
@@ -165,7 +165,7 @@ router.get(
 );
 
 // ============================
-// GET ALL APPLICATIONS (HR/Admin)
+// GET ALL APPLICATIONS (HR)
 // ============================
 router.get(
   "/applications",
@@ -269,7 +269,7 @@ LEFT JOIN employees e ON a.reviewed_by = e.id
 );
 
 // ============================
-// UPDATE APPLICATION STATUS (HR/Admin)
+// UPDATE APPLICATION STATUS (HR)
 // ============================
 router.put(
   "/applications/:id/status",
@@ -399,7 +399,7 @@ router.put(
 );
 
 // ============================
-// SCHEDULE INTERVIEW (HR/Admin)
+// SCHEDULE INTERVIEW (HR)
 // ============================
 router.post(
   "/applications/:id/schedule-interview",
@@ -496,12 +496,12 @@ router.post(
 );
 
 // ============================
-// PUBLISH INTERVIEW RESULTS FOR A JOB OPENING (HR/Admin)
+// PUBLISH INTERVIEW RESULTS FOR A JOB OPENING (HR)
 // ============================
 router.post(
   "/job-openings/:id/publish-interviews",
   verifyToken,
-  verifyRole(["hr", "admin"]),
+  verifyRole(["hr"]),
   async (req, res) => {
     const connection = await db.promise().getConnection();
 
@@ -611,12 +611,12 @@ router.post(
 );
 
 // ============================
-// UPDATE INTERVIEW RESULT (HR/Admin)
+// UPDATE INTERVIEW RESULT (HR)
 // ============================
 router.put(
   "/interviews/:id/result",
   verifyToken,
-  verifyRole(["hr", "admin"]),
+  verifyRole(["hr"]),
   async (req, res) => {
     try {
       const { id } = req.params;
@@ -658,7 +658,7 @@ router.put(
 );
 
 // ============================
-// GET LOLOS DOKUMEN + APLIKASI YANG PERNAH INTERVIEW CANCELED (HR/Admin)
+// GET LOLOS DOKUMEN + APLIKASI YANG PERNAH INTERVIEW CANCELED (HR)
 // ============================
 router.get(
   "/interviews/canceled-applications",
