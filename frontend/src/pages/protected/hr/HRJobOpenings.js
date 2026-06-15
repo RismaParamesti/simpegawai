@@ -15,6 +15,7 @@ import {
 import { setPageTitle } from "../../../features/common/headerSlice";
 import jobService, { hrApi } from "../../../features/hr/api";
 import Pagination from "../../../components/Pagination/Pagination";
+import { formatDateOnly, toDateInputValue } from "../../../utils/dateUtils";
 
 const defaultJobOpening = {
   position_id: "",
@@ -311,6 +312,7 @@ export default function HRJobOpenings() {
         setForm((f) => ({
           ...f,
           ...mergedData,
+          deadline: toDateInputValue(mergedData.deadline),
           base_position:
             mergedData.base_position !== undefined ? mergedData.base_position : "",
           hiring_status:
@@ -334,6 +336,7 @@ export default function HRJobOpenings() {
         setForm((f) => ({
           ...f,
           ...data,
+          deadline: toDateInputValue(data.deadline),
           base_position:
             data.base_position !== undefined ? data.base_position : "",
           hiring_status:
@@ -518,9 +521,7 @@ export default function HRJobOpenings() {
       }
       if (filters.deadline) {
         if (!j.deadline) return false;
-        const dFilter = new Date(filters.deadline);
-        const jd = new Date(j.deadline);
-        if (isNaN(dFilter.getTime()) || jd < dFilter) return false;
+        if (toDateInputValue(j.deadline) < filters.deadline) return false;
       }
       return true;
     });
@@ -664,11 +665,7 @@ export default function HRJobOpenings() {
                 <div>
                   <p className="text-base-content/60">Deadline</p>
                   <p className="font-semibold">
-                    {detailData.deadline
-                      ? new Date(detailData.deadline).toLocaleDateString(
-                          "id-ID",
-                        )
-                      : "-"}
+                    {formatDateOnly(detailData.deadline)}
                   </p>
                 </div>
 
@@ -1225,7 +1222,7 @@ export default function HRJobOpenings() {
                 <input
                   type="date"
                   name="deadline"
-                  value={form.deadline ? form.deadline.substring(0, 10) : ""}
+                  value={toDateInputValue(form.deadline)}
                   onChange={handleChange}
                   className="input input-bordered w-full rounded-xl"
                 />
@@ -1524,16 +1521,7 @@ export default function HRJobOpenings() {
                             <td>
                               <span className="flex items-center gap-2">
                                 <CalendarDays className="h-4 w-4 text-base-content/50" />
-                                {j.deadline
-                                  ? new Date(j.deadline).toLocaleDateString(
-                                      "id-ID",
-                                      {
-                                        day: "numeric",
-                                        month: "long",
-                                        year: "numeric",
-                                      },
-                                    )
-                                  : "-"}
+                                {formatDateOnly(j.deadline)}
                               </span>
                             </td>
 
@@ -1731,16 +1719,7 @@ export default function HRJobOpenings() {
                             <td>
                               <span className="flex items-center gap-2">
                                 <CalendarDays className="h-4 w-4 text-base-content/50" />
-                                {j.deadline
-                                  ? new Date(j.deadline).toLocaleDateString(
-                                      "id-ID",
-                                      {
-                                        day: "numeric",
-                                        month: "long",
-                                        year: "numeric",
-                                      },
-                                    )
-                                  : "-"}
+                                {formatDateOnly(j.deadline)}
                               </span>
                             </td>
 

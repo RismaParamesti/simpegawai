@@ -1,5 +1,5 @@
 import Header from "./Header";
-import { Route, Routes } from "react-router-dom";
+import { Navigate, Route, Routes } from "react-router-dom";
 import { getRoutesByRole } from "../routes";
 import { Suspense, lazy } from "react";
 import SuspenseContent from "./SuspenseContent";
@@ -31,6 +31,8 @@ function PageContent() {
       >
         <Suspense fallback={<SuspenseContent />}>
           <Routes>
+            <Route index element={<Navigate to="/app/dashboard" replace />} />
+
             {routes.map((route, key) => {
               return (
                 <Route

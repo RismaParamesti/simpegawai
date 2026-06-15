@@ -5,15 +5,34 @@ import { setPageTitle } from "../../../features/common/headerSlice";
 import TitleCard from "../../../components/Cards/TitleCard";
 
 const configuredApiUrl = process.env.REACT_APP_API_URL;
-const configuredBaseUrl =
-  process.env.REACT_APP_BASE_URL || "http://localhost:5000";
+const appOrigin = typeof window !== "undefined" ? window.location.origin : "";
+const configuredBaseUrl = process.env.REACT_APP_BASE_URL || appOrigin;
 const normalizedApiRoot = (
-  configuredApiUrl || `${configuredBaseUrl}/api`
+  configuredApiUrl || (configuredBaseUrl ? `${configuredBaseUrl}/api` : "/api")
 ).replace(/\/$/, "");
 const API_BASE_URL = normalizedApiRoot.endsWith("/api")
   ? normalizedApiRoot
   : `${normalizedApiRoot}/api`;
 const DEPARTMENTS_ENDPOINT = `${API_BASE_URL}/departments`;
+
+const generateNextDepartmentCode = (departmentList = []) => {
+  const numericCodes = departmentList
+    .map((department) => String(department.code || "").trim())
+    .filter((code) => /^\d+$/.test(code));
+
+  const width = Math.max(2, ...numericCodes.map((code) => code.length));
+  const usedCodes = new Set(numericCodes);
+  let nextNumber =
+    numericCodes.reduce((max, code) => Math.max(max, Number(code)), 0) + 1;
+  let nextCode = String(nextNumber).padStart(width, "0");
+
+  while (usedCodes.has(nextCode)) {
+    nextNumber += 1;
+    nextCode = String(nextNumber).padStart(width, "0");
+  }
+
+  return nextCode;
+};
 
 const getErrorMessage = async (response, fallbackMessage) => {
   try {
@@ -137,7 +156,7 @@ function AdminDepartement() {
     setSelectedId(null);
 
     setForm({
-      code: "",
+      code: generateNextDepartmentCode(departments),
       name: "",
       description: "",
       status: "active",
@@ -458,9 +477,9 @@ function AdminDepartement() {
                     type="text"
                     name="code"
                     value={form.code}
-                    onChange={handleChange}
                     className="input input-bordered w-full"
-                    placeholder="Contoh: 01"
+                    placeholder="Otomatis"
+                    readOnly
                     required
                   />
                 </div>
@@ -482,20 +501,6 @@ function AdminDepartement() {
                     required
                   />
                 </div>
-              </div>
-
-              <div>
-                <label className="label">
-                  <span className="label-text font-medium">Deskripsi</span>
-                </label>
-
-                <textarea
-                  name="description"
-                  value={form.description}
-                  onChange={handleChange}
-                  className="textarea textarea-bordered w-full min-h-28"
-                  placeholder="Masukkan deskripsi departemen"
-                />
               </div>
 
               <div>
@@ -603,4 +608,3 @@ function AdminDepartement() {
 }
 
 export default AdminDepartement;
-

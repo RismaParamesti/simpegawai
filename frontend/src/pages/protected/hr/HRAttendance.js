@@ -6,6 +6,7 @@ import TitleCard from '../../../components/Cards/TitleCard'
 import Pagination from '../../../components/Pagination/Pagination'
 import { hrApi } from '../../../features/hr/api'
 import useTablePagination from '../../../hooks/useTablePagination'
+import { formatDateOnly } from '../../../utils/dateUtils'
 
 const normalizeAttendanceStatus = (value) => String(value || '').toLowerCase().trim()
 
@@ -284,7 +285,7 @@ function HRAttendance() {
                         <tbody>
                             {recordsPagination.paginatedItems.map((item) => (
                                 <tr key={item.id}>
-                                    <td>{new Date(item.date).toLocaleDateString('id-ID')}</td>
+                                    <td>{formatDateOnly(item.date)}</td>
                                     <td>
                                         <div className="font-semibold">{item.employee_name}</div>
                                         <div className="text-xs opacity-70">{item.employee_code}</div>

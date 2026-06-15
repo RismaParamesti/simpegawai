@@ -6,6 +6,7 @@ import TitleCard from "../components/Cards/TitleCard";
 import { NotificationManager } from "react-notifications";
 import axios from "axios";
 import ApplicationDetailModal from "./ApplicationsDetailModal";
+import { formatDateOnly, toDateInputValue } from "../utils/dateUtils";
 
 export default function CandidateRequestsPage() {
   const dispatch = useDispatch();
@@ -111,18 +112,8 @@ export default function CandidateRequestsPage() {
     }
 
     if (applyDateFilter) {
-      // compare only date portion (yyyy-mm-dd)
       result = result.filter((app) => {
-        try {
-          const d = app.submitted_at ? new Date(app.submitted_at) : null;
-          if (!d) return false;
-          const y = d.getFullYear();
-          const m = String(d.getMonth() + 1).padStart(2, "0");
-          const day = String(d.getDate()).padStart(2, "0");
-          return `${y}-${m}-${day}` === applyDateFilter;
-        } catch (e) {
-          return false;
-        }
+        return toDateInputValue(app.submitted_at) === applyDateFilter;
       });
     }
 
@@ -189,12 +180,7 @@ export default function CandidateRequestsPage() {
     }
   };
 
-  const formatDate = (date) =>
-    new Date(date).toLocaleDateString("id-ID", {
-      day: "numeric",
-      month: "short",
-      year: "numeric",
-    });
+  const formatDate = (date) => formatDateOnly(date);
 
   const statusOptions = [
     { value: "all", label: "Semua" },

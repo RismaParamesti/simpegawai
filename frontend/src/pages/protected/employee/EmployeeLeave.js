@@ -6,6 +6,7 @@ import { pegawaiApi } from "../../../features/pegawai/api";
 import Holidays from "date-holidays";
 import Pagination from "../../../components/Pagination/Pagination";
 import useAppPopup from "../../../hooks/useAppPopup";
+import { formatDateOnly, getTodayDateKey } from "../../../utils/dateUtils";
 
 const INITIAL_FORM = {
   leave_type: "",
@@ -69,13 +70,7 @@ const getLeaveStatusLabel = (status) => {
 };
 
 const formatDate = (value) => {
-  if (!value) return "-";
-  const date = new Date(value);
-  return date.toLocaleDateString("id-ID", {
-    day: "2-digit",
-    month: "long",
-    year: "numeric",
-  });
+  return formatDateOnly(value);
 };
 
 const formatDateTime = (value) => {
@@ -88,35 +83,6 @@ const formatDateTime = (value) => {
     hour: "2-digit",
     minute: "2-digit",
   });
-};
-
-const calculateRequestedDays = (startDate, endDate) => {
-  if (!startDate || !endDate) return 0;
-  const start = new Date(startDate);
-  const end = new Date(endDate);
-  if (
-    Number.isNaN(start.getTime()) ||
-    Number.isNaN(end.getTime()) ||
-    end < start
-  )
-    return 0;
-
-  const difference = end - start;
-  return Math.floor(difference / (1000 * 60 * 60 * 24)) + 1;
-};
-
-const addDaysToDateString = (dateString, daysToAdd) => {
-  if (!dateString || Number.isNaN(Number(daysToAdd))) return "";
-
-  const baseDate = new Date(`${dateString}T00:00:00`);
-  if (Number.isNaN(baseDate.getTime())) return "";
-
-  baseDate.setDate(baseDate.getDate() + Number(daysToAdd));
-
-  const yyyy = baseDate.getFullYear();
-  const mm = String(baseDate.getMonth() + 1).padStart(2, "0");
-  const dd = String(baseDate.getDate()).padStart(2, "0");
-  return `${yyyy}-${mm}-${dd}`;
 };
 
 const getMaxDaysForLeaveType = (leaveType, cutiKhususOptionKey) => {
@@ -145,11 +111,11 @@ const getAssetUrl = (filePath) => {
   if (/^https?:\/\//i.test(filePath)) return filePath;
 
   const configuredBaseUrl = process.env.REACT_APP_BASE_URL;
-  const fallbackBaseUrl = "http://localhost:5000";
+  const fallbackBaseUrl = typeof window !== "undefined" ? window.location.origin : "";
   const baseUrl = (configuredBaseUrl || fallbackBaseUrl).replace(/\/$/, "");
   const normalizedPath = String(filePath).replace(/^\/+/, "");
 
-  return `${baseUrl}/${normalizedPath}`;
+  return baseUrl ? `${baseUrl}/${normalizedPath}` : `/${normalizedPath}`;
 };
 
 const parseLocalDate = (dateValue) => {
@@ -203,6 +169,63 @@ const isPublicHoliday = (dateString) => {
   } catch (error) {
     return false;
   }
+};
+
+const isNonWorkingDay = (dateValue) => {
+  const date = parseLocalDate(dateValue);
+  if (!date || Number.isNaN(date.getTime())) return false;
+
+  const dayOfWeek = date.getDay();
+  return dayOfWeek === 0 || dayOfWeek === 6 || isPublicHoliday(date);
+};
+
+const calculateRequestedDays = (startDate, endDate) => {
+  if (!startDate || !endDate) return 0;
+
+  const current = parseLocalDate(startDate);
+  const end = parseLocalDate(endDate);
+  if (
+    !current ||
+    !end ||
+    Number.isNaN(current.getTime()) ||
+    Number.isNaN(end.getTime()) ||
+    end < current
+  ) {
+    return 0;
+  }
+
+  let totalDays = 0;
+  while (current <= end) {
+    if (!isNonWorkingDay(current)) {
+      totalDays += 1;
+    }
+    current.setDate(current.getDate() + 1);
+  }
+
+  return totalDays;
+};
+
+const addWorkingDaysToDateString = (dateString, workingDaysToAdd) => {
+  if (!dateString || Number.isNaN(Number(workingDaysToAdd))) return "";
+
+  const current = parseLocalDate(dateString);
+  if (!current || Number.isNaN(current.getTime())) return "";
+
+  const targetWorkingDays = Number(workingDaysToAdd);
+  if (targetWorkingDays <= 0) return formatLocalDateKey(current);
+
+  let countedDays = 0;
+  while (countedDays < targetWorkingDays) {
+    if (!isNonWorkingDay(current)) {
+      countedDays += 1;
+    }
+
+    if (countedDays < targetWorkingDays) {
+      current.setDate(current.getDate() + 1);
+    }
+  }
+
+  return formatLocalDateKey(current);
 };
 
 // Get holiday name from date-holidays library
@@ -380,7 +403,7 @@ function EmployeeLeave() {
     const maxDays = getEffectiveMaxDays(leaveType, cutiKhususOptionKey);
     if (!startDate || maxDays <= 0) return "";
 
-    return addDaysToDateString(startDate, maxDays - 1);
+    return addWorkingDaysToDateString(startDate, maxDays);
   };
 
   const normalizeLeaveDates = (draftForm) => {
@@ -409,7 +432,7 @@ function EmployeeLeave() {
     return nextForm;
   };
 
-  const todayDateKey = new Date().toISOString().split("T")[0];
+  const todayDateKey = getTodayDateKey();
 
   const isDateInRange = (startDate, endDate, currentDate) => {
     if (!startDate || !endDate || !currentDate) return false;
@@ -572,18 +595,6 @@ function EmployeeLeave() {
       return;
     }
 
-    // Cek hari libur dalam rentang tanggal
-    const weekendDays = getWeekendDaysInRange(form.start_date, effectiveEndDate);
-    if (weekendDays.length > 0) {
-      const weekendList = weekendDays
-        .map(w => `${w.dayName} (${w.displayDate})`)
-        .join(', ');
-      setError(
-        `Pengajuan cuti/izin tidak dapat dilakukan pada hari libur. Rentang tanggal Anda mencakup: ${weekendList}. Silakan pilih tanggal lain yang hanya hari kerja.`
-      );
-      return;
-    }
-
     const submittedForm = normalizeLeaveDates({
       ...form,
       end_date: effectiveEndDate,
@@ -592,6 +603,13 @@ function EmployeeLeave() {
       submittedForm.start_date,
       submittedForm.end_date,
     );
+
+    if (requestedDaysForSubmit <= 0) {
+      setError(
+        "Rentang tanggal pengajuan hanya berisi hari libur. Pilih minimal 1 hari kerja.",
+      );
+      return;
+    }
 
     // Client-side specific validations (use policy from backend when available)
     const policy = leavePolicy || null;
@@ -699,7 +717,10 @@ function EmployeeLeave() {
       return;
     }
 
-    if (new Date(submittedForm.end_date) < new Date(submittedForm.start_date)) {
+    if (
+      parseLocalDate(submittedForm.end_date) <
+      parseLocalDate(submittedForm.start_date)
+    ) {
       setError("Tanggal akhir tidak boleh lebih kecil dari tanggal mulai");
       return;
     }

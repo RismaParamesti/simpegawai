@@ -4,6 +4,7 @@ import { setPageTitle } from '../features/common/headerSlice'
 import TitleCard from '../components/Cards/TitleCard'
 import { NotificationManager } from 'react-notifications'
 import axios from 'axios'
+import { toDateInputValue } from '../utils/dateUtils'
 
 export default function CandidateProfilePage() {
 
@@ -49,9 +50,7 @@ export default function CandidateProfilePage() {
           phone: candidate.phone || '',
           gender: candidate.gender || '',
           birth_place: candidate.birth_place || '',
-          date_of_birth: candidate.date_of_birth
-            ? candidate.date_of_birth.split('T')[0]
-            : '',
+          date_of_birth: toDateInputValue(candidate.date_of_birth),
           marital_status: candidate.marital_status || '',
           nationality: candidate.nationality || 'Indonesian',
           address: candidate.address || '',

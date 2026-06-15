@@ -380,8 +380,27 @@ const isDirectorLevelPosition = (positionName = "") => {
 
 // Hapus duplikat deklarasi, gunakan fungsi di bagian atas file
 
+const parseLocalDateOnly = (dateValue) => {
+  if (!dateValue) return null;
+
+  if (dateValue instanceof Date) {
+    return new Date(
+      dateValue.getFullYear(),
+      dateValue.getMonth(),
+      dateValue.getDate(),
+    );
+  }
+
+  const dateOnlyMatch = String(dateValue).match(/^(\d{4}-\d{2}-\d{2})/);
+  if (!dateOnlyMatch) return null;
+  return new Date(`${dateOnlyMatch[1]}T00:00:00`);
+};
+
 const getHolidayInfo = (dateValue) => {
-  const result = holidayCalendar.isHoliday(new Date(dateValue));
+  const localDate = parseLocalDateOnly(dateValue);
+  if (!localDate || Number.isNaN(localDate.getTime())) return null;
+
+  const result = holidayCalendar.isHoliday(localDate);
   if (!result) return null;
   if (Array.isArray(result)) return result[0] || null;
   return result;
@@ -393,6 +412,14 @@ const isPublicHoliday = (dateValue) => {
 
 const getHolidayName = (dateValue) => {
   return getHolidayInfo(dateValue)?.name || "Tanggal merah";
+};
+
+const isNonWorkingDay = (dateValue) => {
+  const localDate = parseLocalDateOnly(dateValue);
+  if (!localDate || Number.isNaN(localDate.getTime())) return false;
+
+  const dayOfWeek = localDate.getDay();
+  return dayOfWeek === 0 || dayOfWeek === 6 || isPublicHoliday(localDate);
 };
 
 const mapLeaveTypeToAttendanceStatus = (leaveType) => {
@@ -479,10 +506,12 @@ const getEffectiveMaxLeaveDays = (policy, leaveType, cutiKhususOptionKey) => {
 };
 
 const calculateTotalLeaveDays = (startDate, endDate) => {
-  const startDateObj = new Date(startDate);
-  const endDateObj = new Date(endDate);
+  const startDateObj = parseLocalDateOnly(startDate);
+  const endDateObj = parseLocalDateOnly(endDate);
 
   if (
+    !startDateObj ||
+    !endDateObj ||
     Number.isNaN(startDateObj.getTime()) ||
     Number.isNaN(endDateObj.getTime()) ||
     endDateObj < startDateObj
@@ -490,8 +519,16 @@ const calculateTotalLeaveDays = (startDate, endDate) => {
     return -1;
   }
 
-  const diffTime = endDateObj.getTime() - startDateObj.getTime();
-  return Math.floor(diffTime / (1000 * 60 * 60 * 24)) + 1;
+  let totalDays = 0;
+  const currentDate = new Date(startDateObj);
+  while (currentDate <= endDateObj) {
+    if (!isNonWorkingDay(currentDate)) {
+      totalDays += 1;
+    }
+    currentDate.setDate(currentDate.getDate() + 1);
+  }
+
+  return totalDays;
 };
 
 const isQuotaDeductingLeaveType = (leaveType) =>
@@ -548,8 +585,8 @@ const getEmployeeCreatedDateOnly = async (employeeId) => {
 };
 
 const applyApprovedLeaveEffects = async (leaveRequest) => {
-  const startDate = new Date(leaveRequest.start_date);
-  const endDate = new Date(leaveRequest.end_date);
+  const startDate = parseLocalDateOnly(leaveRequest.start_date);
+  const endDate = parseLocalDateOnly(leaveRequest.end_date);
   const attendanceStatus =
     leaveRequest.attendance_status ||
     mapLeaveTypeToAttendanceStatus(leaveRequest.leave_type);
@@ -575,6 +612,10 @@ const applyApprovedLeaveEffects = async (leaveRequest) => {
     date <= endDate;
     date.setDate(date.getDate() + 1)
   ) {
+    if (isNonWorkingDay(date)) {
+      continue;
+    }
+
     const dateStr = formatDateOnly(date);
     // Persist leave_request_id when available so attendance rows
     // can be traced back to the originating leave request.
@@ -2783,7 +2824,7 @@ router.post(
       const remainingQuota = Number(
         quotaSummary.calculated_remaining_leave_quota || 0,
       );
-      const startDateObj = new Date(start_date);
+      const startDateObj = parseLocalDateOnly(start_date);
       if (Number.isNaN(startDateObj.getTime())) {
         return res.status(400).json({
           message: "Format tanggal mulai tidak valid.",

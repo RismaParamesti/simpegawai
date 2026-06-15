@@ -46,7 +46,7 @@ function Register() {
       .then((res) => {
         localStorage.setItem("token", res.data.token);
         setLoading(false);
-        window.location.href = "/app/welcome";
+        window.location.href = "/login?role=kandidat";
       })
       .catch((err) => {
         let msg = "Registrasi gagal";

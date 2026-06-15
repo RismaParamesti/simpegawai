@@ -6,6 +6,7 @@ import { useParams, useNavigate } from "react-router-dom";
 import TitleCard from "../../../components/Cards/TitleCard";
 import logo1 from "../../../assets/logo1.svg";
 import html2pdf from "html2pdf.js";
+import { formatDateOnly } from "../../../utils/dateUtils";
 
 // Ambil nama user dari localStorage (atau ganti sesuai sumber user login di app Anda)
 const getUserName = () => {
@@ -68,29 +69,7 @@ const HRHiredCandidateDetailModal = () => {
     });
   };
   const formatTanggalIndo = (dateString) => {
-    if (!dateString) return "-";
-
-    const bulanIndo = [
-      "Januari",
-      "Februari",
-      "Maret",
-      "April",
-      "Mei",
-      "Juni",
-      "Juli",
-      "Agustus",
-      "September",
-      "Oktober",
-      "November",
-      "Desember",
-    ];
-
-    const date = new Date(dateString);
-    const hari = date.getDate();
-    const bulan = bulanIndo[date.getMonth()];
-    const tahun = date.getFullYear();
-
-    return `${hari} ${bulan} ${tahun}`;
+    return formatDateOnly(dateString);
   };
   const getGreeting = () => {
     const hour = new Date().getHours();

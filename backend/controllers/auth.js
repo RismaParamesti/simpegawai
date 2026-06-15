@@ -30,6 +30,22 @@ const getPhotoPathFromRequest = (req) => {
     return req.body?.photo;
 };
 
+const validateIdentityNumbers = ({ nik, npwp, bpjs_number }) => {
+    if (nik && !/^\d{16}$/.test(String(nik))) {
+        return "NIK harus 16 angka";
+    }
+
+    if (npwp && !/^\d{16}$/.test(String(npwp))) {
+        return "NPWP harus 16 angka";
+    }
+
+    if (bpjs_number && !/^\d{11,13}$/.test(String(bpjs_number))) {
+        return "BPJS harus minimal 11 dan maksimal 13 angka";
+    }
+
+    return "";
+};
+
 const normalizeRoleSet = (roles = []) => {
     const hierarchicalRoles = [
         "admin",
@@ -54,8 +70,15 @@ const normalizeRoleSet = (roles = []) => {
 const applyPositionBasedRoles = (roles = [], position = null) => {
     const rolesSet = normalizeRoleSet(roles);
     const positionLevel = String(position?.level || "").toLowerCase().trim();
+    const positionName = String(position?.name || "").toLowerCase().trim();
 
-    if (positionLevel === "manager") {
+    if (
+        positionLevel === "manager" ||
+        positionLevel === "director" ||
+        positionLevel === "direktur" ||
+        positionName.includes("director") ||
+        positionName.includes("direktur")
+    ) {
         rolesSet.add("atasan");
         rolesSet.add("pegawai");
     }
@@ -133,6 +156,11 @@ router.post(
                 message:
                     "position_id and join_date are required for employee data",
             });
+        }
+
+        const identityError = validateIdentityNumbers({ nik, npwp, bpjs_number });
+        if (identityError) {
+            return res.status(400).json({ message: identityError });
         }
 
         // Validasi role hanya untuk role pegawai (bukan kandidat)
@@ -232,7 +260,7 @@ router.post(
             // Validasi position_id exists
             const [positionCheck] = await db
                 .promise()
-                .query("SELECT id, level, base_salary FROM positions WHERE id = ?", [
+                .query("SELECT id, name, level, base_salary FROM positions WHERE id = ?", [
                     position_id,
                 ]);
 
@@ -857,7 +885,7 @@ router.put(
                     );
             }
 
-            if (Array.isArray(roles) && roles.length > 0) {
+            if (Array.isArray(roles)) {
                 const validRoles = [
                     "admin",
                     "atasan",
@@ -868,27 +896,15 @@ router.put(
                     "director",
                     "kandidat",
                 ];
-                const rolesFiltered = roles.filter((role) => validRoles.includes(role));
-
-                const [employeePositionRows] = await db.promise().query(
-                    `SELECT p.level
-                     FROM employees e
-                     LEFT JOIN positions p ON e.position_id = p.id
-                     WHERE e.user_id = ? AND e.deleted_at IS NULL
-                     LIMIT 1`,
-                    [userId],
-                );
-
-                const finalRoles = applyPositionBasedRoles(
-                    rolesFiltered,
-                    employeePositionRows[0],
+                const rolesFiltered = Array.from(
+                    new Set(roles.filter((role) => validRoles.includes(role))),
                 );
 
                 await db
                     .promise()
                     .query("DELETE FROM user_roles WHERE user_id = ?", [userId]);
 
-                for (const roleName of finalRoles) {
+                for (const roleName of rolesFiltered) {
                     const [roleRows] = await db
                         .promise()
                         .query("SELECT id FROM roles WHERE name = ?", [roleName]);

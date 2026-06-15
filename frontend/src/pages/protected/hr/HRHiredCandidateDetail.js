@@ -5,6 +5,7 @@ import axios from "axios";
 import { useParams, useNavigate } from "react-router-dom";
 import TitleCard from "../../../components/Cards/TitleCard";
 import { formatInterviewAssessmentNotes } from "../../../utils/interviewAssessmentNotes";
+import { formatDateOnly } from "../../../utils/dateUtils";
 
 const HRHiredCandidateDetail = () => {
   const dispatch = useDispatch();
@@ -161,16 +162,7 @@ const HRHiredCandidateDetail = () => {
             <div className="grid grid-cols-3">
               <p className="text-gray-500">Tanggal Interview</p>
               <p className="col-span-2">
-                {candidate.scheduled_date
-                  ? new Date(candidate.scheduled_date).toLocaleDateString(
-                      "id-ID",
-                      {
-                        year: "numeric",
-                        month: "long",
-                        day: "numeric",
-                      },
-                    )
-                  : "-"}
+                {formatDateOnly(candidate.scheduled_date)}
               </p>
             </div>
             <div className="grid grid-cols-3">

@@ -7,6 +7,7 @@ import {
 import TitleCard from "../../../components/Cards/TitleCard";
 import Pagination from "../../../components/Pagination/Pagination";
 import { atasanApi } from "../../../features/atasan/api";
+import { formatDateOnly } from "../../../utils/dateUtils";
 
 function AtasanAttendance() {
   const dispatch = useDispatch();
@@ -402,7 +403,7 @@ function AtasanAttendance() {
                       className="cursor-pointer hover:bg-base-300/60"
                       onClick={() => openEditRow(item)}
                     >
-                      <td>{new Date(item.date).toLocaleDateString("id-ID")}</td>
+                      <td>{formatDateOnly(item.date)}</td>
                       <td>
                         <div className="font-semibold">
                           {item.employee_name}

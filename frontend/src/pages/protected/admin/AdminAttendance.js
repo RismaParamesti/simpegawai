@@ -7,6 +7,7 @@ import Pagination from '../../../components/Pagination/Pagination'
 import { adminApi } from '../../../features/admin/api'
 import { getHolidaysInMonth } from '../../../utils/attendanceUtils'
 import useTablePagination from '../../../hooks/useTablePagination'
+import { formatDateOnly } from '../../../utils/dateUtils'
 
 function AdminAttendance() {
     const dispatch = useDispatch()
@@ -276,7 +277,7 @@ function AdminAttendance() {
                         <tbody>
                             {recordsPagination.paginatedItems.map((item) => (
                                 <tr key={item.id}>
-                                    <td>{new Date(item.date).toLocaleDateString('id-ID')}</td>
+                                    <td>{formatDateOnly(item.date)}</td>
                                     <td>
                                         <div className="font-semibold">{item.employee_name}</div>
                                         <div className="text-xs opacity-70">{item.employee_code}</div>

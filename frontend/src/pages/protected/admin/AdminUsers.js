@@ -7,10 +7,13 @@ import Pagination from "../../../components/Pagination/Pagination";
 import { adminApi } from "../../../features/admin/api";
 import useTablePagination from "../../../hooks/useTablePagination";
 import useAppPopup from "../../../hooks/useAppPopup";
+import { toDateInputValue } from "../../../utils/dateUtils";
 
 const API_ORIGIN = (process.env.REACT_APP_BASE_URL || "")
   .replace(/\/api\/?$/, "")
   .replace(/\/$/, "");
+const APP_ORIGIN = typeof window !== "undefined" ? window.location.origin : "";
+const ASSET_ORIGIN = API_ORIGIN || APP_ORIGIN;
 
 const getDisplayValue = (value) => {
   if (value === null || value === undefined || value === "") return "-";
@@ -28,8 +31,8 @@ const getAssetUrl = (pathValue) => {
   const normalizedPath = String(pathValue).startsWith("/")
     ? String(pathValue)
     : `/${pathValue}`;
-  if (API_ORIGIN) return `${API_ORIGIN}${normalizedPath}`;
-  return `http://localhost:5000${normalizedPath}`;
+  if (ASSET_ORIGIN) return `${ASSET_ORIGIN}${normalizedPath}`;
+  return normalizedPath;
 };
 
 const getDocumentFileType = (pathValue) => {
@@ -52,46 +55,6 @@ const formatRupiah = (value) =>
 
 const normalizeText = (value = "") =>
   String(value).toLowerCase().replace(/\s+/g, " ").trim();
-
-const isManagerLevelPosition = (position) =>
-  normalizeText(position?.level) === "manager";
-
-const getRawAutoRolesForEdit = (formState, allPositions) => {
-  const autoRoles = new Set(["pegawai"]);
-  const normalizedDepartment = normalizeText(formState.department_name);
-
-  if (normalizedDepartment.includes("management")) {
-    autoRoles.add("admin");
-  }
-  if (normalizedDepartment.startsWith("hr")) {
-    autoRoles.add("hr");
-  }
-  if (normalizedDepartment.includes("finance")) {
-    autoRoles.add("finance");
-  }
-
-  const selectedPosition = allPositions.find(
-    (position) => String(position.id) === String(formState.position_id),
-  );
-  const normalizedPosition = normalizeText(selectedPosition?.name);
-  if (isManagerLevelPosition(selectedPosition)) {
-    autoRoles.add("atasan");
-  }
-  if (
-    normalizedPosition === "hr&ga manager" ||
-    normalizedPosition === "hr & ga manager"
-  ) {
-    autoRoles.add("hr");
-  }
-
-  return Array.from(autoRoles);
-};
-
-const getEffectiveAutoRolesForEdit = (formState, allPositions) => {
-  const rawAutoRoles = getRawAutoRolesForEdit(formState, allPositions);
-  const excludedAutoRoles = formState.excluded_auto_roles || [];
-  return rawAutoRoles.filter((role) => !excludedAutoRoles.includes(role));
-};
 
 function AdminUsers() {
   const dispatch = useDispatch();
@@ -298,68 +261,19 @@ function AdminUsers() {
     }
   }, [location.search]);
 
-  const applyAutoRolesForEdit = (nextFormState, previousFormState) => {
-    const prevState = previousFormState || nextFormState;
-    const prevAutoRoles = getEffectiveAutoRolesForEdit(prevState, positions);
-
-    const rawNextAutoRoles = getRawAutoRolesForEdit(nextFormState, positions);
-    const nextExcludedAutoRoles = (
-      nextFormState.excluded_auto_roles || []
-    ).filter((role) => rawNextAutoRoles.includes(role));
-    const nextAutoRoles = rawNextAutoRoles.filter(
-      (role) => !nextExcludedAutoRoles.includes(role),
-    );
-
-    const existingRoles = nextFormState.roles || prevState.roles || [];
-    const manualRoles = existingRoles.filter(
-      (role) => !prevAutoRoles.includes(role),
-    );
-
-    return {
-      ...nextFormState,
-      excluded_auto_roles: nextExcludedAutoRoles,
-      roles: Array.from(new Set([...manualRoles, ...nextAutoRoles])),
-    };
-  };
-
   const toggleRole = (roleName) => {
     setEditingUser((prev) => {
       if (!prev) return prev;
 
-      const rawCurrentAutoRoles = getRawAutoRolesForEdit(prev, positions);
-      const currentAutoRoles = getEffectiveAutoRolesForEdit(prev, positions);
-      const manualRoles = (prev.roles || []).filter(
-        (role) => !currentAutoRoles.includes(role),
-      );
+      const currentRoles = prev.roles || [];
+      const nextRoles = currentRoles.includes(roleName)
+        ? currentRoles.filter((role) => role !== roleName)
+        : [...currentRoles, roleName];
 
-      const exists = manualRoles.includes(roleName);
-      let updatedRoles = exists
-        ? manualRoles.filter((role) => role !== roleName)
-        : [...manualRoles, roleName];
-
-      let nextExcludedAutoRoles = [...(prev.excluded_auto_roles || [])];
-      if (rawCurrentAutoRoles.includes(roleName)) {
-        const currentlyChecked = (prev.roles || []).includes(roleName);
-        if (currentlyChecked) {
-          updatedRoles = updatedRoles.filter((role) => role !== roleName);
-          nextExcludedAutoRoles = Array.from(
-            new Set([...nextExcludedAutoRoles, roleName]),
-          );
-        } else {
-          nextExcludedAutoRoles = nextExcludedAutoRoles.filter(
-            (role) => role !== roleName,
-          );
-        }
-      }
-
-      return applyAutoRolesForEdit(
-        {
-          ...prev,
-          roles: updatedRoles,
-          excluded_auto_roles: nextExcludedAutoRoles,
-        },
-        prev,
-      );
+      return {
+        ...prev,
+        roles: nextRoles,
+      };
     });
   };
 
@@ -369,12 +283,14 @@ function AdminUsers() {
       ...user,
       photo: user.photo || employee?.photo || "",
       roles: user.roles || [],
-      excluded_auto_roles: [],
       employee_id: employee?.id || null,
       department_name: employee?.department_name || "",
       position_id: employee?.position_id ? String(employee.position_id) : "",
+      original_position_id: employee?.position_id
+        ? String(employee.position_id)
+        : "",
     };
-    setEditingUser(applyAutoRolesForEdit(initialEditState, initialEditState));
+    setEditingUser(initialEditState);
   };
 
   const openViewUser = async (user) => {
@@ -443,7 +359,12 @@ function AdminUsers() {
         roles: editingUser.roles,
       });
 
-      if (editingUser.employee_id && editingUser.position_id) {
+      if (
+        editingUser.employee_id &&
+        editingUser.position_id &&
+        String(editingUser.position_id) !==
+          String(editingUser.original_position_id || "")
+      ) {
         await adminApi.updateEmployee(editingUser.employee_id, {
           position_id: Number(editingUser.position_id),
         });
@@ -717,14 +638,11 @@ function AdminUsers() {
                     onChange={(e) => {
                       setEditingUser((prev) => {
                         if (!prev) return prev;
-                        return applyAutoRolesForEdit(
-                          {
-                            ...prev,
-                            department_name: e.target.value,
-                            position_id: "",
-                          },
-                          prev,
-                        );
+                        return {
+                          ...prev,
+                          department_name: e.target.value,
+                          position_id: "",
+                        };
                       });
                     }}
                   >
@@ -746,10 +664,7 @@ function AdminUsers() {
                     onChange={(e) => {
                       setEditingUser((prev) => {
                         if (!prev) return prev;
-                        return applyAutoRolesForEdit(
-                          { ...prev, position_id: e.target.value },
-                          prev,
-                        );
+                        return { ...prev, position_id: e.target.value };
                       });
                     }}
                   >
@@ -883,9 +798,7 @@ function AdminUsers() {
                   <div>
                     <span className="font-semibold">Tanggal Bergabung:</span>{" "}
                     {getDisplayValue(
-                      viewingUser?.detail?.join_date
-                        ? String(viewingUser.detail.join_date).slice(0, 10)
-                        : "",
+                      toDateInputValue(viewingUser?.detail?.join_date),
                     )}
                   </div>
                   <div>

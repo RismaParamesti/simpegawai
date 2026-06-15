@@ -5,6 +5,7 @@ import TitleCard from "../components/Cards/TitleCard";
 import { NotificationManager } from "react-notifications";
 import axios from "axios";
 import { getStatusLabel } from "../utils/statusLabels";
+import { formatDateOnly, toDateInputValue } from "../utils/dateUtils";
 
 const ASSESSMENT_START = "[ASSESSMENT_CRITERIA]";
 const ASSESSMENT_END = "[/ASSESSMENT_CRITERIA]";
@@ -118,15 +119,17 @@ export default function CandidateInterviewPage() {
 
   const formatDateTime = (dateString) => {
     if (!dateString) return "-";
-    const date = new Date(dateString);
-    return date.toLocaleDateString("id-ID", {
+    const dateKey = toDateInputValue(dateString);
+    const [year, month, day] = dateKey.split("-").map(Number);
+    const date = dateKey ? new Date(year, month - 1, day) : new Date(dateString);
+    const dateLabel = date.toLocaleDateString("id-ID", {
       weekday: "long",
       year: "numeric",
       month: "long",
       day: "numeric",
-      hour: "2-digit",
-      minute: "2-digit",
     });
+    const timeMatch = String(dateString).match(/(?:T| )(\d{2}:\d{2})/);
+    return `${dateLabel}${timeMatch ? ` ${timeMatch[1]}` : ""}`;
   };
 
   // Filter apps berdasarkan status, tipe, dan tanggal interview
@@ -141,16 +144,10 @@ export default function CandidateInterviewPage() {
       typeMatch = app.interview_type === filterType;
     }
     if (filterDateStart) {
-      const appDate = new Date(app.scheduled_date);
-      const startDate = new Date(filterDateStart);
-      dateMatch = appDate >= startDate;
+      dateMatch = toDateInputValue(app.scheduled_date) >= filterDateStart;
     }
     if (filterDateEnd) {
-      const appDate = new Date(app.scheduled_date);
-      const endDate = new Date(filterDateEnd);
-      // Agar tanggal akhir tetap termasuk, set jam ke 23:59:59
-      endDate.setHours(23, 59, 59, 999);
-      dateMatch = dateMatch && appDate <= endDate;
+      dateMatch = dateMatch && toDateInputValue(app.scheduled_date) <= filterDateEnd;
     }
     return statusMatch && typeMatch && dateMatch;
   });
@@ -560,7 +557,7 @@ export default function CandidateInterviewPage() {
                     </span>
                     <p className="mt-1">
                       Diajukan:{" "}
-                      {new Date(app.submitted_at).toLocaleDateString("id-ID")}
+                      {formatDateOnly(app.submitted_at)}
                     </p>
                   </div>
                 </div>

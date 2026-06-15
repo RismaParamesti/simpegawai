@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from "react";
 import axios from "axios";
+import { formatDateOnly } from "../utils/dateUtils";
 import { createPortal } from "react-dom";
 import {
   formatAssessmentWeight,
@@ -523,27 +524,7 @@ export default function ApplicationDetailModal({ isOpen, onClose, app }) {
                         Deadline
                       </p>
                       <p className="font-semibold text-warning">
-                        {jobDetail?.deadline
-                          ? new Date(jobDetail.deadline).toLocaleDateString(
-                              "id-ID",
-                              {
-                                weekday: "long",
-                                year: "numeric",
-                                month: "long",
-                                day: "numeric",
-                              },
-                            )
-                          : app.deadline
-                            ? new Date(app.deadline).toLocaleDateString(
-                                "id-ID",
-                                {
-                                  weekday: "long",
-                                  year: "numeric",
-                                  month: "long",
-                                  day: "numeric",
-                                },
-                              )
-                            : "-"}
+                        {formatDateOnly(jobDetail?.deadline || app.deadline)}
                       </p>
                     </div>
                   </div>
