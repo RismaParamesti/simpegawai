@@ -323,7 +323,7 @@ router.get("/counts", async (req, res) => {
 });
 
 // ============================
-// CREATE JOB OPENING (HR/Admin)
+// CREATE JOB OPENING (HR)
 // ============================
 router.post("/", verifyToken, verifyRole(["hr"]), async (req, res) => {
   try {
@@ -431,7 +431,7 @@ router.post("/", verifyToken, verifyRole(["hr"]), async (req, res) => {
 });
 
 // ============================
-// UPDATE JOB OPENING (HR/Admin)
+// UPDATE JOB OPENING (HR)
 // ============================
 router.put(
   "/:id",
@@ -570,7 +570,7 @@ router.put(
 );
 
 // ============================
-// DELETE JOB OPENING (HR/Admin)
+// DELETE JOB OPENING (HR)
 // ============================
 router.delete(
   "/:id",

@@ -2,7 +2,11 @@ const express = require("express");
 const router = express.Router();
 const db = require("../config/db");
 const { verifyToken, verifyRole } = require("../middleware/authMiddleware");
-const { logActivity, getIpAddress, getUserAgent } = require("../middleware/activityLogger");
+const {
+  logActivity,
+  getIpAddress,
+  getUserAgent,
+} = require("../middleware/activityLogger");
 
 const visiblePositionJoinCondition = `
   d.id = p.department_id
@@ -36,18 +40,25 @@ router.get("/", verifyToken, verifyRole(["admin", "hr"]), async (req, res) => {
     res.json({ data: departments });
   } catch (error) {
     console.error("Error fetching departments:", error);
-    res.status(500).json({ message: "Failed to fetch departments", error: error.message });
+    res
+      .status(500)
+      .json({ message: "Failed to fetch departments", error: error.message });
   }
 });
 
 // ============================
 // GET single department by ID
 // ============================
-router.get("/:id", verifyToken, verifyRole(["admin", "hr"]), async (req, res) => {
-  try {
-    const { id } = req.params;
+router.get(
+  "/:id",
+  verifyToken,
+  verifyRole(["admin", "hr"]),
+  async (req, res) => {
+    try {
+      const { id } = req.params;
 
-    const [departments] = await db.promise().query(`
+      const [departments] = await db.promise().query(
+        `
       SELECT 
         d.*,
         COUNT(DISTINCT e.id) as totalEmployees,
@@ -57,23 +68,28 @@ router.get("/:id", verifyToken, verifyRole(["admin", "hr"]), async (req, res) =>
       LEFT JOIN employees e ON p.id = e.position_id AND e.deleted_at IS NULL
       WHERE d.id = ?
       GROUP BY d.id
-    `, [id]);
+    `,
+        [id],
+      );
 
-    if (departments.length === 0) {
-      return res.status(404).json({ message: "Department not found" });
+      if (departments.length === 0) {
+        return res.status(404).json({ message: "Department not found" });
+      }
+
+      res.json({ data: departments[0] });
+    } catch (error) {
+      console.error("Error fetching department:", error);
+      res
+        .status(500)
+        .json({ message: "Failed to fetch department", error: error.message });
     }
-
-    res.json({ data: departments[0] });
-  } catch (error) {
-    console.error("Error fetching department:", error);
-    res.status(500).json({ message: "Failed to fetch department", error: error.message });
-  }
-});
+  },
+);
 
 // ============================
 // POST create new department (admin only)
 // ============================
-router.post("/", verifyToken, verifyRole(["admin", "hr"]), async (req, res) => {
+router.post("/", verifyToken, verifyRole(["admin"]), async (req, res) => {
   try {
     const { code, name, description, status } = req.body;
 
@@ -83,20 +99,26 @@ router.post("/", verifyToken, verifyRole(["admin", "hr"]), async (req, res) => {
     }
 
     // Check if code already exists
-    const [existing] = await db.promise().query(
-      "SELECT id FROM departments WHERE code = ? OR name = ?",
-      [code, name]
-    );
+    const [existing] = await db
+      .promise()
+      .query("SELECT id FROM departments WHERE code = ? OR name = ?", [
+        code,
+        name,
+      ]);
 
     if (existing.length > 0) {
-      return res.status(409).json({ message: "Department code or name already exists" });
+      return res
+        .status(409)
+        .json({ message: "Department code or name already exists" });
     }
 
     // Insert new department
-    const [result] = await db.promise().query(
-      "INSERT INTO departments (code, name, description, status, created_at, updated_at) VALUES (?, ?, ?, ?, NOW(), NOW())",
-      [code, name, description || null, status || "active"]
-    );
+    const [result] = await db
+      .promise()
+      .query(
+        "INSERT INTO departments (code, name, description, status, created_at, updated_at) VALUES (?, ?, ?, ?, NOW(), NOW())",
+        [code, name, description || null, status || "active"],
+      );
 
     // Log activity
     await logActivity({
@@ -127,95 +149,108 @@ router.post("/", verifyToken, verifyRole(["admin", "hr"]), async (req, res) => {
     });
   } catch (error) {
     console.error("Error creating department:", error);
-    res.status(500).json({ message: "Failed to create department", error: error.message });
+    res
+      .status(500)
+      .json({ message: "Failed to create department", error: error.message });
   }
 });
 
 // ============================
 // PUT update department (admin only)
 // ============================
-router.put("/:id", verifyToken, verifyRole(["admin", "hr"]), async (req, res) => {
-  try {
-    const { id } = req.params;
-    const { code, name, description, status } = req.body;
+router.put(
+  "/:id",
+  verifyToken,
+  verifyRole(["admin", "hr"]),
+  async (req, res) => {
+    try {
+      const { id } = req.params;
+      const { code, name, description, status } = req.body;
 
-    // Validation
-    if (!code || !name) {
-      return res.status(400).json({ message: "Code and name are required" });
+      // Validation
+      if (!code || !name) {
+        return res.status(400).json({ message: "Code and name are required" });
+      }
+
+      // Check if department exists
+      const [existing] = await db
+        .promise()
+        .query("SELECT * FROM departments WHERE id = ?", [id]);
+
+      if (existing.length === 0) {
+        return res.status(404).json({ message: "Department not found" });
+      }
+
+      const oldDept = existing[0];
+
+      // Check if new code conflicts with other departments
+      const [codeConflict] = await db
+        .promise()
+        .query(
+          "SELECT id FROM departments WHERE (code = ? OR name = ?) AND id != ?",
+          [code, name, id],
+        );
+
+      if (codeConflict.length > 0) {
+        return res
+          .status(409)
+          .json({ message: "Department code or name already exists" });
+      }
+
+      // Update department
+      await db
+        .promise()
+        .query(
+          "UPDATE departments SET code = ?, name = ?, description = ?, status = ?, updated_at = NOW() WHERE id = ?",
+          [code, name, description || null, status || "active", id],
+        );
+
+      // Log activity
+      await logActivity({
+        userId: req.user.id,
+        username: req.user.username,
+        role: req.user.roles?.[0] || req.user.role,
+        action: "UPDATE",
+        module: "departments",
+        description: `Updated department: ${name}`,
+        oldValues: oldDept,
+        newValues: { code, name, description, status },
+        ipAddress: getIpAddress(req),
+        userAgent: getUserAgent(req),
+      });
+
+      res.json({
+        message: "Department updated successfully",
+        data: {
+          id: parseInt(id),
+          code,
+          name,
+          description,
+          status: status || "active",
+          created_at: oldDept.created_at,
+          updated_at: new Date(),
+        },
+      });
+    } catch (error) {
+      console.error("Error updating department:", error);
+      res
+        .status(500)
+        .json({ message: "Failed to update department", error: error.message });
     }
-
-    // Check if department exists
-    const [existing] = await db.promise().query(
-      "SELECT * FROM departments WHERE id = ?",
-      [id]
-    );
-
-    if (existing.length === 0) {
-      return res.status(404).json({ message: "Department not found" });
-    }
-
-    const oldDept = existing[0];
-
-    // Check if new code conflicts with other departments
-    const [codeConflict] = await db.promise().query(
-      "SELECT id FROM departments WHERE (code = ? OR name = ?) AND id != ?",
-      [code, name, id]
-    );
-
-    if (codeConflict.length > 0) {
-      return res.status(409).json({ message: "Department code or name already exists" });
-    }
-
-    // Update department
-    await db.promise().query(
-      "UPDATE departments SET code = ?, name = ?, description = ?, status = ?, updated_at = NOW() WHERE id = ?",
-      [code, name, description || null, status || "active", id]
-    );
-
-    // Log activity
-    await logActivity({
-      userId: req.user.id,
-      username: req.user.username,
-      role: req.user.roles?.[0] || req.user.role,
-      action: "UPDATE",
-      module: "departments",
-      description: `Updated department: ${name}`,
-      oldValues: oldDept,
-      newValues: { code, name, description, status },
-      ipAddress: getIpAddress(req),
-      userAgent: getUserAgent(req),
-    });
-
-    res.json({
-      message: "Department updated successfully",
-      data: {
-        id: parseInt(id),
-        code,
-        name,
-        description,
-        status: status || "active",
-        created_at: oldDept.created_at,
-        updated_at: new Date(),
-      },
-    });
-  } catch (error) {
-    console.error("Error updating department:", error);
-    res.status(500).json({ message: "Failed to update department", error: error.message });
-  }
-});
+  },
+);
 
 // ============================
 // DELETE department (admin only)
 // ============================
-router.delete("/:id", verifyToken, verifyRole(["admin", "hr"]), async (req, res) => {
+router.delete("/:id", verifyToken, verifyRole(["admin"]), async (req, res) => {
   try {
     const { id } = req.params;
 
     // Check if department exists
-    const [existing] = await db.promise().query(
-      "SELECT * FROM departments WHERE id = ?",
-      [id]
-    );
+    const [existing] = await db
+      .promise()
+      .query("SELECT * FROM departments WHERE id = ?", [id]);
 
     if (existing.length === 0) {
       return res.status(404).json({ message: "Department not found" });
@@ -224,10 +259,12 @@ router.delete("/:id", verifyToken, verifyRole(["admin", "hr"]), async (req, res)
     const dept = existing[0];
 
     // Check if department has positions
-    const [positions] = await db.promise().query(
-      "SELECT COUNT(*) as count FROM positions WHERE department_id = ?",
-      [id]
-    );
+    const [positions] = await db
+      .promise()
+      .query(
+        "SELECT COUNT(*) as count FROM positions WHERE department_id = ?",
+        [id],
+      );
 
     if (positions[0].count > 0) {
       return res.status(400).json({
@@ -255,7 +292,9 @@ router.delete("/:id", verifyToken, verifyRole(["admin", "hr"]), async (req, res)
     res.json({ message: "Department deleted successfully" });
   } catch (error) {
     console.error("Error deleting department:", error);
-    res.status(500).json({ message: "Failed to delete department", error: error.message });
+    res
+      .status(500)
+      .json({ message: "Failed to delete department", error: error.message });
   }
 });
 

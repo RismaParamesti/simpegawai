@@ -611,7 +611,7 @@ const getIssuerSignatureInfo = async (userId, issuerRole) => {
 router.get(
     "/eligible-employees",
     verifyToken,
-    verifyRole(["hr", "admin"]),
+    verifyRole(["hr"]),
     async (req, res) => {
         try {
             const [rows] = await db.promise().query(
@@ -708,7 +708,7 @@ router.get(
 router.get(
     "/active",
     verifyToken,
-    verifyRole(["hr", "admin"]),
+    verifyRole(["hr"]),
     async (req, res) => {
         try {
             const { employee_id } = req.query;
@@ -738,7 +738,7 @@ router.get(
     }
 );
 
-router.get("/", verifyToken, verifyRole(["hr", "admin"]), async (req, res) => {
+router.get("/", verifyToken, verifyRole(["hr" ]), async (req, res) => {
     try {
         const { employee_id } = req.query;
 

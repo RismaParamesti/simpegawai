@@ -509,7 +509,7 @@ router.post(
   },
 );
 
-// Admin approve manager adjustments
+
 router.put(
   "/manager-adjustments/:id/approve",
   verifyToken,
@@ -560,7 +560,7 @@ router.put(
   },
 );
 
-// Admin reject manager adjustments
+
 router.put(
   "/manager-adjustments/:id/reject",
   verifyToken,
@@ -619,11 +619,10 @@ router.put(
 // ============================
 // CREATE/GENERATE PAYROLL
 // ============================
-// HR/Admin membuat payroll untuk employee tertentu di periode tertentu
 router.post(
   "/generate",
   verifyToken,
-  verifyRole(["hr", "finance"]),
+  verifyRole(["finance"]),
   async (req, res) => {
     try {
       const {
@@ -1723,11 +1722,11 @@ router.get(
 // ============================
 // PUBLISH PAYROLL
 // ============================
-// HR/Finance mempublikasikan payroll
+// Finance mempublikasikan payroll
 router.put(
   "/:id/publish",
   verifyToken,
-  verifyRole(["hr", "finance"]),
+  verifyRole(["finance"]),
   async (req, res) => {
     try {
       const supportsTransferredAt = await ensureTransferredAtColumn();
@@ -1927,11 +1926,11 @@ router.put(
 // ============================
 // DELETE PAYROLL
 // ============================
-// HR/Admin/Finance menghapus payroll draft
+// Finance menghapus payroll draft
 router.delete(
   "/:id",
   verifyToken,
-  verifyRole(["hr", "finance"]),
+  verifyRole(["finance"]),
   async (req, res) => {
     try {
       const { id } = req.params;

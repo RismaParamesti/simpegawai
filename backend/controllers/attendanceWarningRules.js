@@ -87,7 +87,7 @@ const mapRuleRow = (row) => ({
   is_active: Number(row.is_active || 0) === 1,
 });
 
-router.get("/", verifyToken, verifyRole(["hr", "admin"]), async (req, res) => {
+router.get("/", verifyToken, verifyRole(["hr"]), async (req, res) => {
   try {
     const { search, sanction_level, is_active } = req.query;
 
@@ -148,7 +148,7 @@ router.get("/", verifyToken, verifyRole(["hr", "admin"]), async (req, res) => {
   }
 });
 
-router.get("/:id", verifyToken, verifyRole(["hr", "admin"]), async (req, res) => {
+router.get("/:id", verifyToken, verifyRole(["hr"]), async (req, res) => {
   try {
     const [rows] = await db.promise().query(
       `SELECT
@@ -190,7 +190,7 @@ router.get("/:id", verifyToken, verifyRole(["hr", "admin"]), async (req, res) =>
   }
 });
 
-router.post("/", verifyToken, verifyRole(["hr", "admin"]), async (req, res) => {
+router.post("/", verifyToken, verifyRole(["hr"]), async (req, res) => {
   try {
     const ruleName = String(req.body.rule_name || "").trim();
     const description = String(req.body.description || "").trim() || null;
@@ -294,7 +294,7 @@ router.post("/", verifyToken, verifyRole(["hr", "admin"]), async (req, res) => {
   }
 });
 
-router.put("/:id", verifyToken, verifyRole(["hr", "admin"]), async (req, res) => {
+router.put("/:id", verifyToken, verifyRole(["hr"]), async (req, res) => {
   try {
     const ruleName = String(req.body.rule_name || "").trim();
     const description = String(req.body.description || "").trim() || null;
@@ -396,7 +396,7 @@ router.put("/:id", verifyToken, verifyRole(["hr", "admin"]), async (req, res) =>
   }
 });
 
-router.delete("/:id", verifyToken, verifyRole(["hr", "admin"]), async (req, res) => {
+router.delete("/:id", verifyToken, verifyRole(["hr"]), async (req, res) => {
   try {
     const [result] = await db.promise().query(
       `DELETE FROM attendance_warning_rules WHERE id = ?`,

@@ -27,11 +27,11 @@ const DEFAULT_PAYROLL_SETTINGS = {
   alpha_deduction_percentage: 1,
 };
 
-// Get current payroll settings (Finance/HR/Admin)
+// Get current payroll settings (Finance/HR)
 router.get(
   "/",
   verifyToken,
-  verifyRole(["finance", "hr", "admin"]),
+  verifyRole(["finance", "hr"]),
   async (req, res) => {
     try {
       const [rows] = await db.promise().query(
@@ -78,11 +78,11 @@ router.get(
   }
 );
 
-// Update payroll settings (Finance/HR/Admin) - Creates a new record
+// Update payroll settings (Finance/HR) - Creates a new record
 router.put(
   "/",
   verifyToken,
-  verifyRole(["finance", "hr", "admin"]),
+  verifyRole(["finance", "hr"]),
   async (req, res) => {
     try {
       // Debug: log roles and incoming payload to help investigate missing fields
@@ -92,8 +92,8 @@ router.put(
         console.debug('[DEBUG] PUT /api/payroll-settings - failed to stringify debug info');
       }
       const roles = new Set((req.user?.roles || []).map((role) => String(role || "").toLowerCase()));
-      const canEditTax = roles.has("finance") || roles.has("admin");
-      const canEditOperational = roles.has("hr") || roles.has("admin");
+      const canEditTax = roles.has("finance");
+      const canEditOperational = roles.has("hr");
 
       if (!canEditTax && !canEditOperational) {
         return res.status(403).json({ message: "Access denied" });

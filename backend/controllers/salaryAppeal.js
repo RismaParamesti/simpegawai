@@ -955,7 +955,7 @@ router.get(
 // ============================
 // HR approve/reject salary appeal
 // ============================
-router.put("/:id/review", verifyToken, verifyRole(["hr", "admin"]), async (req, res) => {
+router.put("/:id/review", verifyToken, verifyRole(["hr"]), async (req, res) => {
     try {
         const { id } = req.params;
         const {
@@ -1282,7 +1282,7 @@ router.put("/:id/review", verifyToken, verifyRole(["hr", "admin"]), async (req, 
 router.post(
     "/:appeal_id/create-revised-payroll",
     verifyToken,
-    verifyRole(["finance", "admin"]),
+    verifyRole(["finance"]),
     async (req, res) => {
         try {
             const { appeal_id } = req.params;
