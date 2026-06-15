@@ -7,6 +7,7 @@ import {
 import TitleCard from "../Cards/TitleCard";
 import Pagination from "../Pagination/Pagination";
 import useTablePagination from "../../hooks/useTablePagination";
+import { toDateInputValue } from "../../utils/dateUtils";
 
 const normalizeSanctionLevel = (value) => {
   const raw = String(value || "").toLowerCase().trim();
@@ -35,16 +36,6 @@ const formatSanctionLabel = (value) => {
   const spMatch = raw.match(/^\s*sp\s*[-_]?\s*(\d+)\s*$/i);
   if (spMatch) return `SP${spMatch[1]}`;
   return raw.replace(/[-_]+/g, " ").replace(/\b\w/g, (char) => char.toUpperCase());
-};
-
-const toDateInputValue = (dateValue) => {
-  if (!dateValue) return "";
-  const date = new Date(dateValue);
-  if (Number.isNaN(date.getTime())) return "";
-  const year = date.getFullYear();
-  const month = String(date.getMonth() + 1).padStart(2, "0");
-  const day = String(date.getDate()).padStart(2, "0");
-  return `${year}-${month}-${day}`;
 };
 
 const emptyForm = () => ({

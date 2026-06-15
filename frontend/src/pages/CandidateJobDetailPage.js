@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import api from "../lib/api";
+import { formatDateOnly } from "../utils/dateUtils";
 
 export default function CandidateJobDetailPage() {
   const { jobId } = useParams();
@@ -87,13 +88,7 @@ export default function CandidateJobDetailPage() {
                   <div>
                     <p className="text-gray-500">Deadline</p>
                     <p className="font-semibold">
-                      {job.deadline
-                        ? new Date(job.deadline).toLocaleDateString("id-ID", {
-                            day: "numeric",
-                            month: "long",
-                            year: "numeric",
-                          })
-                        : "-"}
+                      {formatDateOnly(job.deadline)}
                     </p>
                   </div>
 
@@ -171,13 +166,7 @@ export default function CandidateJobDetailPage() {
                 <p className="text-sm mt-2">
                   <span className="text-gray-500">Deadline</span>
                   <br />
-                  {job.deadline
-                    ? new Date(job.deadline).toLocaleDateString("id-ID", {
-                        day: "numeric",
-                        month: "long",
-                        year: "numeric",
-                      })
-                    : "-"}
+                  {formatDateOnly(job.deadline)}
                 </p>
 
                 <p className="text-sm">

@@ -2,10 +2,12 @@ import axios from "axios"
 
 const initializeApp = () => {
     const configuredBaseUrl = process.env.REACT_APP_BASE_URL
-    const fallbackBaseUrl = "http://localhost:5000"
+    const fallbackBaseUrl = typeof window !== "undefined" ? window.location.origin : ""
     const baseUrl = (configuredBaseUrl || fallbackBaseUrl).replace(/\/$/, "")
 
-    axios.defaults.baseURL = baseUrl
+    if (baseUrl) {
+        axios.defaults.baseURL = baseUrl
+    }
 
 
     if (!process.env.NODE_ENV || process.env.NODE_ENV === 'development') {

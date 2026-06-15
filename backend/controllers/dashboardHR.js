@@ -3,12 +3,19 @@ const router = express.Router();
 const db = require("../config/db");
 const { verifyToken, verifyRole } = require("../middleware/authMiddleware");
 
+const getLocalDateKey = (date = new Date()) => {
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, "0");
+    const day = String(date.getDate()).padStart(2, "0");
+    return `${year}-${month}-${day}`;
+};
+
 // ============================
 // HR Dashboard
 // ============================
 router.get("/", verifyToken, verifyRole(["hr"]), async (req, res) => {
     try {
-        const today = new Date().toISOString().split("T")[0];
+        const today = getLocalDateKey();
         const currentMonth = new Date().getMonth() + 1;
         const currentYear = new Date().getFullYear();
         const requesterUserId = Number(req.user?.id || req.user?.user_id || 0);

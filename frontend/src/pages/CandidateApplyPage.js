@@ -5,6 +5,7 @@ import { setPageTitle } from "../features/common/headerSlice";
 import TitleCard from "../components/Cards/TitleCard";
 import { NotificationManager } from "react-notifications";
 import axios from "axios";
+import { formatDateOnly, getTodayDateKey, toDateInputValue } from "../utils/dateUtils";
 
 function CandidateApplyPage() {
   // State untuk menyimpan daftar job yang sudah pernah dilamar
@@ -399,9 +400,7 @@ function CandidateApplyPage() {
             phone: candidateDataFromDB.phone || "",
             gender: candidateDataFromDB.gender || "",
             birth_place: candidateDataFromDB.birth_place || "",
-            date_of_birth: candidateDataFromDB.date_of_birth
-              ? candidateDataFromDB.date_of_birth.split("T")[0]
-              : "",
+            date_of_birth: toDateInputValue(candidateDataFromDB.date_of_birth),
             marital_status: candidateDataFromDB.marital_status || "",
             nationality: candidateDataFromDB.nationality || "Indonesian",
             address: candidateDataFromDB.address || "",
@@ -419,11 +418,11 @@ function CandidateApplyPage() {
         // Handle job openings
         if (jobsRes && jobsRes.data && jobsRes.data.jobs) {
           // Filter: hanya tampilkan yang status open dan deadline belum lewat
-          const now = new Date();
+          const todayDateKey = getTodayDateKey();
           const filtered = jobsRes.data.jobs.filter((job) => {
             if (job.status !== "open") return false;
             if (!job.deadline) return true;
-            return new Date(job.deadline) >= now;
+            return toDateInputValue(job.deadline) >= todayDateKey;
           });
           setJobOpenings(filtered);
 
@@ -843,12 +842,7 @@ function CandidateApplyPage() {
                     {selectedJob.title || selectedJob.position_name}
                   </h3>
                   <span className="text-xs text-gray-500">
-                    {selectedJob.created_at
-                      ? new Date(selectedJob.created_at).toLocaleDateString(
-                          "id-ID",
-                          { day: "2-digit", month: "short", year: "numeric" },
-                        )
-                      : "-"}
+                    {formatDateOnly(selectedJob.created_at)}
                   </span>
                 </div>
                 <div className="grid md:grid-cols-2 gap-4 text-sm mb-4">
@@ -881,17 +875,7 @@ function CandidateApplyPage() {
                   </div>
                   <div>
                     <span className="font-semibold">Deadline:</span>{" "}
-                    <span className="inline-flex rounded-full bg-red-50 px-3 py-1 text-xs font-bold text-red-600 ring-1 ring-red-200">{selectedJob.deadline
-                      ? new Date(selectedJob.deadline).toLocaleDateString(
-                          "id-ID",
-                          {
-                            weekday: "long",
-                            year: "numeric",
-                            month: "long",
-                            day: "numeric",
-                          },
-                        )
-                      : "-"}</span>
+                    <span className="inline-flex rounded-full bg-red-50 px-3 py-1 text-xs font-bold text-red-600 ring-1 ring-red-200">{formatDateOnly(selectedJob.deadline)}</span>
                   </div>
                   <div>
                     <span className="font-semibold">Status:</span>{" "}
@@ -1378,16 +1362,7 @@ function CandidateApplyPage() {
                             {job.title || job.position_name}
                           </h3>
                           <div className="text-xs text-gray-500">
-                            {job.created_at
-                              ? new Date(job.created_at).toLocaleDateString(
-                                  "id-ID",
-                                  {
-                                    day: "2-digit",
-                                    month: "short",
-                                    year: "numeric",
-                                  },
-                                )
-                              : "-"}
+                            {formatDateOnly(job.created_at)}
                           </div>
                         </div>
                         <button
@@ -1432,17 +1407,7 @@ function CandidateApplyPage() {
                         </div>
                         <div>
                           <span className="font-semibold">Deadline:</span>{" "}
-                          <span className="inline-flex rounded-full bg-red-50 px-3 py-1 text-xs font-bold text-red-600 ring-1 ring-red-200">{job.deadline
-                            ? new Date(job.deadline).toLocaleDateString(
-                                "id-ID",
-                                {
-                                  weekday: "long",
-                                  year: "numeric",
-                                  month: "long",
-                                  day: "numeric",
-                                },
-                              )
-                            : "-"}</span>
+                          <span className="inline-flex rounded-full bg-red-50 px-3 py-1 text-xs font-bold text-red-600 ring-1 ring-red-200">{formatDateOnly(job.deadline)}</span>
                         </div>
                         <div>
                           <span className="font-semibold">Status:</span>{" "}
@@ -1884,17 +1849,7 @@ function CandidateApplyPage() {
                           Deadline
                         </p>
                         <p className="inline-flex rounded-full bg-red-50 px-3 py-1 text-sm font-bold text-red-600 ring-1 ring-red-200">
-                          {selectedJob.deadline
-                            ? new Date(selectedJob.deadline).toLocaleDateString(
-                                "id-ID",
-                                {
-                                  weekday: "long",
-                                  year: "numeric",
-                                  month: "long",
-                                  day: "numeric",
-                                },
-                              )
-                            : "-"}
+                          {formatDateOnly(selectedJob.deadline)}
                         </p>
                       </div>
                     </div>

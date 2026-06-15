@@ -26,7 +26,11 @@ const toSanctionBadge = (value) => {
 
 const toDateOnly = (value) => {
   if (!value) return null;
-  const date = new Date(value);
+  const valueString = String(value);
+  const dateOnlyMatch = valueString.match(/^(\d{4}-\d{2}-\d{2})/);
+  if (dateOnlyMatch) return dateOnlyMatch[1];
+
+  const date = value instanceof Date ? value : new Date(value);
   if (Number.isNaN(date.getTime())) return null;
   const year = date.getFullYear();
   const month = String(date.getMonth() + 1).padStart(2, "0");

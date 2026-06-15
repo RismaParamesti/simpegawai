@@ -5,6 +5,7 @@ import { setPageTitle } from "../../../features/common/headerSlice";
 import TitleCard from "../../../components/Cards/TitleCard";
 import Pagination from "../../../components/Pagination/Pagination";
 import { atasanApi } from "../../../features/atasan/api";
+import { formatDateOnly } from "../../../utils/dateUtils";
 import {
   Chart as ChartJS,
   ArcElement,
@@ -670,7 +671,7 @@ function AtasanDashboard() {
                     <tr key={item.id} onClick={() => navigate("/app/leave-requests", { state: { requestId: item.id } })} className="cursor-pointer hover:bg-orange-50/50 dark:hover:bg-slate-800/60">
                       <td><div className="font-semibold">{item.employee_name}</div><div className="text-xs text-slate-500">{item.employee_code}</div></td>
                       <td>{humanizeType(item.leave_type)}</td>
-                      <td>{new Date(item.start_date).toLocaleDateString("id-ID")} - {new Date(item.end_date).toLocaleDateString("id-ID")}</td>
+                      <td>{formatDateOnly(item.start_date)} - {formatDateOnly(item.end_date)}</td>
                       <td><span className="badge badge-warning badge-sm">{formatStatusLabel(item.status)}</span></td>
                     </tr>
                   ))}

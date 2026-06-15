@@ -5,6 +5,7 @@ import { setPageTitle, showNotification } from '../../../features/common/headerS
 import TitleCard from '../../../components/Cards/TitleCard'
 import Pagination from '../../../components/Pagination/Pagination'
 import { atasanApi } from '../../../features/atasan/api'
+import { formatDateOnly } from '../../../utils/dateUtils'
 
 const LEAVE_TYPE_LABEL = {
     izin: 'Izin',
@@ -377,13 +378,13 @@ function AtasanLeaveRequestsHistory() {
                             <div>
                                 <p className="opacity-60">Tanggal Mulai</p>
                                 <p className="font-semibold">
-                                    {selectedItem.start_date ? new Date(selectedItem.start_date).toLocaleDateString('id-ID') : '-'}
+                                    {formatDateOnly(selectedItem.start_date)}
                                 </p>
                             </div>
                             <div>
                                 <p className="opacity-60">Tanggal Selesai</p>
                                 <p className="font-semibold">
-                                    {selectedItem.end_date ? new Date(selectedItem.end_date).toLocaleDateString('id-ID') : '-'}
+                                    {formatDateOnly(selectedItem.end_date)}
                                 </p>
                             </div>
                             <div>

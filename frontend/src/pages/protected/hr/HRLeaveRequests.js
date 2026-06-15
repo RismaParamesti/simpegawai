@@ -11,6 +11,7 @@ import {
     CheckCircleIcon,
     XCircleIcon
 } from '@heroicons/react/24/outline'
+import { formatDateOnly, toDateInputValue } from '../../../utils/dateUtils'
 
 const buildEmployeeSearchOptions = (items) => {
     const map = new Map()
@@ -76,7 +77,11 @@ function HRLeaveRequests() {
         const selectedYear = Number(filters.year || 0)
 
         return leaveRequests.filter((item) => {
-            const startDate = item?.start_date ? new Date(item.start_date) : null
+            const startDateKey = toDateInputValue(item?.start_date)
+            const startDateParts = startDateKey ? startDateKey.split('-').map(Number) : []
+            const startDate = startDateParts.length === 3
+                ? new Date(startDateParts[0], startDateParts[1] - 1, startDateParts[2])
+                : null
             const createdDate = item?.created_at ? new Date(item.created_at) : null
             const referenceDate = startDate && !Number.isNaN(startDate.getTime())
                 ? startDate
@@ -327,8 +332,8 @@ function HRLeaveRequests() {
                                                 {item.leave_type}
                                             </span>
                                         </td>
-                                        <td>{new Date(item.start_date).toLocaleDateString('id-ID')}</td>
-                                        <td>{new Date(item.end_date).toLocaleDateString('id-ID')}</td>
+                                        <td>{formatDateOnly(item.start_date)}</td>
+                                        <td>{formatDateOnly(item.end_date)}</td>
                                         <td className="font-semibold">{getDurationDays(item)} hari</td>
                                         <td>
                                             <span className={getStatusBadge(item.status)}>
@@ -395,11 +400,11 @@ function HRLeaveRequests() {
                                 </div>
                                 <div>
                                     <label className="font-semibold">Tanggal Mulai:</label>
-                                    <p>{new Date(selectedItem.start_date).toLocaleDateString('id-ID')}</p>
+                                    <p>{formatDateOnly(selectedItem.start_date)}</p>
                                 </div>
                                 <div>
                                     <label className="font-semibold">Tanggal Selesai:</label>
-                                    <p>{new Date(selectedItem.end_date).toLocaleDateString('id-ID')}</p>
+                                    <p>{formatDateOnly(selectedItem.end_date)}</p>
                                 </div>
                                 <div>
                                     <label className="font-semibold">Durasi:</label>

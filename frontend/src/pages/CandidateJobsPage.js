@@ -16,6 +16,7 @@ import {
   MapPin,
   Wallet,
 } from "lucide-react";
+import { formatDateOnly, getTodayDateKey, toDateInputValue } from "../utils/dateUtils";
 
 import "swiper/css";
 import "swiper/css/navigation";
@@ -62,11 +63,11 @@ export default function CandidateJobsPage() {
       .get("/job-openings")
       .then((res) => {
         const jobsData = res.data.jobs || [];
-        const now = new Date();
+        const todayDateKey = getTodayDateKey();
         const visible = jobsData.filter((job) => {
           if (job.status !== "open") return false;
           if (!job.deadline) return true;
-          return new Date(job.deadline) >= now;
+          return toDateInputValue(job.deadline) >= todayDateKey;
         });
         setJobs(visible);
       })
@@ -263,13 +264,7 @@ animate-gradient"
                         job.salary_range_min && job.salary_range_max
                           ? `Rp ${Number(job.salary_range_min).toLocaleString("id-ID")} - Rp ${Number(job.salary_range_max).toLocaleString("id-ID")}`
                           : "Dirahasiakan";
-                      const deadlineText = job.deadline
-                        ? new Date(job.deadline).toLocaleDateString("id-ID", {
-                            day: "numeric",
-                            month: "short",
-                            year: "numeric",
-                          })
-                        : "-";
+                      const deadlineText = formatDateOnly(job.deadline);
 
                       return (
                         <SwiperSlide key={job.id} className="h-auto">

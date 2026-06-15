@@ -6,6 +6,7 @@ import api from "../lib/api";
 
 import { setPageTitle } from "../features/common/headerSlice";
 import TitleCard from "../components/Cards/TitleCard";
+import { formatDateOnly, getTodayDateKey, toDateInputValue } from "../utils/dateUtils";
 
 export default function CandidateJobList() {
   const dispatch = useDispatch();
@@ -39,11 +40,11 @@ export default function CandidateJobList() {
       const res = await api.get("/job-openings");
       const jobsData = res.data.jobs || [];
       // Filter: hanya tampilkan yang status open dan deadline belum lewat
-      const now = new Date();
+      const todayDateKey = getTodayDateKey();
       const filtered = jobsData.filter((job) => {
         if (job.status !== "open") return false;
         if (!job.deadline) return true;
-        return new Date(job.deadline) >= now;
+        return toDateInputValue(job.deadline) >= todayDateKey;
       });
       setJobs(filtered);
       setFilteredJobs(filtered);
@@ -222,9 +223,7 @@ export default function CandidateJobList() {
                   <div>
                     <span className="inline-flex items-center rounded-full bg-red-500 px-3 py-1 text-xs font-bold text-white">
                       ⏳ Deadline:{" "}
-                      {job.deadline
-                        ? new Date(job.deadline).toLocaleDateString("id-ID")
-                        : "-"}
+                      {formatDateOnly(job.deadline)}
                     </span>
                   </div>
                   {/* STATUS */}
@@ -353,11 +352,7 @@ export default function CandidateJobList() {
                   <p className="text-xs opacity-60">Deadline</p>
                   <p className="font-semibold text-sm mt-1 text-warning">
                     ⏳{" "}
-                    {selectedJob.deadline
-                      ? new Date(selectedJob.deadline).toLocaleDateString(
-                          "id-ID",
-                        )
-                      : "-"}
+                    {formatDateOnly(selectedJob.deadline)}
                   </p>
                 </div>
               </div>

@@ -5,6 +5,7 @@ import { setPageTitle, showNotification } from '../../../features/common/headerS
 import TitleCard from '../../../components/Cards/TitleCard'
 import Pagination from '../../../components/Pagination/Pagination'
 import { atasanApi } from '../../../features/atasan/api'
+import { formatDateOnly, toDateInputValue } from '../../../utils/dateUtils'
 
 const getStatusLabel = (status) => {
     const labels = {
@@ -105,13 +106,7 @@ function AtasanReimbursements() {
     }
 
     const normalizeLocalDate = (value) => {
-        if (!value) return ''
-        const parsed = new Date(value)
-        if (Number.isNaN(parsed.getTime())) return ''
-        const year = parsed.getFullYear()
-        const month = String(parsed.getMonth() + 1).padStart(2, '0')
-        const day = String(parsed.getDate()).padStart(2, '0')
-        return `${year}-${month}-${day}`
+        return toDateInputValue(value)
     }
 
     const getReimbursementTypeLabel = (value) => {
@@ -239,7 +234,7 @@ function AtasanReimbursements() {
                                             </td>
                                             <td>{getReimbursementTypeLabel(item.reimbursement_type)}</td>
                                             <td className="font-semibold">Rp {(Number(item.amount) || 0).toLocaleString('id-ID')}</td>
-                                            <td>{item.created_at ? new Date(item.created_at).toLocaleDateString('id-ID') : '-'}</td>
+                                            <td>{formatDateOnly(item.created_at)}</td>
                                            <td>
                                                 <span className={`badge ${getStatusBadge(item.status)}`}>
                                                     {getStatusLabel(item.status)}
@@ -328,7 +323,7 @@ function AtasanReimbursements() {
                                 </div>
                                 <div>
                                     <p className="opacity-60">Diajukan Pada</p>
-                                    <p className="font-semibold">{selectedItem.created_at ? new Date(selectedItem.created_at).toLocaleString('id-ID') : '-'}</p>
+                                    <p className="font-semibold">{formatDateOnly(selectedItem.created_at)}</p>
                                 </div>
                                 <div>
                                     <p className="opacity-60">Diproses Oleh</p>

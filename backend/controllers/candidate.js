@@ -732,15 +732,17 @@ router.get(
       // Format date_of_birth ke YYYY-MM-DD jika ada
       const candidate = { ...candidates[0] };
       if (candidate.date_of_birth) {
-        const d = new Date(candidate.date_of_birth);
-        // Handle jika sudah string YYYY-MM-DD
-        if (typeof candidate.date_of_birth === 'string' && candidate.date_of_birth.length === 10 && candidate.date_of_birth[4] === '-') {
-          candidate.date_of_birth = candidate.date_of_birth;
-        } else if (!isNaN(d.getTime())) {
-          // Format ke YYYY-MM-DD
-          const month = String(d.getMonth() + 1).padStart(2, '0');
-          const day = String(d.getDate()).padStart(2, '0');
-          candidate.date_of_birth = `${d.getFullYear()}-${month}-${day}`;
+        const dateOnlyMatch = String(candidate.date_of_birth).match(/^(\d{4}-\d{2}-\d{2})/);
+        if (dateOnlyMatch) {
+          candidate.date_of_birth = dateOnlyMatch[1];
+        } else {
+          const d = new Date(candidate.date_of_birth);
+          if (!isNaN(d.getTime())) {
+            // Format ke YYYY-MM-DD
+            const month = String(d.getMonth() + 1).padStart(2, '0');
+            const day = String(d.getDate()).padStart(2, '0');
+            candidate.date_of_birth = `${d.getFullYear()}-${month}-${day}`;
+          }
         }
       }
       res.json({ candidate });

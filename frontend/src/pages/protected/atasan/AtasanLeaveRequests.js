@@ -8,6 +8,7 @@ import {
 import TitleCard from "../../../components/Cards/TitleCard";
 import Pagination from "../../../components/Pagination/Pagination";
 import { atasanApi } from "../../../features/atasan/api";
+import { formatDateOnly, toDateInputValue } from "../../../utils/dateUtils";
 
 const LEAVE_TYPE_LABEL = {
   izin: "Izin",
@@ -161,13 +162,7 @@ function AtasanLeaveRequests() {
   }, [filters.name, filters.type, filters.date, filters.totalDays]);
 
   const normalizeLocalDate = (value) => {
-    if (!value) return "";
-    const parsed = new Date(value);
-    if (Number.isNaN(parsed.getTime())) return "";
-    const year = parsed.getFullYear();
-    const month = String(parsed.getMonth() + 1).padStart(2, "0");
-    const day = String(parsed.getDate()).padStart(2, "0");
-    return `${year}-${month}-${day}`;
+    return toDateInputValue(value);
   };
 
   const filteredItems = items.filter((item) => {
@@ -368,8 +363,8 @@ function AtasanLeaveRequests() {
                     </td>
                     <td>{getLeaveTypeLabel(item.leave_type)}</td>
                     <td>
-                      {new Date(item.start_date).toLocaleDateString("id-ID")} -{" "}
-                      {new Date(item.end_date).toLocaleDateString("id-ID")}
+                      {formatDateOnly(item.start_date)} -{" "}
+                      {formatDateOnly(item.end_date)}
                     </td>
                     <td>{item.total_days || item.duration || 0}</td>
                     <td>
@@ -486,9 +481,7 @@ function AtasanLeaveRequests() {
                 <p className="opacity-60">Tanggal Mulai</p>
                 <p className="font-semibold">
                   {selectedItem.start_date
-                    ? new Date(selectedItem.start_date).toLocaleDateString(
-                        "id-ID",
-                      )
+                    ? formatDateOnly(selectedItem.start_date)
                     : "-"}
                 </p>
               </div>
@@ -496,9 +489,7 @@ function AtasanLeaveRequests() {
                 <p className="opacity-60">Tanggal Selesai</p>
                 <p className="font-semibold">
                   {selectedItem.end_date
-                    ? new Date(selectedItem.end_date).toLocaleDateString(
-                        "id-ID",
-                      )
+                    ? formatDateOnly(selectedItem.end_date)
                     : "-"}
                 </p>
               </div>

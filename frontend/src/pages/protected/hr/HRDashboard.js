@@ -18,20 +18,14 @@ import {
   ChevronRightIcon,
   ShieldCheckIcon,
 } from "@heroicons/react/24/outline";
+import { formatDateOnly, getTodayDateKey } from "../../../utils/dateUtils";
 
 const SummaryPagination = () => (
   <Pagination page={1} totalPages={1} onChangePage={() => {}} />
 );
 
 const formatDateLabel = (value) => {
-  if (!value) return "-";
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return "-";
-  return date.toLocaleDateString("id-ID", {
-    day: "2-digit",
-    month: "short",
-    year: "numeric",
-  });
+  return formatDateOnly(value);
 };
 
 const formatViolationCounts = (item) => {
@@ -248,7 +242,7 @@ function HRDashboard() {
   const salaryAppeals = dashboard?.salary_appeals || {};
   const attendanceSummary = dashboard?.attendance_summary || {};
   const organization = dashboard?.organization || {};
-  const todayDate = new Date().toISOString().split("T")[0];
+  const todayDate = getTodayDateKey();
   const leaveYearlyTotal = Number(leaveManagement.stats?.yearly_total || 0);
   const leaveMonthlyHistory = Number(
     leaveManagement.stats?.monthly_total || leaveManagement.stats?.total || 0,
@@ -578,13 +572,8 @@ function HRDashboard() {
                             </span>
                           </td>
                           <td className="text-xs font-medium text-slate-500">
-                            {new Date(item.start_date).toLocaleDateString(
-                              "id-ID",
-                            )}{" "}
-                            -{" "}
-                            {new Date(item.end_date).toLocaleDateString(
-                              "id-ID",
-                            )}
+                            {formatDateOnly(item.start_date)} -{" "}
+                            {formatDateOnly(item.end_date)}
                           </td>
                           <td>
                             <span className="badge badge-warning badge-sm rounded-full">

@@ -4,6 +4,7 @@ import axios from "axios"
 import TitleCard from "../../../components/Cards/TitleCard"
 import { showNotification } from '../../common/headerSlice'
 import { pegawaiApi } from '../../pegawai/api'
+import { toDateInputValue } from "../../../utils/dateUtils"
 
 const INITIAL_PROFILE_FORM = {
     user_id: '',
@@ -52,6 +53,21 @@ const INITIAL_PASSWORD_FORM = {
     newPassword: '',
 }
 
+const onlyDigits = (value = '') => String(value).replace(/\D/g, '')
+
+const normalizeProfileField = (field, value) => {
+    if (field === 'nik') return onlyDigits(value).slice(0, 16)
+    return value
+}
+
+const validateProfileIdentityNumbers = ({ nik }) => {
+    if (nik && !/^\d{16}$/.test(nik)) {
+        return 'NIK harus 16 angka'
+    }
+
+    return ''
+}
+
 function ProfileSettings(){
     const dispatch = useDispatch()
     const [loading, setLoading] = useState(true)
@@ -66,13 +82,14 @@ function ProfileSettings(){
     const [passwordForm, setPasswordForm] = useState(INITIAL_PASSWORD_FORM)
     const [selectedPreview, setSelectedPreview] = useState(null)
 
-    const formatDateForInput = (value) => (value ? String(value).slice(0, 10) : '')
+    const formatDateForInput = toDateInputValue
     const getFileUrl = (filePath) => {
         if (!filePath) return ''
         if (/^https?:\/\//i.test(filePath)) return filePath
-        const baseUrl = (process.env.REACT_APP_BASE_URL || 'http://localhost:5000').replace(/\/$/, '')
+        const appOrigin = typeof window !== 'undefined' ? window.location.origin : ''
+        const baseUrl = (process.env.REACT_APP_BASE_URL || appOrigin).replace(/\/$/, '')
         const normalizedPath = String(filePath).replace(/^\/+/, '')
-        return `${baseUrl}/${normalizedPath}`
+        return baseUrl ? `${baseUrl}/${normalizedPath}` : `/${normalizedPath}`
     }
     const formatMataUangIDR = (value) => {
         const angka = Number(value || 0)
@@ -200,7 +217,7 @@ function ProfileSettings(){
     }, [loadProfile])
 
     const updateProfileField = (field, value) => {
-        setProfileForm((prev) => ({ ...prev, [field]: value }))
+        setProfileForm((prev) => ({ ...prev, [field]: normalizeProfileField(field, value) }))
     }
 
     const updatePasswordField = (field, value) => {
@@ -212,6 +229,12 @@ function ProfileSettings(){
 
         if (!profileForm.name || !profileForm.email) {
             setError('Nama dan email wajib diisi')
+            return
+        }
+
+        const identityError = validateProfileIdentityNumbers(profileForm)
+        if (identityError) {
+            setError(identityError)
             return
         }
 
@@ -364,7 +387,7 @@ function ProfileSettings(){
                         </div>
                         <div className="form-control w-full">
                             <label className="label"><span className="label-text">NIK</span></label>
-                            <input className="input input-bordered" value={profileForm.nik} onChange={(e) => updateProfileField('nik', e.target.value)} />
+                            <input className="input input-bordered" inputMode="numeric" maxLength={16} value={profileForm.nik} onChange={(e) => updateProfileField('nik', e.target.value)} />
                         </div>
                         <div className="form-control w-full md:col-span-2">
                             <label className="label"><span className="label-text">Alamat</span></label>

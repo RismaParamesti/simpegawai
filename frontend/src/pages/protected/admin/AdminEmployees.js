@@ -1,14 +1,44 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useLocation } from "react-router-dom";
 import { useDispatch } from "react-redux";
-import { setPageTitle } from "../../../features/common/headerSlice";
+import {
+  setPageTitle,
+  showNotification,
+} from "../../../features/common/headerSlice";
 import TitleCard from "../../../components/Cards/TitleCard";
 import Pagination from "../../../components/Pagination/Pagination";
 import { adminApi } from "../../../features/admin/api";
 import useTablePagination from "../../../hooks/useTablePagination";
+import { toDateInputValue } from "../../../utils/dateUtils";
 
 const normalizeText = (value = "") =>
   String(value).toLowerCase().replace(/\s+/g, " ").trim();
+
+const onlyDigits = (value = "") => String(value).replace(/\D/g, "");
+
+const limitDigits = (value, maxLength) => onlyDigits(value).slice(0, maxLength);
+
+const normalizeIdentityField = (field, value) => {
+  if (field === "nik" || field === "npwp") return limitDigits(value, 16);
+  if (field === "bpjs_number") return limitDigits(value, 13);
+  return value;
+};
+
+const validateIdentityNumbers = ({ nik, npwp, bpjs_number }) => {
+  if (nik && !/^\d{16}$/.test(nik)) {
+    return "NIK harus 16 angka";
+  }
+
+  if (npwp && !/^\d{16}$/.test(npwp)) {
+    return "NPWP harus 16 angka";
+  }
+
+  if (bpjs_number && !/^\d{11,13}$/.test(bpjs_number)) {
+    return "BPJS harus minimal 11 dan maksimal 13 angka";
+  }
+
+  return "";
+};
 
 const formatRupiah = (value) =>
   `Rp. ${Number(value || 0).toLocaleString("id-ID")}`;
@@ -16,6 +46,8 @@ const formatRupiah = (value) =>
 const API_ORIGIN = (process.env.REACT_APP_BASE_URL || "")
   .replace(/\/api\/?$/, "")
   .replace(/\/$/, "");
+const APP_ORIGIN = typeof window !== "undefined" ? window.location.origin : "";
+const ASSET_ORIGIN = API_ORIGIN || APP_ORIGIN;
 
 const getEmployeePhotoUrl = (photoPath) => {
   if (!photoPath) return "https://placeimg.com/120/120/people";
@@ -24,8 +56,8 @@ const getEmployeePhotoUrl = (photoPath) => {
   const normalizedPath = String(photoPath).startsWith("/")
     ? String(photoPath)
     : `/${photoPath}`;
-  if (API_ORIGIN) return `${API_ORIGIN}${normalizedPath}`;
-  return `http://localhost:5000${normalizedPath}`;
+  if (ASSET_ORIGIN) return `${ASSET_ORIGIN}${normalizedPath}`;
+  return normalizedPath;
 };
 
 const getDocumentUrl = (documentPath) => {
@@ -35,8 +67,8 @@ const getDocumentUrl = (documentPath) => {
   const normalizedPath = String(documentPath).startsWith("/")
     ? String(documentPath)
     : `/${documentPath}`;
-  if (API_ORIGIN) return `${API_ORIGIN}${normalizedPath}`;
-  return `http://localhost:5000${normalizedPath}`;
+  if (ASSET_ORIGIN) return `${ASSET_ORIGIN}${normalizedPath}`;
+  return normalizedPath;
 };
 
 const getDocumentFileType = (pathValue) => {
@@ -54,8 +86,18 @@ const getDocumentFileType = (pathValue) => {
   return "unknown";
 };
 
-const isManagerLevelPosition = (position) =>
-  normalizeText(position?.level) === "manager";
+const isLeadershipPosition = (position) => {
+  const normalizedLevel = normalizeText(position?.level);
+  const normalizedName = normalizeText(position?.name);
+
+  return (
+    normalizedLevel === "manager" ||
+    normalizedLevel === "director" ||
+    normalizedLevel === "direktur" ||
+    normalizedName.includes("director") ||
+    normalizedName.includes("direktur")
+  );
+};
 
 const getRawAutoRolesForCreateForm = (formState, allPositions) => {
   const autoRoles = new Set(["pegawai"]);
@@ -78,7 +120,7 @@ const getRawAutoRolesForCreateForm = (formState, allPositions) => {
     (position) => String(position.id) === String(formState.position_id),
   );
   const normalizedPosition = normalizeText(selectedPosition?.name);
-  if (isManagerLevelPosition(selectedPosition)) {
+  if (isLeadershipPosition(selectedPosition)) {
     autoRoles.add("atasan");
   }
 
@@ -312,7 +354,9 @@ function AdminEmployees() {
   };
 
   const updateCreateForm = (field, value) => {
-    setCreateForm((prev) => applyAutoRoles({ ...prev, [field]: value }));
+    setCreateForm((prev) =>
+      applyAutoRoles({ ...prev, [field]: normalizeIdentityField(field, value) }),
+    );
   };
 
   const handleFilterChange = (field, value) => {
@@ -368,6 +412,12 @@ function AdminEmployees() {
 
     if (!createForm.roles.length) {
       setError("Minimal 1 role harus dipilih");
+      return;
+    }
+
+    const identityError = validateIdentityNumbers(createForm);
+    if (identityError) {
+      setError(identityError);
       return;
     }
 
@@ -467,9 +517,7 @@ function AdminEmployees() {
         phone: employee.phone || "",
         gender: employee.gender || "",
         birth_place: employee.birth_place || "",
-        date_of_birth: employee.date_of_birth
-          ? String(employee.date_of_birth).slice(0, 10)
-          : "",
+        date_of_birth: toDateInputValue(employee.date_of_birth),
         marital_status: employee.marital_status || "",
         nationality: employee.nationality || "",
         address: employee.address || "",
@@ -481,9 +529,7 @@ function AdminEmployees() {
         bank_name: employee.bank_name || "",
         department_name: employee.department_name || "",
         position_id: employee.position_id ? String(employee.position_id) : "",
-        join_date: employee.join_date
-          ? String(employee.join_date).slice(0, 10)
-          : "",
+        join_date: toDateInputValue(employee.join_date),
         user_status: employee.status || "active",
         employment_status: employee.employment_status || "permanent",
         roles: rolesFromEmployee.length ? rolesFromEmployee : rolesFromUser,
@@ -543,6 +589,12 @@ function AdminEmployees() {
 
   const handleSaveEdit = async () => {
     if (!editingEmployee) return;
+
+    const identityError = validateIdentityNumbers(editingEmployee);
+    if (identityError) {
+      setError(identityError);
+      return;
+    }
 
     try {
       setSubmitting(true);
@@ -651,6 +703,12 @@ function AdminEmployees() {
         });
       }
 
+      dispatch(
+        showNotification({
+          message: "Data pegawai berhasil diperbarui",
+          status: 1,
+        }),
+      );
       setEditingEmployee(null);
       setEditDocuments(INITIAL_DOCUMENTS);
       await loadData();
@@ -682,10 +740,6 @@ function AdminEmployees() {
       case "contract":
       case "kontrak":
         return "badge badge-warning text-black";
-
-      case "intern":
-      case "magang":
-        return "badge badge-info text-white";
 
       default:
         return "badge badge-outline";
@@ -814,9 +868,7 @@ function AdminEmployees() {
                         </span>
                       </td>
                       <td className="text-center whitespace-nowrap">
-                        {employee.join_date
-                          ? String(employee.join_date).slice(0, 10)
-                          : "-"}
+                        {toDateInputValue(employee.join_date) || "-"}
                       </td>
                       <td>
                         <div className="flex items-center gap-2 whitespace-nowrap">
@@ -989,18 +1041,24 @@ function AdminEmployees() {
                 <input
                   className="input input-bordered"
                   placeholder="NIK"
+                  inputMode="numeric"
+                  maxLength={16}
                   value={createForm.nik}
                   onChange={(e) => updateCreateForm("nik", e.target.value)}
                 />
                 <input
                   className="input input-bordered"
                   placeholder="NPWP"
+                  inputMode="numeric"
+                  maxLength={16}
                   value={createForm.npwp}
                   onChange={(e) => updateCreateForm("npwp", e.target.value)}
                 />
                 <input
                   className="input input-bordered"
                   placeholder="Nomor BPJS"
+                  inputMode="numeric"
+                  maxLength={13}
                   value={createForm.bpjs_number}
                   onChange={(e) =>
                     updateCreateForm("bpjs_number", e.target.value)
@@ -1098,7 +1156,6 @@ function AdminEmployees() {
                 >
                   <option value="permanent">Pegawai Tetap</option>
                   <option value="contract">Pegawai Kontrak</option>
-                  <option value="intern">Pegawai Magang</option>
                 </select>
               </div>
             </div>
@@ -1285,9 +1342,7 @@ function AdminEmployees() {
                   <div>
                     <span className="font-semibold">Tanggal Lahir:</span>{" "}
                     {getDisplayValue(
-                      viewingEmployee.date_of_birth
-                        ? String(viewingEmployee.date_of_birth).slice(0, 10)
-                        : "",
+                      toDateInputValue(viewingEmployee.date_of_birth),
                     )}
                   </div>
                   <div>
@@ -1345,9 +1400,7 @@ function AdminEmployees() {
                   <div>
                     <span className="font-semibold">Tanggal Bergabung:</span>{" "}
                     {getDisplayValue(
-                      viewingEmployee.join_date
-                        ? String(viewingEmployee.join_date).slice(0, 10)
-                        : "",
+                      toDateInputValue(viewingEmployee.join_date),
                     )}
                   </div>
                   <div>
@@ -1725,33 +1778,42 @@ function AdminEmployees() {
                   <input
                     className="input input-bordered"
                     placeholder="NIK"
+                    inputMode="numeric"
+                    maxLength={16}
                     value={editingEmployee.nik || ""}
                     onChange={(e) =>
                       setEditingEmployee({
                         ...editingEmployee,
-                        nik: e.target.value,
+                        nik: normalizeIdentityField("nik", e.target.value),
                       })
                     }
                   />
                   <input
                     className="input input-bordered"
                     placeholder="NPWP"
+                    inputMode="numeric"
+                    maxLength={16}
                     value={editingEmployee.npwp || ""}
                     onChange={(e) =>
                       setEditingEmployee({
                         ...editingEmployee,
-                        npwp: e.target.value,
+                        npwp: normalizeIdentityField("npwp", e.target.value),
                       })
                     }
                   />
                   <input
                     className="input input-bordered"
                     placeholder="Nomor BPJS"
+                    inputMode="numeric"
+                    maxLength={13}
                     value={editingEmployee.bpjs_number || ""}
                     onChange={(e) =>
                       setEditingEmployee({
                         ...editingEmployee,
-                        bpjs_number: e.target.value,
+                        bpjs_number: normalizeIdentityField(
+                          "bpjs_number",
+                          e.target.value,
+                        ),
                       })
                     }
                   />
@@ -1871,7 +1933,6 @@ function AdminEmployees() {
                   >
                     <option value="permanent">Tetap</option>
                     <option value="contract">Kontrak</option>
-                    <option value="intern">Magang</option>
                   </select>
                   <div className="relative">
                     <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm text-base-content/70">

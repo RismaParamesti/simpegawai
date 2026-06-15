@@ -11,17 +11,41 @@ const {
   getUserAgent,
 } = require("../middleware/activityLogger");
 
+const validateIdentityNumbers = ({ nik, npwp, bpjs_number }) => {
+  if (nik && !/^\d{16}$/.test(String(nik))) {
+    return "NIK harus 16 angka";
+  }
+
+  if (npwp && !/^\d{16}$/.test(String(npwp))) {
+    return "NPWP harus 16 angka";
+  }
+
+  if (bpjs_number && !/^\d{11,13}$/.test(String(bpjs_number))) {
+    return "BPJS harus minimal 11 dan maksimal 13 angka";
+  }
+
+  return "";
+};
+
 const syncAtasanRoleByPosition = async (userId, positionId) => {
   if (!userId || !positionId) return;
 
   const [positionRows] = await db
     .promise()
-    .query("SELECT level FROM positions WHERE id = ?", [positionId]);
+    .query("SELECT name, level FROM positions WHERE id = ?", [positionId]);
 
   if (positionRows.length === 0) return;
 
-  const isManagerLevel =
-    String(positionRows[0].level || "").toLowerCase().trim() === "manager";
+  const positionName = String(positionRows[0].name || "").toLowerCase().trim();
+  const positionLevel = String(positionRows[0].level || "")
+    .toLowerCase()
+    .trim();
+  const isLeadershipPosition =
+    positionLevel === "manager" ||
+    positionLevel === "director" ||
+    positionLevel === "direktur" ||
+    positionName.includes("director") ||
+    positionName.includes("direktur");
 
   const [roles] = await db.promise().query(
     `SELECT r.name
@@ -34,7 +58,7 @@ const syncAtasanRoleByPosition = async (userId, positionId) => {
   const roleSet = new Set(roles.map((role) => role.name));
   roleSet.add("pegawai");
 
-  if (isManagerLevel) {
+  if (isLeadershipPosition) {
     roleSet.add("atasan");
   } else {
     roleSet.delete("atasan");
@@ -257,6 +281,11 @@ router.put(
     } = req.body;
 
     try {
+      const identityError = validateIdentityNumbers({ nik, npwp, bpjs_number });
+      if (identityError) {
+        return res.status(400).json({ message: identityError });
+      }
+
       // Cek apakah employee exists
       const [employeeCheck] = await db
         .promise()

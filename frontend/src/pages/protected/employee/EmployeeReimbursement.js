@@ -7,6 +7,7 @@ import {
 import TitleCard from "../../../components/Cards/TitleCard";
 import Pagination from "../../../components/Pagination/Pagination";
 import { pegawaiApi } from "../../../features/pegawai/api";
+import { formatDateOnly, toDateInputValue } from "../../../utils/dateUtils";
 
 const INITIAL_FORM = {
   reimbursement_type: "",
@@ -160,12 +161,7 @@ function EmployeeReimbursement() {
 
       // single date filter (match same day)
       if (dateFilter && item?.created_at) {
-        const itemDate = new Date(item.created_at);
-        const targetStart = new Date(dateFilter);
-        targetStart.setHours(0, 0, 0, 0);
-        const targetEnd = new Date(dateFilter);
-        targetEnd.setHours(23, 59, 59, 999);
-        if (itemDate < targetStart || itemDate > targetEnd) return false;
+        if (toDateInputValue(item.created_at) !== dateFilter) return false;
       }
 
       return true;
@@ -410,9 +406,7 @@ function EmployeeReimbursement() {
                     <tr key={item.id} className="align-top">
                       <td className="whitespace-nowrap">
                         {item.created_at
-                          ? new Date(item.created_at).toLocaleDateString(
-                              "id-ID",
-                            )
+                          ? formatDateOnly(item.created_at)
                           : "-"}
                       </td>
                       <td>

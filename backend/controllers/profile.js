@@ -8,6 +8,14 @@ const fsp = require("fs/promises");
 const path = require("path");
 const { verifyToken, verifyRole } = require("../middleware/authMiddleware");
 
+const validateIdentityNumbers = ({ nik }) => {
+    if (nik && !/^\d{16}$/.test(String(nik))) {
+        return "NIK harus 16 angka";
+    }
+
+    return "";
+};
+
 const profileStorage = multer.diskStorage({
     destination: (req, file, cb) => {
         let uploadDir = path.join(__dirname, "../uploads/profile_photos");
@@ -268,6 +276,11 @@ router.put("/", verifyToken, uploadProfileFiles, async (req, res) => {
     // Validasi input
     if (!name || !email) {
         return res.status(400).json({ message: "Name and email are required" });
+    }
+
+    const identityError = validateIdentityNumbers({ nik });
+    if (identityError) {
+        return res.status(400).json({ message: identityError });
     }
 
     try {
