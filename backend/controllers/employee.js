@@ -563,39 +563,65 @@ router.delete(
   verifyRole(["admin", "hr"]),
   async (req, res) => {
     const { id } = req.params;
+    let connection;
 
     try {
+      connection = await db.promise().getConnection();
+      await connection.beginTransaction();
+
       // Cek apakah employee exists
-      const [employeeCheck] = await db
-        .promise()
-        .query(
-          "SELECT id, user_id FROM employees WHERE id = ? AND deleted_at IS NULL",
-          [id],
-        );
+      const [employeeCheck] = await connection.query(
+        "SELECT id, user_id FROM employees WHERE id = ? AND deleted_at IS NULL",
+        [id],
+      );
 
       if (employeeCheck.length === 0) {
+        await connection.rollback();
+        connection.release();
+        connection = null;
         return res.status(404).json({ message: "Employee not found" });
       }
 
       const employee = employeeCheck[0];
+      let userAccountDeleted = false;
+      let userAccessRemoved = false;
 
       // Soft delete employee record
-      await db
-        .promise()
-        .query(
-          "UPDATE employees SET deleted_at = NOW(), updated_at = NOW() WHERE id = ?",
-          [id],
-        );
+      await connection.query(
+        "UPDATE employees SET deleted_at = NOW(), updated_at = NOW() WHERE id = ?",
+        [id],
+      );
 
-      // Nonaktifkan akun user agar tidak bisa login
+      // Hapus akun user terkait. Jika tertahan referensi historis, cabut semua aksesnya.
       if (employee.user_id) {
-        await db
-          .promise()
-          .query(
+        await connection.query("DELETE FROM user_roles WHERE user_id = ?", [
+          employee.user_id,
+        ]);
+
+        try {
+          await connection.query("DELETE FROM users WHERE id = ?", [
+            employee.user_id,
+          ]);
+          userAccountDeleted = true;
+        } catch (userDeleteError) {
+          if (
+            userDeleteError?.errno !== 1451 &&
+            userDeleteError?.code !== "ER_ROW_IS_REFERENCED_2"
+          ) {
+            throw userDeleteError;
+          }
+
+          await connection.query(
             "UPDATE users SET status = 'inactive', updated_at = NOW() WHERE id = ?",
             [employee.user_id],
           );
+          userAccessRemoved = true;
+        }
       }
+
+      await connection.commit();
+      connection.release();
+      connection = null;
 
       // Log employee deletion
       await logActivity({
@@ -604,13 +630,29 @@ router.delete(
         role: req.user.roles?.[0] || req.user.role,
         action: "DELETE",
         module: "employees",
-        description: `Deleted employee ID: ${id}`,
+        description: `Deleted employee ID: ${id}; user account ${
+          userAccountDeleted
+            ? "deleted"
+            : userAccessRemoved
+              ? "access removed"
+              : "not linked"
+        }`,
         ipAddress: getIpAddress(req),
         userAgent: getUserAgent(req),
       });
 
-      res.json({ message: "Employee deleted successfully" });
+      res.json({
+        message: userAccessRemoved
+          ? "Employee deleted successfully. User account access was removed because the account is still referenced by historical data."
+          : "Employee and user account deleted successfully",
+        user_deleted: userAccountDeleted,
+        user_access_removed: userAccessRemoved,
+      });
     } catch (error) {
+      if (connection) {
+        await connection.rollback();
+        connection.release();
+      }
       console.error(error);
       // Log failed employee deletion
       await logActivity({

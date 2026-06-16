@@ -23,6 +23,39 @@ const sendEmptyWarningLetters = (res, message) =>
         data: [],
     });
 
+const emptyAutoAlphaWhereSql = (alias = "") => {
+    const prefix = alias ? `${alias}.` : "";
+    return `(
+        LOWER(COALESCE(${prefix}status, '')) = 'alpha'
+        AND ${prefix}check_in IS NULL
+        AND ${prefix}check_out IS NULL
+        AND (${prefix}notes IS NULL OR TRIM(${prefix}notes) = '')
+        AND ${prefix}leave_request_id IS NULL
+        AND COALESCE(${prefix}is_late, 0) = 0
+        AND COALESCE(${prefix}late_minutes, 0) = 0
+        AND ${prefix}working_hours IS NULL
+        AND COALESCE(${prefix}overtime_hours, 0) = 0
+    )`;
+};
+
+const countableAttendanceWhereSql = (alias = "") =>
+    `NOT ${emptyAutoAlphaWhereSql(alias)}`;
+
+const isEmptyAutoAlphaRow = (row) => {
+    if (String(row?.status || "").toLowerCase() !== "alpha") return false;
+
+    return (
+        !row.check_in &&
+        !row.check_out &&
+        !String(row.notes || "").trim() &&
+        !row.leave_request_id &&
+        Number(row.is_late || 0) === 0 &&
+        Number(row.late_minutes || 0) === 0 &&
+        (row.working_hours === null || row.working_hours === undefined) &&
+        Number(row.overtime_hours || 0) === 0
+    );
+};
+
 const normalizeSpLevel = (value) => {
     const raw = String(value || "").toLowerCase().trim();
     if (!raw) return null;
@@ -433,10 +466,11 @@ const getAlphaViolationContext = async (employeeId) => {
     const employeeCreatedDate = employeeData[0].created_at;
 
     const [rows] = await db.promise().query(
-        `SELECT date, status
+        `SELECT date, status, check_in, check_out, notes, leave_request_id, working_hours, overtime_hours, is_late, late_minutes
          FROM attendance
          WHERE employee_id = ?
            AND date >= DATE(?)
+           AND ${countableAttendanceWhereSql()}
          ORDER BY date DESC`,
         [employeeId, employeeCreatedDate]
     );
@@ -453,12 +487,14 @@ const getAlphaViolationContext = async (employeeId) => {
 
     for (const row of rows) {
         const status = String(row.status || "").toLowerCase();
+        const isCountableAlpha =
+            status === "alpha" && !isEmptyAutoAlphaRow(row);
 
-        if (status === "alpha") {
+        if (isCountableAlpha) {
             alphaAccumulatedDays += 1;
         }
 
-        if (!latestAlphaDate && status === "alpha") {
+        if (!latestAlphaDate && isCountableAlpha) {
             latestAlphaDate = toDateOnly(row.date);
         }
 
@@ -466,7 +502,7 @@ const getAlphaViolationContext = async (employeeId) => {
             continue;
         }
 
-        if (status === "alpha") {
+        if (isCountableAlpha) {
             streakStarted = true;
             consecutiveAlphaDays += 1;
             streakStartDate = toDateOnly(row.date);
@@ -559,7 +595,23 @@ const buildActiveViolationListQuery = ({ scope = "all" } = {}) => {
                  LEFT JOIN positions p ON e.position_id = p.id
                  LEFT JOIN departments d ON p.department_id = d.id
                  WHERE wl.status = 'active'
-                     AND wl.valid_until >= CURDATE()`;
+                     AND wl.valid_until >= CURDATE()
+                     AND (
+                         (COALESCE(wl.generated_by, 'hr') <> 'system' AND wl.auto_letter_number IS NULL)
+                         OR EXISTS (
+                             SELECT 1
+                             FROM attendance a
+                             WHERE a.employee_id = wl.employee_id
+                               AND YEAR(a.date) = YEAR(CURDATE())
+                               AND ${countableAttendanceWhereSql("a")}
+                               AND (
+                                   a.status = 'alpha'
+                                   OR COALESCE(a.is_late, 0) = 1
+                                   OR COALESCE(a.late_minutes, 0) > 60
+                               )
+                             LIMIT 1
+                         )
+                     )`;
 
     if (scope === "team") {
         return `${baseQuery}
@@ -627,7 +679,7 @@ router.get(
                     e.alpha_sanction_level,
                     e.alpha_consecutive_days,
                     e.alpha_accumulated_days,
-                          MAX(CASE WHEN a.status = 'alpha' THEN a.date END) AS latest_alpha_date,
+                          MAX(CASE WHEN a.status = 'alpha' AND ${countableAttendanceWhereSql("a")} THEN a.date END) AS latest_alpha_date,
                     GROUP_CONCAT(DISTINCT LOWER(r.name)) AS roles_csv
                  FROM employees e
                  JOIN users u ON e.user_id = u.id
@@ -717,7 +769,10 @@ router.get(
 
             let finalQuery = query;
             if (employee_id) {
-                finalQuery = query.replace("WHERE wl.status = 'active'\n           AND wl.valid_until >= CURDATE()", "WHERE wl.status = 'active'\n           AND wl.valid_until >= CURDATE()\n           AND wl.employee_id = ?");
+                finalQuery = query.replace(
+                    "WHERE wl.status = 'active'",
+                    "WHERE wl.status = 'active'\n           AND wl.employee_id = ?"
+                );
                 params.push(employee_id);
             }
 
@@ -860,6 +915,22 @@ router.get("/my", verifyToken, verifyRole(["pegawai"]), async (req, res) => {
              LEFT JOIN positions p ON e.position_id = p.id
              LEFT JOIN departments d ON p.department_id = d.id
              WHERE wl.employee_id = ?
+               AND (
+                   (COALESCE(wl.generated_by, 'hr') <> 'system' AND wl.auto_letter_number IS NULL)
+                   OR EXISTS (
+                       SELECT 1
+                       FROM attendance a
+                       WHERE a.employee_id = wl.employee_id
+                         AND YEAR(a.date) = YEAR(CURDATE())
+                         AND ${countableAttendanceWhereSql("a")}
+                         AND (
+                             a.status = 'alpha'
+                             OR COALESCE(a.is_late, 0) = 1
+                             OR COALESCE(a.late_minutes, 0) > 60
+                         )
+                       LIMIT 1
+                   )
+               )
              ORDER BY wl.issued_date DESC, wl.id DESC`,
             [employeeId]
         );

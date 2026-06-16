@@ -180,6 +180,27 @@ const expireOutdatedWarningLettersForEmployee = async (employeeId) => {
   }
 };
 
+const expireAutoAttendanceWarningsForEmployee = async (employeeId) => {
+  try {
+    await db.promise().query(
+      `UPDATE warning_letters
+             SET status = 'expired', updated_at = NOW()
+             WHERE employee_id = ?
+               AND status = 'active'
+               AND (
+                 generated_by = 'system'
+                 OR auto_letter_number IS NOT NULL
+               )`,
+      [employeeId],
+    );
+  } catch (error) {
+    if (isMissingWarningLettersTableError(error)) {
+      return;
+    }
+    throw error;
+  }
+};
+
 const persistAutoWarningLetter = async ({
   employeeId,
   rule,
@@ -427,6 +448,74 @@ const mapLeaveTypeToAttendanceStatus = (leaveType) => {
   return "izin";
 };
 
+const isDayBasedLeaveForPayrollSummary = (leaveRequest) => {
+  const leaveType = String(leaveRequest?.leave_type || "").toLowerCase();
+  const specialOption = String(
+    leaveRequest?.cuti_khusus_option || "",
+  ).toLowerCase();
+
+  if (leaveType === "izin_terlambat") return false;
+  if (
+    leaveType === "cuti_khusus" &&
+    ["terlambat", "pulang_cepat"].includes(specialOption)
+  ) {
+    return false;
+  }
+
+  return true;
+};
+
+const getApprovedLeaveDateSummaryForPeriod = async (
+  employeeId,
+  periodMonth,
+  periodYear,
+) => {
+  const periodStart = `${periodYear}-${String(periodMonth).padStart(2, "0")}-01`;
+  const periodEndDate = new Date(Number(periodYear), Number(periodMonth), 0);
+  const periodEnd = formatDateOnly(periodEndDate);
+
+  const [rows] = await db.promise().query(
+    `SELECT leave_type, start_date, end_date, cuti_khusus_option
+     FROM leave_requests
+     WHERE employee_id = ?
+       AND status = 'approved'
+       AND end_date >= ?
+       AND start_date <= ?`,
+    [employeeId, periodStart, periodEnd],
+  );
+
+  const datesByStatus = {
+    izin: new Set(),
+    sakit: new Set(),
+  };
+
+  for (const row of rows) {
+    if (!isDayBasedLeaveForPayrollSummary(row)) continue;
+
+    const start = new Date(
+      Math.max(new Date(row.start_date).getTime(), new Date(periodStart).getTime()),
+    );
+    const end = new Date(
+      Math.min(new Date(row.end_date).getTime(), new Date(periodEnd).getTime()),
+    );
+    const status = mapLeaveTypeToAttendanceStatus(row.leave_type);
+
+    for (
+      let cursor = new Date(start);
+      cursor <= end;
+      cursor.setDate(cursor.getDate() + 1)
+    ) {
+      if (isNonWorkingDay(cursor)) continue;
+      datesByStatus[status].add(formatDateOnly(cursor));
+    }
+  }
+
+  return {
+    izinDays: datesByStatus.izin.size,
+    sakitDays: datesByStatus.sakit.size,
+  };
+};
+
 const formatServiceRequirement = (months) => {
   const totalMonths = Number(months) || 0;
   if (totalMonths % 12 === 0) {
@@ -583,6 +672,43 @@ const getEmployeeCreatedDateOnly = async (employeeId) => {
   createdDate.setHours(0, 0, 0, 0);
   return createdDate;
 };
+
+const emptyAutoAlphaWhereSql = (alias = "") => {
+  const prefix = alias ? `${alias}.` : "";
+  return `(
+    LOWER(COALESCE(${prefix}status, '')) = 'alpha'
+    AND ${prefix}check_in IS NULL
+    AND ${prefix}check_out IS NULL
+    AND (${prefix}notes IS NULL OR TRIM(${prefix}notes) = '')
+    AND ${prefix}leave_request_id IS NULL
+    AND COALESCE(${prefix}is_late, 0) = 0
+    AND COALESCE(${prefix}late_minutes, 0) = 0
+    AND ${prefix}working_hours IS NULL
+    AND COALESCE(${prefix}overtime_hours, 0) = 0
+  )`;
+};
+
+const countableAttendanceWhereSql = (alias = "") =>
+  `NOT ${emptyAutoAlphaWhereSql(alias)}`;
+
+const isEmptyAutoAlphaRow = (row) => {
+  if (String(row?.status || "").toLowerCase() !== "alpha") return false;
+
+  return (
+    !row.check_in &&
+    !row.check_out &&
+    !String(row.notes || "").trim() &&
+    !row.leave_request_id &&
+    Number(row.is_late || 0) === 0 &&
+    Number(row.late_minutes || 0) === 0 &&
+    (row.working_hours === null || row.working_hours === undefined) &&
+    Number(row.overtime_hours || 0) === 0
+  );
+};
+
+const isDisciplinaryAlphaRow = (row) =>
+  String(row?.status || "").toLowerCase() === "alpha" &&
+  !isEmptyAutoAlphaRow(row);
 
 const applyApprovedLeaveEffects = async (leaveRequest) => {
   const startDate = parseLocalDateOnly(leaveRequest.start_date);
@@ -897,7 +1023,7 @@ const evaluateAlphaDisciplineForEmployee = async (employeeId) => {
   // For disciplinary counts we consider only the current calendar year
   const yearStart = `${new Date().getFullYear()}-01-01`;
   const [attendanceRows] = await db.promise().query(
-    `SELECT status, date
+    `SELECT status, date, check_in, check_out, notes, leave_request_id, working_hours, overtime_hours, is_late, late_minutes
                  FROM attendance
                  WHERE employee_id = ?
                      AND date >= DATE(?)
@@ -906,17 +1032,45 @@ const evaluateAlphaDisciplineForEmployee = async (employeeId) => {
     [employeeId, yearStart],
   );
 
-  const alphaAccumulatedDays = attendanceRows.reduce((total, row) => {
-    return total + (row.status === "alpha" ? 1 : 0);
+  const countableAttendanceRows = attendanceRows.filter(
+    (row) => !isEmptyAutoAlphaRow(row),
+  );
+
+  if (countableAttendanceRows.length === 0) {
+    await db.promise().query(
+      `UPDATE employees
+         SET alpha_consecutive_days = 0,
+             alpha_accumulated_days = 0,
+             alpha_sanction_level = ?,
+             alpha_last_evaluated_at = NOW(),
+             updated_at = NOW()
+         WHERE id = ?`,
+      [ALPHA_SANCTION_LEVEL.NONE, employeeId],
+    );
+    await expireAutoAttendanceWarningsForEmployee(employeeId);
+
+    return {
+      alpha_consecutive_days: 0,
+      alpha_accumulated_days: 0,
+      late_consecutive_days: 0,
+      late_accumulated_days: 0,
+      alpha_sanction_level: ALPHA_SANCTION_LEVEL.NONE,
+      alpha_sanction_label_from_rule: null,
+      account_locked: false,
+    };
+  }
+
+  const alphaAccumulatedDays = countableAttendanceRows.reduce((total, row) => {
+    return total + (isDisciplinaryAlphaRow(row) ? 1 : 0);
   }, 0);
 
   let alphaConsecutiveDays = 0;
-  for (const row of attendanceRows) {
+  for (const row of countableAttendanceRows) {
     if (row.status === "libur") {
       continue;
     }
 
-    if (row.status === "alpha") {
+    if (isDisciplinaryAlphaRow(row)) {
       alphaConsecutiveDays += 1;
       continue;
     }
@@ -925,20 +1079,31 @@ const evaluateAlphaDisciplineForEmployee = async (employeeId) => {
   }
 
   // compute late metrics used by some rules
-  const lateAccumulatedDays = attendanceRows.reduce((total, row) => {
-    const isLate = Number(row.late_minutes || 0) > 0 || Boolean(row.is_late);
+  const lateAccumulatedDays = countableAttendanceRows.reduce((total, row) => {
+    const isLate =
+      Number(row.late_minutes || 0) > LATE_TOLERANCE_MINUTES ||
+      Boolean(row.is_late);
     return total + (isLate ? 1 : 0);
   }, 0);
 
   let lateConsecutiveDays = 0;
-  for (const row of attendanceRows) {
-    const isLate = Number(row.late_minutes || 0) > 0 || Boolean(row.is_late);
+  for (const row of countableAttendanceRows) {
+    if (row.status === "libur") {
+      continue;
+    }
+
+    const isLate =
+      Number(row.late_minutes || 0) > LATE_TOLERANCE_MINUTES ||
+      Boolean(row.is_late);
     if (isLate) {
       lateConsecutiveDays += 1;
       continue;
     }
     break;
   }
+
+  const hasAttendanceViolation =
+    alphaAccumulatedDays > 0 || lateAccumulatedDays > 0;
 
   const sanctionResult = await getSanctionLevelFromAlphaCounts({
     alphaConsecutiveDays,
@@ -948,7 +1113,7 @@ const evaluateAlphaDisciplineForEmployee = async (employeeId) => {
   });
 
   const sanctionLevel =
-    sanctionResult && sanctionResult.level
+    hasAttendanceViolation && sanctionResult && sanctionResult.level
       ? sanctionResult.level
       : ALPHA_SANCTION_LEVEL.NONE;
   const sanctionLabelFromRule =
@@ -970,7 +1135,10 @@ const evaluateAlphaDisciplineForEmployee = async (employeeId) => {
   if (sanctionLevel && sanctionLevel !== ALPHA_SANCTION_LEVEL.NONE) {
     const latestViolationDate =
       attendanceRows.find(
-        (row) => String(row.status || "").toLowerCase() === "alpha",
+        (row) =>
+          isDisciplinaryAlphaRow(row) ||
+          Number(row.late_minutes || 0) > LATE_TOLERANCE_MINUTES ||
+          Boolean(row.is_late),
       )?.date || new Date();
 
     await persistAutoWarningLetter({
@@ -983,6 +1151,8 @@ const evaluateAlphaDisciplineForEmployee = async (employeeId) => {
       lateAccumulatedDays,
       violationDate: formatDateOnly(latestViolationDate),
     });
+  } else {
+    await expireAutoAttendanceWarningsForEmployee(employeeId);
   }
 
   return {
@@ -1781,11 +1951,10 @@ router.get(
 
       const employeeId = employeeResult[0].id;
 
-      // Auto-generate alpha untuk hari kerja yang belum punya record
-      await ensureAlphaAttendanceRecords(employeeId, month, year);
-
       // Build query dengan filter optional
-      let query = "SELECT * FROM attendance WHERE employee_id = ?";
+      let query = `SELECT * FROM attendance
+                   WHERE employee_id = ?
+                     AND ${countableAttendanceWhereSql()}`;
       const params = [employeeId];
 
       if (month && year) {
@@ -1844,9 +2013,6 @@ router.get(
 
       const employeeId = employeeResult[0].id;
 
-      // Pastikan alpha otomatis tercatat sebelum summary dihitung
-      await ensureAlphaAttendanceRecords(employeeId, month, year);
-
       // Build query dengan filter optional
       let query = `
                 SELECT 
@@ -1864,7 +2030,9 @@ router.get(
                     SUM(COALESCE(overtime_hours, 0)) as total_overtime_hours,
                     AVG(COALESCE(overtime_hours, 0)) as avg_overtime_hours
                 FROM attendance 
-                WHERE employee_id = ? AND date >= (SELECT DATE(created_at) FROM employees WHERE id = ?)`;
+                WHERE employee_id = ?
+                  AND date >= (SELECT DATE(created_at) FROM employees WHERE id = ?)
+                  AND ${countableAttendanceWhereSql()}`;
       const params = [employeeId, employeeId];
 
       if (month && year) {
@@ -2190,14 +2358,32 @@ router.get(
 
       const [summaryData] = await db.promise().query(query, params);
 
-      const mappedSummaryData = summaryData.map((row) => {
+      const mappedSummaryData = await Promise.all(summaryData.map(async (row) => {
         const alphaDays = Number(row.absent_days || 0);
         const unpaidLeaveDays = Number(row.unpaid_leave_days || 0);
         const lateDays = Number(row.late_days || 0);
         const latePenaltyDays = Number(row.late_penalty_days || 0);
+        const approvedLeaveSummary =
+          month && year
+            ? await getApprovedLeaveDateSummaryForPeriod(
+                row.employee_id,
+                Number(month),
+                Number(year),
+              )
+            : { izinDays: 0, sakitDays: 0 };
+        const permissionDays = Math.max(
+          Number(row.permission_days || 0),
+          approvedLeaveSummary.izinDays,
+        );
+        const sickDays = Math.max(
+          Number(row.sick_days || 0),
+          approvedLeaveSummary.sakitDays,
+        );
         const salaryPenaltyThreshold = 5;
         return {
           ...row,
+          permission_days: permissionDays,
+          sick_days: sickDays,
           alpha_days: alphaDays,
           unpaid_leave_days: unpaidLeaveDays,
           effective_absent_days: Number(
@@ -2207,7 +2393,7 @@ router.get(
           salary_penalty_triggered: lateDays >= salaryPenaltyThreshold,
           salary_penalty_units: Math.floor(lateDays / salaryPenaltyThreshold),
         };
-      });
+      }));
 
       res.status(200).json({
         message: "Attendance summary for all employees retrieved successfully",
@@ -2846,6 +3032,29 @@ router.post(
         });
       }
 
+      const [overlapRows] = await db.promise().query(
+        `SELECT id, leave_type, start_date, end_date
+                 FROM leave_requests
+                 WHERE employee_id = ?
+                   AND status = 'approved'
+                   AND start_date <= ?
+                   AND end_date >= ?
+                 ORDER BY start_date ASC, id ASC
+                 LIMIT 1`,
+        [employeeId, end_date, start_date],
+      );
+
+      if (overlapRows.length > 0) {
+        const overlap = overlapRows[0];
+        return res.status(400).json({
+          message: `Tidak bisa mengajukan cuti/izin karena sudah ada pengajuan disetujui pada tanggal ${formatDateOnly(overlap.start_date)} - ${formatDateOnly(overlap.end_date)}.`,
+          overlap_request_id: overlap.id,
+          overlap_leave_type: overlap.leave_type,
+          overlap_start_date: formatDateOnly(overlap.start_date),
+          overlap_end_date: formatDateOnly(overlap.end_date),
+        });
+      }
+
       const serviceDate =
         employeeResult[0].join_date || employeeResult[0].created_at;
       const serviceMonths = calculateServiceMonths(serviceDate);
@@ -3207,11 +3416,33 @@ router.put(
 
       const leaveRequest = leaveRequestRows[0];
 
-      if (String(leaveRequest.status || "").toLowerCase() !== "pending") {
+      const currentStatus = String(leaveRequest.status || "").toLowerCase();
+      if (!["pending", "approved"].includes(currentStatus)) {
         return res.status(400).json({
           message:
-            "Only pending leave requests can be cancelled by the requester",
+            "Only pending or approved leave requests can be cancelled by the requester",
         });
+      }
+
+      if (currentStatus === "approved") {
+        await db.promise().query(
+          `DELETE FROM attendance
+             WHERE employee_id = ?
+               AND leave_request_id = ?`,
+          [employeeId, leaveRequestId],
+        );
+
+        if (isQuotaDeductingLeaveType(leaveRequest.leave_type)) {
+          await db.promise().query(
+            `UPDATE employees
+               SET remaining_leave_quota = LEAST(
+                 COALESCE(annual_leave_quota, 12),
+                 COALESCE(remaining_leave_quota, 0) + ?
+               )
+               WHERE id = ?`,
+            [Number(leaveRequest.total_days || 0), employeeId],
+          );
+        }
       }
 
       await db.promise().query(
@@ -3238,6 +3469,7 @@ router.put(
           newValues: {
             request_id: leaveRequestId,
             status: "cancelled",
+            previous_status: currentStatus,
           },
           ipAddress: getIpAddress(req),
           userAgent: getUserAgent(req),
@@ -3323,6 +3555,8 @@ router.get(
       if (status) {
         query += " AND lr.status = ?";
         params.push(status);
+      } else {
+        query += " AND lr.status <> 'cancelled'";
       }
 
       if (employee_id) {
@@ -3501,6 +3735,37 @@ router.put(
         return res.status(400).json({
           message: `Leave request already ${leaveRequest.status}`,
         });
+      }
+
+      if (status === "approved") {
+        const [overlapRows] = await db.promise().query(
+          `SELECT id, leave_type, start_date, end_date
+                     FROM leave_requests
+                     WHERE employee_id = ?
+                       AND id <> ?
+                       AND status = 'approved'
+                       AND start_date <= ?
+                       AND end_date >= ?
+                     ORDER BY start_date ASC, id ASC
+                     LIMIT 1`,
+          [
+            leaveRequest.employee_id,
+            leaveRequest.id,
+            leaveRequest.end_date,
+            leaveRequest.start_date,
+          ],
+        );
+
+        if (overlapRows.length > 0) {
+          const overlap = overlapRows[0];
+          return res.status(400).json({
+            message: `Tidak bisa menyetujui pengajuan ini karena pegawai sudah memiliki cuti/izin disetujui pada tanggal ${formatDateOnly(overlap.start_date)} - ${formatDateOnly(overlap.end_date)}.`,
+            overlap_request_id: overlap.id,
+            overlap_leave_type: overlap.leave_type,
+            overlap_start_date: formatDateOnly(overlap.start_date),
+            overlap_end_date: formatDateOnly(overlap.end_date),
+          });
+        }
       }
 
       // Cari employee_id dari user yang approve

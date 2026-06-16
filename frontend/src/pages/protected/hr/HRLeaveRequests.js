@@ -57,6 +57,7 @@ function HRLeaveRequests() {
     const [employeeSearchOptions, setEmployeeSearchOptions] = useState([])
     const [employeeSearchInput, setEmployeeSearchInput] = useState('')
     const [selectedItem, setSelectedItem] = useState(null)
+    const [selectedProof, setSelectedProof] = useState(null)
     const [showModal, setShowModal] = useState(false)
     const [actionNotes, setActionNotes] = useState('')
     const [actionType, setActionType] = useState('') // 'approve' or 'reject'
@@ -207,6 +208,33 @@ function HRLeaveRequests() {
         if (!path) return ''
         const baseUrl = process.env.REACT_APP_API_URL || 'http://localhost:5000'
         return `${baseUrl}/${String(path).replace(/^\/+/, '')}`
+    }
+
+    const getFileTypeFromPath = (path) => {
+        const lowerPath = String(path || '').toLowerCase()
+        if (lowerPath.endsWith('.pdf')) return 'pdf'
+        if (
+            lowerPath.endsWith('.jpg') ||
+            lowerPath.endsWith('.jpeg') ||
+            lowerPath.endsWith('.png') ||
+            lowerPath.endsWith('.webp')
+        ) {
+            return 'image'
+        }
+        return 'unknown'
+    }
+
+    const openProofModal = (item) => {
+        if (!item?.bukti) return
+        setSelectedProof({
+            path: item.bukti,
+            type: getFileTypeFromPath(item.bukti),
+            title: `${item.employee_name || 'Pegawai'} - ${item.leave_type || 'Cuti/Izin'}`,
+        })
+    }
+
+    const closeProofModal = () => {
+        setSelectedProof(null)
     }
 
     return (
@@ -437,15 +465,14 @@ function HRLeaveRequests() {
                             <div>
                                 <label className="font-semibold">Bukti:</label>
                                 {selectedItem.bukti ? (
-                                    <p>
-                                        <a
-                                            href={getBuktiUrl(selectedItem.bukti)}
-                                            target="_blank"
-                                            rel="noreferrer"
-                                            className="link link-primary"
+                                    <p className="mt-2">
+                                        <button
+                                            type="button"
+                                            className="btn btn-outline btn-sm rounded-full"
+                                            onClick={() => openProofModal(selectedItem)}
                                         >
                                             Lihat bukti
-                                        </a>
+                                        </button>
                                     </p>
                                 ) : (
                                     <p className="opacity-70">Tidak ada bukti lampiran.</p>
@@ -497,6 +524,63 @@ function HRLeaveRequests() {
                     </div>
                 </div>
             )}
+
+            {selectedProof ? (
+                <div className="modal modal-open">
+                    <div className="modal-box max-w-4xl">
+                        <button
+                            type="button"
+                            className="btn btn-sm btn-circle absolute right-2 top-2"
+                            onClick={closeProofModal}
+                        >
+                            x
+                        </button>
+                        <h3 className="font-semibold text-xl mb-1">Bukti Pengajuan</h3>
+                        <p className="text-sm opacity-70 mb-4">{selectedProof.title}</p>
+
+                        <div className="w-full min-h-[420px] bg-base-200 rounded-lg overflow-hidden flex items-center justify-center">
+                            {selectedProof.type === 'image' ? (
+                                <img
+                                    src={getBuktiUrl(selectedProof.path)}
+                                    alt="Bukti pengajuan cuti atau izin"
+                                    className="max-h-[70vh] w-auto object-contain"
+                                />
+                            ) : selectedProof.type === 'pdf' ? (
+                                <iframe
+                                    title="Bukti PDF"
+                                    src={getBuktiUrl(selectedProof.path)}
+                                    className="w-full h-[70vh] border-0"
+                                />
+                            ) : (
+                                <div className="text-center p-6">
+                                    <p className="mb-2">Preview tidak tersedia untuk tipe file ini.</p>
+                                    <a
+                                        href={getBuktiUrl(selectedProof.path)}
+                                        target="_blank"
+                                        rel="noreferrer"
+                                        className="btn btn-primary btn-sm"
+                                    >
+                                        Buka File
+                                    </a>
+                                </div>
+                            )}
+                        </div>
+
+                        <div className="modal-action">
+                            <button className="btn" onClick={closeProofModal}>
+                                Tutup
+                            </button>
+                        </div>
+                    </div>
+                    <button
+                        type="button"
+                        className="modal-backdrop"
+                        onClick={closeProofModal}
+                    >
+                        Close
+                    </button>
+                </div>
+            ) : null}
         </>
     )
 }

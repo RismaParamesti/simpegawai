@@ -240,7 +240,7 @@ router.post("/", verifyToken, verifyRole(["hr"]), async (req, res) => {
           updated_by_user_id,
           created_at,
           updated_at
-       ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(), NOW())`,
+       ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(), NOW())`,
       [
         ruleCode,
         ruleName,

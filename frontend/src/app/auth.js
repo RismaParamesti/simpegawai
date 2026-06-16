@@ -1,4 +1,86 @@
 import axios from "axios";
+import { NotificationManager } from "react-notifications";
+
+const MUTATION_METHODS = new Set(["post", "put", "patch", "delete"]);
+const AUTO_NOTIFICATION_DELAY_MS = 250;
+
+const getRequestMethod = (config = {}) =>
+  String(config.method || "get").toLowerCase();
+
+const isMutationRequest = (config = {}) =>
+  MUTATION_METHODS.has(getRequestMethod(config));
+
+const shouldSkipMutationNotification = (config = {}) => {
+  const url = String(config.url || "").toLowerCase();
+  const headers = config.headers || {};
+
+  return (
+    headers["X-Skip-Mutation-Notification"] === "1" ||
+    headers["x-skip-mutation-notification"] === "1" ||
+    url.includes("/api/auth/login") ||
+    url.includes("/auth/login") ||
+    url.includes("/upload")
+  );
+};
+
+const getResponseMessage = (response, fallback) =>
+  response?.data?.message || response?.data?.msg || fallback;
+
+const getErrorMessage = (error) =>
+  error?.response?.data?.message ||
+  error?.response?.data?.error ||
+  error?.message ||
+  "Aksi gagal diproses";
+
+const getSuccessFallbackMessage = (method) => {
+  if (method === "post") return "Data berhasil ditambahkan";
+  if (method === "delete") return "Data berhasil dihapus";
+  return "Data berhasil diperbarui";
+};
+
+const markManualNotification = () => {
+  window.__lastManualNotificationAt = Date.now();
+};
+
+const runAutoNotification = (callback) => {
+  window.__isAutoMutationNotification = true;
+  callback();
+  window.__isAutoMutationNotification = false;
+};
+
+const installNotificationTracking = () => {
+  if (window.__notificationTrackingInitialized) return;
+  window.__notificationTrackingInitialized = true;
+
+  ["success", "error", "warning", "info"].forEach((type) => {
+    const original = NotificationManager[type];
+    if (typeof original !== "function") return;
+
+    NotificationManager[type] = (...args) => {
+      if (!window.__isAutoMutationNotification) {
+        markManualNotification();
+      }
+      return original.apply(NotificationManager, args);
+    };
+  });
+};
+
+const scheduleMutationNotification = (type, message) => {
+  const startedAt = Date.now();
+
+  window.setTimeout(() => {
+    const lastManualNotificationAt = window.__lastManualNotificationAt || 0;
+    if (lastManualNotificationAt >= startedAt) return;
+
+    runAutoNotification(() => {
+      if (type === "success") {
+        NotificationManager.success(message, "Berhasil", 3500);
+      } else {
+        NotificationManager.error(message, "Gagal", 4500);
+      }
+    });
+  }, AUTO_NOTIFICATION_DELAY_MS);
+};
 
 const checkAuth = () => {
   /*  Getting token value stored in localstorage, if token is not present we will open login page 
@@ -12,6 +94,7 @@ const checkAuth = () => {
     "reset-password",
     "register",
     "documentation",
+    "portal",
     "candidate/jobs",
     "candidate/apply",
     "candidate/status",
@@ -63,6 +146,7 @@ const checkAuth = () => {
 
   if (!window.__axiosInterceptorsInitialized) {
     window.__axiosInterceptorsInitialized = true;
+    installNotificationTracking();
 
     axios.interceptors.request.use(
       function (config) {
@@ -82,6 +166,18 @@ const checkAuth = () => {
     axios.interceptors.response.use(
       function (response) {
         document.body.classList.remove("loading-indicator");
+
+        if (
+          isMutationRequest(response?.config) &&
+          !shouldSkipMutationNotification(response?.config)
+        ) {
+          const method = getRequestMethod(response.config);
+          scheduleMutationNotification(
+            "success",
+            getResponseMessage(response, getSuccessFallbackMessage(method)),
+          );
+        }
+
         return response;
       },
       function (error) {
@@ -106,6 +202,13 @@ const checkAuth = () => {
           localStorage.setItem("sessionExpiredNotice", "1");
           delete axios.defaults.headers.common["Authorization"];
           window.location.href = "/login";
+        }
+
+        if (
+          isMutationRequest(error?.config) &&
+          !shouldSkipMutationNotification(error?.config)
+        ) {
+          scheduleMutationNotification("error", getErrorMessage(error));
         }
 
         return Promise.reject(error);

@@ -80,6 +80,95 @@ const calculateWorkdaysInMonth = (month, year) => {
   return workdays || 30;
 };
 
+const formatDateOnly = (date) => {
+  const value = date instanceof Date ? date : new Date(date);
+  return `${value.getFullYear()}-${String(value.getMonth() + 1).padStart(
+    2,
+    "0",
+  )}-${String(value.getDate()).padStart(2, "0")}`;
+};
+
+const getPeriodBounds = (periodMonth, periodYear) => {
+  const periodStart = `${periodYear}-${String(periodMonth).padStart(2, "0")}-01`;
+  const periodEndDate = new Date(Number(periodYear), Number(periodMonth), 0);
+  const periodEnd = formatDateOnly(periodEndDate);
+
+  return { periodStart, periodEnd };
+};
+
+const mapLeaveTypeToPayrollStatus = (leaveType) => {
+  const normalized = String(leaveType || "").toLowerCase();
+  if (normalized === "cuti_sakit" || normalized === "izin_sakit") {
+    return "sakit";
+  }
+  return "izin";
+};
+
+const isDayBasedLeaveForPayroll = (leaveRequest) => {
+  const leaveType = String(leaveRequest?.leave_type || "").toLowerCase();
+  const specialOption = String(
+    leaveRequest?.cuti_khusus_option || "",
+  ).toLowerCase();
+
+  if (leaveType === "izin_terlambat") return false;
+  if (
+    leaveType === "cuti_khusus" &&
+    ["terlambat", "pulang_cepat"].includes(specialOption)
+  ) {
+    return false;
+  }
+
+  return true;
+};
+
+const getApprovedLeaveDateSummaryForPeriod = async (
+  employeeId,
+  periodMonth,
+  periodYear,
+) => {
+  const { periodStart, periodEnd } = getPeriodBounds(periodMonth, periodYear);
+  const [rows] = await db.promise().query(
+    `SELECT id, leave_type, start_date, end_date, total_days, cuti_khusus_option
+     FROM leave_requests
+     WHERE employee_id = ?
+       AND status = 'approved'
+       AND end_date >= ?
+       AND start_date <= ?`,
+    [employeeId, periodStart, periodEnd],
+  );
+
+  const datesByStatus = {
+    izin: new Set(),
+    sakit: new Set(),
+  };
+
+  for (const row of rows) {
+    if (!isDayBasedLeaveForPayroll(row)) continue;
+
+    const start = new Date(
+      Math.max(new Date(row.start_date).getTime(), new Date(periodStart).getTime()),
+    );
+    const end = new Date(
+      Math.min(new Date(row.end_date).getTime(), new Date(periodEnd).getTime()),
+    );
+    const payrollStatus = mapLeaveTypeToPayrollStatus(row.leave_type);
+
+    for (
+      let cursor = new Date(start);
+      cursor <= end;
+      cursor.setDate(cursor.getDate() + 1)
+    ) {
+      if (!isPayrollWorkday(cursor)) continue;
+      datesByStatus[payrollStatus].add(formatDateOnly(cursor));
+    }
+  }
+
+  return {
+    izinDays: datesByStatus.izin.size,
+    sakitDays: datesByStatus.sakit.size,
+  };
+};
+
 // Calculate late deduction berdasarkan total late minutes dan working hours
 const calculateLateDeduction = (
   totalLateMinutes,
@@ -118,11 +207,7 @@ const getUnpaidLeaveDaysForPeriod = async (
   periodMonth,
   periodYear,
 ) => {
-  const periodStart = `${periodYear}-${String(periodMonth).padStart(2, "0")}-01`;
-  const periodEndDate = new Date(Number(periodYear), Number(periodMonth), 0);
-  const periodEnd = `${periodEndDate.getFullYear()}-${String(
-    periodEndDate.getMonth() + 1,
-  ).padStart(2, "0")}-${String(periodEndDate.getDate()).padStart(2, "0")}`;
+  const { periodStart, periodEnd } = getPeriodBounds(periodMonth, periodYear);
 
   const fallbackUnpaidTypes = ["cuti_lainnya", "izin_lainnya", "izin_pribadi"];
 
@@ -712,8 +797,21 @@ router.post(
 
       const totalLateMinutes = attendanceSummary[0].total_late_minutes || 0;
       const totalAlphaDays = attendanceSummary[0].total_alpha_days || 0;
-      const totalSakitDays = attendanceSummary[0].total_sakit_days || 0;
-      const totalIzinDays = attendanceSummary[0].total_izin_days || 0;
+      const attendanceSakitDays = Number(attendanceSummary[0].total_sakit_days || 0);
+      const attendanceIzinDays = Number(attendanceSummary[0].total_izin_days || 0);
+      const approvedLeaveSummary = await getApprovedLeaveDateSummaryForPeriod(
+        employee_id,
+        period_month,
+        period_year,
+      );
+      const totalSakitDays = Math.max(
+        attendanceSakitDays,
+        approvedLeaveSummary.sakitDays,
+      );
+      const totalIzinDays = Math.max(
+        attendanceIzinDays,
+        approvedLeaveSummary.izinDays,
+      );
       const totalUnpaidLeaveDays = await getUnpaidLeaveDaysForPeriod(
         employee_id,
         period_month,

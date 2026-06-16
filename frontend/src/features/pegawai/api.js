@@ -249,6 +249,15 @@ export const pegawaiApi = {
         }
     },
 
+    async cancelReimbursement(id) {
+        try {
+            const response = await axios.put(`/api/reimbursements/${id}/cancel`)
+            return response.data
+        } catch (error) {
+            throw new Error(parseApiError(error, 'Gagal membatalkan reimbursement'))
+        }
+    },
+
     async getMySalaryAppeals() {
         try {
             const response = await axios.get('/api/salary-appeals/my')
@@ -320,7 +329,7 @@ export const pegawaiApi = {
             const response = await axios.delete(`/api/salary-appeals/${id}`)
             return response.data
         } catch (error) {
-            throw new Error(parseApiError(error, 'Gagal menghapus banding gaji'))
+            throw new Error(parseApiError(error, 'Gagal membatalkan banding gaji'))
         }
     },
 }

@@ -12,6 +12,16 @@ const {
   DOCUMENT_FIELD_METADATA,
 } = require("../utils/documentRequirements");
 
+const syncExpiredJobOpenings = async () => {
+  await db.promise().query(
+    `UPDATE job_openings
+     SET status = 'closed'
+     WHERE status = 'open'
+       AND deadline IS NOT NULL
+       AND deadline < CURDATE()`,
+  );
+};
+
 // ============================
 // CANCEL JOB OPENING (HR/Admin)
 // ============================
@@ -77,6 +87,8 @@ router.put(
 // ============================
 router.get("/", async (req, res) => {
   try {
+    await syncExpiredJobOpenings();
+
     const { status, position_id } = req.query;
 
     let query = `
@@ -144,6 +156,8 @@ router.get("/", async (req, res) => {
 // ============================
 router.get("/:id", async (req, res) => {
   try {
+    await syncExpiredJobOpenings();
+
     const { id } = req.params;
 
         const query = `

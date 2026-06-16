@@ -105,6 +105,7 @@ const APPEAL_STATUS_BADGE_CLASS = {
   pending: "badge-warning",
   approved: "badge-success",
   rejected: "badge-error",
+  cancelled: "badge-neutral",
   reviewed: "badge-info",
 };
 
@@ -236,8 +237,6 @@ function EmployeeSalaryAppeal() {
     });
   }, [appeals]);
 
-  // fixed status options: pending, approved (disetujui), rejected (ditolak)
-
   const filteredAppeals = useMemo(() => {
     return appeals.filter((item) => {
       const periodMatch = !periodFilter || `${item.period_month}/${item.period_year}` === periodFilter;
@@ -272,7 +271,13 @@ function EmployeeSalaryAppeal() {
 
   const eligiblePayrolls = useMemo(() => {
     const appealedPayrollIds = new Set(
-      appeals.map((item) => String(item.payroll_id || "")).filter(Boolean),
+      appeals
+        .filter(
+          (item) =>
+            String(item.status || "").toLowerCase() !== "cancelled",
+        )
+        .map((item) => String(item.payroll_id || ""))
+        .filter(Boolean),
     );
 
     return publishedPayrolls.filter(
@@ -427,11 +432,11 @@ function EmployeeSalaryAppeal() {
 
   const deleteAppeal = async (appeal) => {
     const confirmed = await confirmPopup({
-      title: "Hapus Banding Gaji",
-      subtitle: "Tindakan ini tidak bisa dibatalkan",
+      title: "Batalkan Banding Gaji",
+      subtitle: "Data tetap tersimpan di riwayat Anda",
       badge: "Konfirmasi",
-      message: `Yakin ingin menghapus riwayat banding gaji ini?\n\nPeriode: ${appeal.period_month}/${appeal.period_year}\nStatus: ${getAppealStatusLabel(appeal.status)}\n\nTindakan ini tidak bisa dibatalkan.`,
-      confirmLabel: "Hapus",
+      message: `Yakin ingin membatalkan banding gaji ini?\n\nPeriode: ${appeal.period_month}/${appeal.period_year}\nStatus: ${getAppealStatusLabel(appeal.status)}\n\nData akan tetap tampil di riwayat Anda dengan status dibatalkan.`,
+      confirmLabel: "Batalkan",
       cancelLabel: "Batal",
       variant: "warning",
     });
@@ -796,9 +801,10 @@ function EmployeeSalaryAppeal() {
                 }}
               >
                 <option value="">Semua Status</option>
-                <option value="approved">disetujui</option>
-                <option value="rejected">ditolak</option>
-                <option value="pending">pending</option>
+                <option value="pending">Menunggu</option>
+                <option value="approved">Diproses</option>
+                <option value="rejected">Ditolak</option>
+                <option value="cancelled">Dibatalkan</option>
               </select>
 
               <button type="button" className="btn btn-secondary rounded-full" onClick={resetAppealFilters}>
@@ -884,7 +890,7 @@ function EmployeeSalaryAppeal() {
                                 </button>
 
                                 <button className="btn btn-xs btn-error text-white rounded-full" type="button" onClick={() => deleteAppeal(item)} disabled={submitting}>
-                                  Hapus
+                                  Batalkan
                                 </button>
                               </>
                             )}

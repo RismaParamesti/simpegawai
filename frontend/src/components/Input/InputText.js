@@ -1,4 +1,5 @@
 import { useState } from "react";
+import PasswordInput from "./PasswordInput";
 
 function InputText({
   labelTitle,
@@ -26,13 +27,22 @@ function InputText({
           {labelTitle}
         </span>
       </label>
-      <input
-        type={type || "text"}
-        value={value}
-        placeholder={placeholder || ""}
-        onChange={(e) => updateInputValue(e.target.value)}
-        className="input input-bordered w-full rounded-2xl border-base-300 bg-base-100/90 shadow-sm outline-none focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/15"
-      />
+      {type === "password" ? (
+        <PasswordInput
+          value={value}
+          placeholder={placeholder || ""}
+          onChange={(e) => updateInputValue(e.target.value)}
+          className="input input-bordered w-full rounded-2xl border-base-300 bg-base-100/90 shadow-sm outline-none focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/15"
+        />
+      ) : (
+        <input
+          type={type || "text"}
+          value={value}
+          placeholder={placeholder || ""}
+          onChange={(e) => updateInputValue(e.target.value)}
+          className="input input-bordered w-full rounded-2xl border-base-300 bg-base-100/90 shadow-sm outline-none focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/15"
+        />
+      )}
     </div>
   );
 }

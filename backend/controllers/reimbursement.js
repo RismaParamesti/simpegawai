@@ -62,7 +62,7 @@ const normalizeReimbursementType = (rawType) => {
 const getEmployeeIdByUser = async (userId) => {
     const [rows] = await db
         .promise()
-        .query("SELECT id FROM employees WHERE user_id = ?", [userId]);
+        .query("SELECT id FROM employees WHERE user_id = ? AND deleted_at IS NULL", [userId]);
     return rows.length ? rows[0].id : null;
 };
 
@@ -79,6 +79,25 @@ const getRoleNamesByUserId = async (userId) => {
 };
 
 const HR_REJECTION_MARKER = "[HR_REJECTION_REASON]";
+let reimbursementCancelledStatusEnsured = false;
+
+const ensureReimbursementCancelledStatus = async () => {
+    if (reimbursementCancelledStatusEnsured) return;
+
+    const [columns] = await db
+        .promise()
+        .query("SHOW COLUMNS FROM reimbursements LIKE 'status'");
+    const statusType = String(columns?.[0]?.Type || "").toLowerCase();
+
+    if (statusType && !statusType.includes("'cancelled'")) {
+        await db.promise().query(
+            `ALTER TABLE reimbursements
+             MODIFY status ENUM('pending','approved','included_in_payroll','rejected','cancelled') DEFAULT 'pending'`
+        );
+    }
+
+    reimbursementCancelledStatusEnsured = true;
+};
 
 const stripHrRejectionReason = (text = "") => {
     return String(text || "")
@@ -216,6 +235,86 @@ router.get(
 );
 
 // ============================
+// Pegawai membatalkan reimbursement miliknya
+// ============================
+router.put(
+    "/:id/cancel",
+    verifyToken,
+    verifyRole(["pegawai"]),
+    async (req, res) => {
+        try {
+            await ensureReimbursementCancelledStatus();
+
+            const employeeId = await getEmployeeIdByUser(req.user.id);
+            if (!employeeId) {
+                return res
+                    .status(404)
+                    .json({ message: "Employee record not found" });
+            }
+
+            const { id } = req.params;
+            const [rows] = await db.promise().query(
+                `SELECT id, employee_id, status
+                 FROM reimbursements
+                 WHERE id = ?`,
+                [id]
+            );
+
+            if (!rows.length) {
+                return res.status(404).json({ message: "Reimbursement not found" });
+            }
+
+            const reimbursement = rows[0];
+            if (Number(reimbursement.employee_id) !== Number(employeeId)) {
+                return res.status(403).json({
+                    message: "You can only cancel your own reimbursement",
+                });
+            }
+
+            if (reimbursement.status !== "pending") {
+                return res.status(400).json({
+                    message: "Only pending reimbursement can be cancelled",
+                });
+            }
+
+            await db.promise().query(
+                `UPDATE reimbursements
+                 SET status = 'cancelled', updated_at = NOW()
+                 WHERE id = ?`,
+                [id]
+            );
+
+            try {
+                const userId = req.user?.id || req.user?.user_id;
+                await logActivity({
+                    userId,
+                    username: req.user.username || req.user.name || null,
+                    role: Array.isArray(req.user.roles) ? req.user.roles[0] : req.user.role || null,
+                    action: "UPDATE",
+                    module: "reimbursements",
+                    description: "Reimbursement cancelled by employee",
+                    oldValues: { id: reimbursement.id, status: reimbursement.status },
+                    newValues: { id, status: "cancelled" },
+                    ipAddress: getIpAddress(req),
+                    userAgent: getUserAgent(req),
+                    status: "success",
+                });
+            } catch (logError) {
+                console.error("Failed to log reimbursement cancellation:", logError);
+            }
+
+            return res.json({
+                message: "Reimbursement cancelled successfully",
+                status: "cancelled",
+            });
+        } catch (error) {
+            console.error(error);
+            return res.status(500).json({ message: "Server error" });
+        }
+    }
+);
+
+// ============================
 // Admin/HR/Finance/Atasan melihat semua reimbursement
 // ============================
 router.get(
@@ -264,6 +363,7 @@ router.get(
                  JOIN positions p ON e.position_id = p.id
                  JOIN users u ON e.user_id = u.id
                  WHERE ${deptClause}
+                                     AND r.status <> 'cancelled'
                                      AND (
                                          ? IS NULL OR EXISTS (
                                              SELECT 1
@@ -306,6 +406,12 @@ router.put(
             const requesterUserId = req.user?.id || req.user?.user_id;
             if (!requesterUserId || Number(requesterUserId) <= 0) {
                 return res.status(401).json({ message: "Invalid authenticated user" });
+            }
+            const requesterEmployeeId = await getEmployeeIdByUser(requesterUserId);
+            if (!requesterEmployeeId) {
+                return res.status(404).json({
+                    message: "Employee record for approver not found",
+                });
             }
 
             if (!action || !["approve", "reject"].includes(action)) {
@@ -393,7 +499,7 @@ router.put(
                 `UPDATE reimbursements 
                  SET status = ?, approved_by = ?, approved_at = NOW(), updated_at = NOW() 
                  WHERE id = ?`,
-                [newStatus, requesterUserId, id]
+                [newStatus, requesterEmployeeId, id]
             );
 
             // Log activity: level-1 approval/rejection
@@ -408,7 +514,7 @@ router.put(
                     module: "reimbursements",
                     description: newStatus === "approved" || newStatus === "included_in_payroll" ? "Reimbursement approved by manager" : "Reimbursement rejected by manager",
                     oldValues: rows[0] || null,
-                    newValues: { request_id: id, status: newStatus, approved_by: requesterUserId },
+                    newValues: { request_id: id, status: newStatus, approved_by: requesterEmployeeId },
                     ipAddress: getIpAddress(req),
                     userAgent: getUserAgent(req),
                     status: "success",

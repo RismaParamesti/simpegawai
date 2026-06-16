@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from "react"
 import { useDispatch } from "react-redux"
 import axios from "axios"
 import TitleCard from "../../../components/Cards/TitleCard"
+import PasswordInput from "../../../components/Input/PasswordInput"
 import { showNotification } from '../../common/headerSlice'
 import { pegawaiApi } from '../../pegawai/api'
 import { toDateInputValue } from "../../../utils/dateUtils"
@@ -508,11 +509,11 @@ function ProfileSettings(){
                 <form className="grid grid-cols-1 md:grid-cols-2 gap-6" onSubmit={updatePassword}>
                     <div className="form-control w-full">
                         <label className="label"><span className="label-text">Password Lama</span></label>
-                        <input className="input input-bordered" type="password" value={passwordForm.oldPassword} onChange={(e) => updatePasswordField('oldPassword', e.target.value)} />
+                        <PasswordInput className="input input-bordered w-full" value={passwordForm.oldPassword} onChange={(e) => updatePasswordField('oldPassword', e.target.value)} />
                     </div>
                     <div className="form-control w-full">
                         <label className="label"><span className="label-text">Password Baru</span></label>
-                        <input className="input input-bordered" type="password" value={passwordForm.newPassword} onChange={(e) => updatePasswordField('newPassword', e.target.value)} />
+                        <PasswordInput className="input input-bordered w-full" value={passwordForm.newPassword} onChange={(e) => updatePasswordField('newPassword', e.target.value)} />
                     </div>
                     <div className="md:col-span-2">
                         <button className={`btn btn-secondary ${savingPassword ? 'loading' : ''}`} type="submit" disabled={savingPassword}>Simpan Password</button>

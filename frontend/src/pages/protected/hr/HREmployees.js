@@ -7,6 +7,7 @@ import {
   showNotification,
 } from "../../../features/common/headerSlice";
 import TitleCard from "../../../components/Cards/TitleCard";
+import PasswordInput from "../../../components/Input/PasswordInput";
 import Pagination from "../../../components/Pagination/Pagination";
 import { hrApi } from "../../../features/hr/api";
 import { MagnifyingGlassIcon } from "@heroicons/react/24/outline";
@@ -326,6 +327,7 @@ function HREmployees() {
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [createForm, setCreateForm] = useState(INITIAL_FORM);
   const [createDocuments, setCreateDocuments] = useState(INITIAL_DOCUMENTS);
+  const [createDocumentInputKey, setCreateDocumentInputKey] = useState(0);
   const [candidateApplications, setCandidateApplications] = useState([]);
   const [candidatePickerLoading, setCandidatePickerLoading] = useState(false);
   const [candidatePickerSearch, setCandidatePickerSearch] = useState("");
@@ -333,6 +335,7 @@ function HREmployees() {
 
   const [editingEmployee, setEditingEmployee] = useState(null);
   const [editDocuments, setEditDocuments] = useState(INITIAL_DOCUMENTS);
+  const [editDocumentInputKey, setEditDocumentInputKey] = useState(0);
 
   const [viewingEmployee, setViewingEmployee] = useState(null);
   const [documentPreview, setDocumentPreview] = useState(null);
@@ -702,6 +705,7 @@ function HREmployees() {
 
     setCreateForm(mapCandidateToCreateForm(candidateToCreate));
     setCreateDocuments(INITIAL_DOCUMENTS);
+    setCreateDocumentInputKey((prev) => prev + 1);
     setCandidateApplications([]);
     setCandidatePickerSearch("");
     setShowCandidatePicker(false);
@@ -724,6 +728,29 @@ function HREmployees() {
     });
   };
 
+  const resetCreateEmployeeForm = () => {
+    setCreateForm({
+      ...INITIAL_FORM,
+      roles: getRawAutoRolesForForm(INITIAL_FORM, positions),
+    });
+    setCreateDocuments(INITIAL_DOCUMENTS);
+    setCreateDocumentInputKey((prev) => prev + 1);
+    setCandidateApplications([]);
+    setCandidatePickerSearch("");
+    setShowCandidatePicker(false);
+  };
+
+  const closeCreateModal = () => {
+    setShowCreateModal(false);
+    resetCreateEmployeeForm();
+  };
+
+  const resetEditEmployeeForm = () => {
+    setEditingEmployee(null);
+    setEditDocuments(INITIAL_DOCUMENTS);
+    setEditDocumentInputKey((prev) => prev + 1);
+  };
+
   const handleFilterChange = (key, value) => {
     setFilters((prev) => ({ ...prev, [key]: value }));
   };
@@ -738,14 +765,7 @@ function HREmployees() {
   };
 
   const openCreateModal = () => {
-    setCreateForm({
-      ...INITIAL_FORM,
-      roles: getRawAutoRolesForForm(INITIAL_FORM, positions),
-    });
-    setCreateDocuments(INITIAL_DOCUMENTS);
-    setCandidateApplications([]);
-    setCandidatePickerSearch("");
-    setShowCandidatePicker(false);
+    resetCreateEmployeeForm();
     setShowCreateModal(true);
   };
 
@@ -797,6 +817,7 @@ function HREmployees() {
 
   const openEditModal = async (employee) => {
     setEditDocuments(INITIAL_DOCUMENTS);
+    setEditDocumentInputKey((prev) => prev + 1);
     const detail = await hrApi.getEmployeeDetails(employee.id);
     const mapped = mapEmployeeToForm(detail || employee);
     setEditingEmployee(mapped);
@@ -892,8 +913,7 @@ function HREmployees() {
         }),
       );
       setShowCreateModal(false);
-      setCreateForm(INITIAL_FORM);
-      setCreateDocuments(INITIAL_DOCUMENTS);
+      resetCreateEmployeeForm();
       await loadEmployees();
       await loadEmployeeSearchOptions();
     } catch (err) {
@@ -1009,8 +1029,7 @@ function HREmployees() {
           status: 1,
         }),
       );
-      setEditingEmployee(null);
-      setEditDocuments(INITIAL_DOCUMENTS);
+      resetEditEmployeeForm();
       await loadEmployees();
       await loadEmployeeSearchOptions();
     } catch (err) {
@@ -1307,7 +1326,7 @@ function HREmployees() {
         id="create-employee-modal-hr"
         className="modal-toggle"
         checked={showCreateModal}
-        onChange={() => setShowCreateModal(false)}
+        onChange={closeCreateModal}
       />
       <div className="modal">
         <div className="modal-box max-w-6xl">
@@ -1342,10 +1361,9 @@ function HREmployees() {
                   value={createForm.username}
                   onChange={(e) => updateCreateForm("username", e.target.value)}
                 />
-                <input
-                  className="input input-bordered"
+                <PasswordInput
+                  className="input input-bordered w-full"
                   placeholder="Password"
-                  type="password"
                   value={createForm.password}
                   onChange={(e) => updateCreateForm("password", e.target.value)}
                 />
@@ -1566,6 +1584,7 @@ function HREmployees() {
                     </span>
                   </label>
                   <input
+                    key={`create-ktp-${createDocumentInputKey}`}
                     type="file"
                     accept=".pdf,.jpg,.jpeg,.png"
                     className="file-input file-input-bordered w-full"
@@ -1584,6 +1603,7 @@ function HREmployees() {
                     </span>
                   </label>
                   <input
+                    key={`create-diploma-${createDocumentInputKey}`}
                     type="file"
                     accept=".pdf,.jpg,.jpeg,.png"
                     className="file-input file-input-bordered w-full"
@@ -1602,6 +1622,7 @@ function HREmployees() {
                     </span>
                   </label>
                   <input
+                    key={`create-contract-${createDocumentInputKey}`}
                     type="file"
                     accept=".pdf,.jpg,.jpeg,.png"
                     className="file-input file-input-bordered w-full"
@@ -1628,7 +1649,7 @@ function HREmployees() {
               <button
                 type="button"
                 className="btn"
-                onClick={() => setShowCreateModal(false)}
+                onClick={closeCreateModal}
               >
                 Batal
               </button>
@@ -2114,7 +2135,7 @@ function HREmployees() {
         id="edit-employee-modal-hr"
         className="modal-toggle"
         checked={!!editingEmployee}
-        onChange={() => setEditingEmployee(null)}
+        onChange={resetEditEmployeeForm}
       />
       <div className="modal">
         <div className="modal-box max-w-3xl">
@@ -2473,6 +2494,7 @@ function HREmployees() {
                       <span className="label-text">Ganti Dokumen KTP</span>
                     </label>
                     <input
+                      key={`edit-ktp-${editDocumentInputKey}`}
                       type="file"
                       accept=".pdf,.jpg,.jpeg,.png"
                       className="file-input file-input-bordered w-full"
@@ -2489,6 +2511,7 @@ function HREmployees() {
                       <span className="label-text">Ganti Dokumen Ijazah</span>
                     </label>
                     <input
+                      key={`edit-diploma-${editDocumentInputKey}`}
                       type="file"
                       accept=".pdf,.jpg,.jpeg,.png"
                       className="file-input file-input-bordered w-full"
@@ -2505,6 +2528,7 @@ function HREmployees() {
                       <span className="label-text">Ganti Dokumen Kontrak</span>
                     </label>
                     <input
+                      key={`edit-contract-${editDocumentInputKey}`}
                       type="file"
                       accept=".pdf,.jpg,.jpeg,.png"
                       className="file-input file-input-bordered w-full"
@@ -2522,7 +2546,7 @@ function HREmployees() {
             </div>
           ) : null}
           <div className="modal-action">
-            <button className="btn" onClick={() => setEditingEmployee(null)}>
+            <button className="btn" onClick={resetEditEmployeeForm}>
               Batal
             </button>
             <button

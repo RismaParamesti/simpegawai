@@ -205,6 +205,85 @@ const calculateRequestedDays = (startDate, endDate) => {
   return totalDays;
 };
 
+const formatLeavePeriod = (startDate, endDate) => {
+  if (!startDate && !endDate) return "-";
+  if (!startDate || !endDate) return formatDate(startDate || endDate);
+
+  const start = parseLocalDate(startDate);
+  const end = parseLocalDate(endDate);
+  if (
+    !start ||
+    !end ||
+    Number.isNaN(start.getTime()) ||
+    Number.isNaN(end.getTime())
+  ) {
+    return `${formatDate(startDate)} - ${formatDate(endDate)}`;
+  }
+
+  if (formatLocalDateKey(start) === formatLocalDateKey(end)) {
+    return formatDate(startDate);
+  }
+
+  const segments = [];
+  let segmentStart = null;
+  let segmentEnd = null;
+
+  for (
+    let cursor = new Date(start);
+    cursor <= end;
+    cursor.setDate(cursor.getDate() + 1)
+  ) {
+    const dateKey = formatLocalDateKey(cursor);
+
+    if (isNonWorkingDay(cursor)) {
+      if (segmentStart) {
+        segments.push({ start: segmentStart, end: segmentEnd });
+        segmentStart = null;
+        segmentEnd = null;
+      }
+      continue;
+    }
+
+    if (!segmentStart) {
+      segmentStart = dateKey;
+    }
+    segmentEnd = dateKey;
+  }
+
+  if (segmentStart) {
+    segments.push({ start: segmentStart, end: segmentEnd });
+  }
+
+  if (!segments.length) {
+    return `${formatDate(startDate)} - ${formatDate(endDate)}`;
+  }
+
+  const expandSegmentDates = (segment) => {
+    const dates = [];
+    const segmentStartDate = parseLocalDate(segment.start);
+    const segmentEndDate = parseLocalDate(segment.end);
+
+    for (
+      let cursor = new Date(segmentStartDate);
+      cursor <= segmentEndDate;
+      cursor.setDate(cursor.getDate() + 1)
+    ) {
+      if (!isNonWorkingDay(cursor)) {
+        dates.push(formatDate(formatLocalDateKey(cursor)));
+      }
+    }
+
+    return dates;
+  };
+
+  const workingDateLabels = segments.flatMap(expandSegmentDates);
+  if (workingDateLabels.length <= 1) {
+    return workingDateLabels[0] || formatDate(startDate);
+  }
+
+  return workingDateLabels.join(" dan ");
+};
+
 const addWorkingDaysToDateString = (dateString, workingDaysToAdd) => {
   if (!dateString || Number.isNaN(Number(workingDaysToAdd))) return "";
 
@@ -298,6 +377,36 @@ const getLeaveTypesByMode = (mode, leaveTypeOptions) => {
   return LEAVE_MODE_TYPES[mode] || [];
 };
 
+const rangesOverlap = (startA, endA, startB, endB) => {
+  if (!startA || !endA || !startB || !endB) return false;
+  return startA <= endB && endA >= startB;
+};
+
+const calculateServiceMonths = (referenceDate) => {
+  if (!referenceDate) return 0;
+
+  const start = parseLocalDate(referenceDate);
+  if (!start || Number.isNaN(start.getTime())) return 0;
+
+  const now = new Date();
+  let months =
+    (now.getFullYear() - start.getFullYear()) * 12 +
+    (now.getMonth() - start.getMonth());
+
+  if (now.getDate() < start.getDate()) {
+    months -= 1;
+  }
+
+  return Math.max(months, 0);
+};
+
+const formatServiceRequirement = (months) => {
+  const value = Number(months || 0);
+  if (value <= 0) return "";
+  if (value % 12 === 0) return `${value / 12} tahun`;
+  return `${value} bulan`;
+};
+
 function EmployeeLeave() {
   const dispatch = useDispatch();
   const { popup, confirmPopup } = useAppPopup();
@@ -321,6 +430,7 @@ function EmployeeLeave() {
   const itemsPerPage = 10;
   const [leaveTypeOptions, setLeaveTypeOptions] = useState({});
   const [cancellingId, setCancellingId] = useState(null);
+  const [proofInputKey, setProofInputKey] = useState(0);
 
   useEffect(() => {
     let mounted = true;
@@ -599,6 +709,16 @@ function EmployeeLeave() {
       ...form,
       end_date: effectiveEndDate,
     });
+
+    const approvedOverlapForSubmit = findApprovedOverlap(
+      submittedForm.start_date,
+      submittedForm.end_date,
+    );
+    if (approvedOverlapForSubmit) {
+      setError(getApprovedOverlapMessage(approvedOverlapForSubmit));
+      return;
+    }
+
     const requestedDaysForSubmit = calculateRequestedDays(
       submittedForm.start_date,
       submittedForm.end_date,
@@ -692,6 +812,11 @@ function EmployeeLeave() {
     }
 
     if (form.leave_type === "cuti_tahunan") {
+      if (annualLeaveTenureBlocked) {
+        setError(annualLeaveTenureMessage);
+        return;
+      }
+
       if (Number(remainingLeaveQuota || 0) <= 0) {
         setError("Sisa kuota cuti tahunan sudah habis.");
         return;
@@ -734,6 +859,7 @@ function EmployeeLeave() {
         ...INITIAL_FORM,
         leave_type: getLeaveTypesByMode(leaveMode, leaveTypeOptions)?.[0] || "",
       });
+      setProofInputKey((prev) => prev + 1);
       setSuccessMessage("Pengajuan cuti/izin berhasil dikirim");
       setShowSuccessModal(true);
       await loadData(statusFilter);
@@ -746,6 +872,21 @@ function EmployeeLeave() {
 
   const annualLeaveQuota = profile?.employee?.annual_leave_quota ?? 0;
   const remainingLeaveQuota = profile?.employee?.remaining_leave_quota ?? 0;
+  const employeeServiceDate =
+    profile?.employee?.join_date || profile?.employee?.created_at || "";
+  const currentServiceMonths = calculateServiceMonths(employeeServiceDate);
+  const annualLeaveRequiredTenureMonths = Number(
+    form.leave_type === "cuti_tahunan"
+      ? leavePolicy?.min_tenure_months ?? 12
+      : 0,
+  );
+  const annualLeaveTenureBlocked =
+    form.leave_type === "cuti_tahunan" &&
+    annualLeaveRequiredTenureMonths > 0 &&
+    currentServiceMonths < annualLeaveRequiredTenureMonths;
+  const annualLeaveTenureMessage = annualLeaveTenureBlocked
+    ? `Cuti Tahunan hanya bisa diajukan setelah masa kerja ${formatServiceRequirement(annualLeaveRequiredTenureMonths)}. Masa kerja Anda saat ini ${formatServiceRequirement(currentServiceMonths) || "kurang dari 1 bulan"}.`
+    : "";
   const requestedDays = calculateRequestedDays(form.start_date, form.end_date);
   const maxDaysForCurrentLeave = getEffectiveMaxDays(
     form.leave_type,
@@ -770,6 +911,42 @@ function EmployeeLeave() {
     (item) =>
       item.status === "approved" &&
       isDateInRange(item.start_date, item.end_date, todayDateKey),
+  );
+  const findApprovedOverlap = (startDate, endDate) => {
+    if (!startDate || !endDate) return null;
+
+    return (
+      allRequests.find(
+        (item) =>
+          item.status === "approved" &&
+          rangesOverlap(
+            startDate,
+            endDate,
+            formatLocalDateKey(item.start_date),
+            formatLocalDateKey(item.end_date),
+          ),
+      ) || null
+    );
+  };
+
+  const canCancelLeaveRequest = (leaveRequest) => {
+    const status = String(leaveRequest?.status || "").toLowerCase();
+    return status === "pending" || status === "approved";
+  };
+  const getApprovedOverlapMessage = (item) =>
+    item
+      ? `Tidak bisa mengajukan cuti/izin karena sudah ada pengajuan disetujui pada tanggal ${formatDate(item.start_date)} - ${formatDate(item.end_date)}.`
+      : "";
+  const currentOverlapEndDate =
+    form.leave_type === "izin_terlambat"
+      ? form.start_date || form.end_date
+      : form.end_date;
+  const currentApprovedOverlap =
+    form.start_date && currentOverlapEndDate
+      ? findApprovedOverlap(form.start_date, currentOverlapEndDate)
+      : null;
+  const approvedOverlapMessage = getApprovedOverlapMessage(
+    currentApprovedOverlap,
   );
   const isAttendanceIntegratedToday = ["izin", "sakit"].includes(
     String(todayAttendance?.status || "").toLowerCase(),
@@ -955,6 +1132,11 @@ function EmployeeLeave() {
                   </option>
                 ))}
               </select>
+              {annualLeaveTenureBlocked ? (
+                <div className="mt-2 rounded-lg border border-warning/40 bg-warning/10 px-3 py-2 text-xs font-medium text-warning">
+                  {annualLeaveTenureMessage}
+                </div>
+              ) : null}
             </div>
             {form.leave_type === "cuti_khusus" ? (
               <div className="hidden md:block" aria-hidden="true" />
@@ -1131,11 +1313,18 @@ function EmployeeLeave() {
                 })()}
               </div>
             )}
+            {approvedOverlapMessage ? (
+              <div className="md:col-span-2 rounded-lg border border-error/40 bg-error/10 px-3 py-2 text-xs font-medium text-error">
+                {approvedOverlapMessage}
+              </div>
+            ) : null}
             <div className="md:col-span-2 text-xs opacity-70">
               {form.leave_type === "izin_terlambat"
                 ? "Izin terlambat/pulang cepat hanya untuk 1 tanggal pengajuan pada hari kerja."
                 : form.leave_type === "cuti_tahunan"
-                  ? remainingLeaveQuota > 0
+                  ? annualLeaveTenureBlocked
+                    ? annualLeaveTenureMessage
+                    : remainingLeaveQuota > 0
                     ? `Cuti Tahunan dapat diajukan dalam rentang berapa pun selama tidak melebihi sisa kuota ${remainingLeaveQuota} hari.`
                     : "Sisa kuota cuti tahunan sudah habis."
                 : maxDaysForCurrentLeave > 0
@@ -1149,6 +1338,7 @@ function EmployeeLeave() {
               onChange={(e) => updateForm("reason", e.target.value)}
             />
             <input
+              key={proofInputKey}
               className="file-input file-input-bordered md:col-span-2"
               type="file"
               accept=".pdf,.jpg,.jpeg,.png"
@@ -1199,14 +1389,22 @@ function EmployeeLeave() {
               <button
                 className={`btn btn-primary ${submitting ? "loading" : ""}`}
                 type="submit"
-                disabled={submitting}
+                disabled={
+                  submitting ||
+                  annualLeaveTenureBlocked ||
+                  Boolean(currentApprovedOverlap)
+                }
               >
                 Kirim Pengajuan
               </button>
               <button
                 type="button"
                 className="btn btn-ghost"
-                onClick={() => setLeaveMode("")}
+                onClick={() => {
+                  setLeaveMode("");
+                  setForm(INITIAL_FORM);
+                  setProofInputKey((prev) => prev + 1);
+                }}
               >
                 Ulangi Pilihan
               </button>
@@ -1293,18 +1491,18 @@ function EmployeeLeave() {
         ) : (
           <>
             <div className="w-full overflow-x-auto rounded-2xl border border-base-200">
-              <table className="table table-zebra table-sm w-[1490px] max-w-none table-fixed">
+              <table className="table table-zebra table-sm min-w-max">
                 <colgroup>
-                  <col className="w-[116px]" />
-                  <col className="w-[190px]" />
-                  <col className="w-[210px]" />
+                  <col className="w-[112px]" />
+                  <col className="w-[280px]" />
+                  <col className="w-[230px]" />
                   <col className="w-[82px]" />
-                  <col className="w-[125px]" />
-                  <col className="w-[130px]" />
-                  <col className="w-[160px]" />
-                  <col className="w-[300px]" />
-                  <col className="w-[92px]" />
-                  <col className="w-[85px]" />
+                  <col className="w-[118px]" />
+                  <col className="w-[135px]" />
+                  <col className="w-[150px]" />
+                  <col className="w-[240px]" />
+                  <col className="w-[82px]" />
+                  <col className="w-[76px]" />
                 </colgroup>
                 <thead>
                   <tr className="bg-base-200/80">
@@ -1327,19 +1525,22 @@ function EmployeeLeave() {
                         <td className="whitespace-nowrap">
                           {formatDate(item.created_at)}
                         </td>
-                        <td className="whitespace-nowrap">
-                          {formatDate(item.start_date)} -{" "}
-                          {formatDate(item.end_date)}
+                        <td>
+                          <div className="max-w-[280px] whitespace-normal break-words leading-snug">
+                            {formatLeavePeriod(item.start_date, item.end_date)}
+                          </div>
                         </td>
                         <td>
-                          <div className="break-words leading-snug">
+                          <div className="max-w-[230px] break-words leading-snug">
                             {getLeaveTypeLabel(
                               item.leave_type,
                               leaveTypeOptions,
                             ) || item.leave_type}
                           </div>
                         </td>
-                        <td className="text-center">{item.total_days || 0}</td>
+                        <td className="text-center whitespace-nowrap">
+                          {item.total_days || 0}
+                        </td>
                         <td>
                           <span
                           className={`badge badge-sm whitespace-nowrap ${STATUS_BADGE_CLASS[item.status] || "badge-outline"}`}
@@ -1349,7 +1550,7 @@ function EmployeeLeave() {
                         </td>
                         <td>
                           <div
-                            className="truncate"
+                            className="max-w-[135px] whitespace-normal break-words leading-snug"
                             title={item.approved_by_name || "-"}
                           >
                             {item.approved_by_name || "-"}
@@ -1360,7 +1561,7 @@ function EmployeeLeave() {
                         </td>
                         <td>
                           <div
-                            className="overflow-hidden whitespace-normal break-words leading-relaxed"
+                            className="max-w-[240px] overflow-hidden whitespace-normal break-words leading-relaxed"
                             title={item.reason || "-"}
                             style={{
                               display: "-webkit-box",
@@ -1387,7 +1588,7 @@ function EmployeeLeave() {
                           )}
                         </td>
                         <td className="text-center">
-                          {item.status === "pending" ? (
+                          {canCancelLeaveRequest(item) ? (
                             <button
                               type="button"
                               className="btn btn-xs btn-error rounded-full px-4 text-white"

@@ -59,6 +59,35 @@ body::before {
   position: relative;
 }
 
+.notifications-wrapper,
+.notifications-tr,
+.notifications-tl,
+.notifications-br,
+.notifications-bl {
+  z-index: 12000 !important;
+  pointer-events: none;
+}
+
+.notification {
+  pointer-events: auto;
+}
+
+.toast {
+  z-index: 12000 !important;
+}
+
+@media (max-width: 640px) {
+  .notifications-wrapper {
+    width: min(92vw, 420px) !important;
+    right: 4vw !important;
+    left: auto !important;
+  }
+
+  .notification {
+    width: 100% !important;
+  }
+}
+
 h1,
 h2,
 h3,
@@ -86,6 +115,13 @@ textarea {
     border-color 160ms ease,
     box-shadow 160ms ease,
     transform 160ms ease;
+}
+
+.app-password-input::-ms-reveal,
+.app-password-input::-ms-clear {
+  display: none;
+  width: 0;
+  height: 0;
 }
 
 .app-surface {

@@ -74,10 +74,7 @@ function Login() {
         axios.defaults.headers.common["Authorization"] = `Bearer ${token}`;
 
         // Redirect sesuai role
-        if (
-          activeRole === "kandidat" ||
-          (Array.isArray(roles) && roles.includes("kandidat"))
-        ) {
+        if (activeRole === "kandidat") {
           window.location.href = "/candidate/dashboard";
         } else {
           window.location.href = "/app/dashboard";

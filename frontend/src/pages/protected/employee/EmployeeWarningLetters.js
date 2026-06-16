@@ -56,7 +56,6 @@ function EmployeeWarningLetters() {
   const [loading, setLoading] = useState(true);
   const [summary, setSummary] = useState({});
   const [history, setHistory] = useState([]);
-  const [letters, setLetters] = useState([]);
   const [rules, setRules] = useState([]);
   const [error, setError] = useState("");
   const [alphaPage, setAlphaPage] = useState(1);
@@ -66,11 +65,10 @@ function EmployeeWarningLetters() {
       setLoading(true);
       setError("");
 
-      const [summaryRes, historyRes, lettersRes, rulesRes] =
+      const [summaryRes, historyRes, rulesRes] =
         await Promise.allSettled([
           pegawaiApi.getAttendanceSummary(),
           pegawaiApi.getAttendanceHistory({ limit: 200 }),
-          pegawaiApi.getMyWarningLetters(),
           pegawaiApi.getAttendanceWarningRulesPublic(),
         ]);
 
@@ -81,10 +79,6 @@ function EmployeeWarningLetters() {
       if (historyRes.status === "fulfilled")
         setHistory(historyRes.value?.data || []);
       else setHistory([]);
-
-      if (lettersRes && lettersRes.status === "fulfilled")
-        setLetters(lettersRes.value?.data || []);
-      else setLetters([]);
 
       if (rulesRes && rulesRes.status === "fulfilled")
         setRules(rulesRes.value?.data || []);
@@ -158,10 +152,7 @@ function EmployeeWarningLetters() {
     }
   })();
   const normalizeSanction = (value) => {
-    if (!value && !letters?.length) return "none";
-    const raw = String(
-      value || (letters && letters[0] && letters[0].sp_level) || "",
-    )
+    const raw = String(value || "")
       .toLowerCase()
       .trim();
     if (!raw) return "none";
@@ -254,10 +245,6 @@ function EmployeeWarningLetters() {
   const sanctionLabel = (!discipline.alpha_sanction_label || _isPlaceholderLabel(discipline.alpha_sanction_label))
     ? (derivedSanction && derivedSanction.label) || makeSanctionLabel(discipline.alpha_sanction_level || sanctionLevel)
     : discipline.alpha_sanction_label;
-
-  const sanctionBadgeClass = (!discipline.alpha_sanction_badge || String(discipline.alpha_sanction_badge).trim() === "")
-    ? (derivedSanction && derivedSanction.badge) || makeSanctionBadge(discipline.alpha_sanction_level || sanctionLevel)
-    : discipline.alpha_sanction_badge;
 
   const alphaHistory = (history || []).filter((item) => {
     const status = String(item.status || "").toLowerCase();
