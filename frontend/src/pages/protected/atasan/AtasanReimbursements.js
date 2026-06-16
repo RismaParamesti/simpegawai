@@ -37,6 +37,23 @@ const getStatusBadge = (status) => {
     }
 }
 
+const getFileTypeFromPath = (filePath) => {
+    if (!filePath) return 'unknown'
+
+    const lowerPath = String(filePath).toLowerCase()
+    if (lowerPath.endsWith('.pdf')) return 'pdf'
+    if (
+        lowerPath.endsWith('.jpg') ||
+        lowerPath.endsWith('.jpeg') ||
+        lowerPath.endsWith('.png') ||
+        lowerPath.endsWith('.webp')
+    ) {
+        return 'image'
+    }
+
+    return 'unknown'
+}
+
 function AtasanReimbursements() {
     const dispatch = useDispatch()
     const location = useLocation()
@@ -51,6 +68,7 @@ function AtasanReimbursements() {
     const [allItems, setAllItems] = useState([])
     const [pendingPage, setPendingPage] = useState(1)
     const [selectedItem, setSelectedItem] = useState(null)
+    const [selectedAttachment, setSelectedAttachment] = useState(null)
     const [showDetailModal, setShowDetailModal] = useState(false)
     const [reviewConfirm, setReviewConfirm] = useState(null)
 
@@ -122,6 +140,25 @@ function AtasanReimbursements() {
     const closeDetailModal = () => {
         setSelectedItem(null)
         setShowDetailModal(false)
+    }
+
+    const getAttachmentUrl = (path) => {
+        if (!path) return ''
+        const baseUrl = process.env.REACT_APP_API_URL || 'http://localhost:5000'
+        return `${baseUrl}/${String(path).replace(/^\/+/, '')}`
+    }
+
+    const openAttachmentModal = (item) => {
+        if (!item?.attachment) return
+        setSelectedAttachment({
+            path: item.attachment,
+            type: getFileTypeFromPath(item.attachment),
+            title: getReimbursementTypeLabel(item.reimbursement_type),
+        })
+    }
+
+    const closeAttachmentModal = () => {
+        setSelectedAttachment(null)
     }
 
     const openReviewConfirm = (item, action) => {
@@ -222,10 +259,6 @@ function AtasanReimbursements() {
                             </thead>
                             <tbody>
                                 {paginatedPendingItems.map((item) => {
-                                    const attachmentUrl = item.attachment
-                                        ? `${process.env.REACT_APP_API_URL || 'http://localhost:5000'}/${item.attachment}`
-                                        : ''
-
                                     return (
                                         <tr key={item.id}>
                                             <td>
@@ -242,7 +275,13 @@ function AtasanReimbursements() {
                                             </td>
                                             <td>
                                                 {item.attachment ? (
-                                                    <a href={attachmentUrl} target="_blank" rel="noreferrer" className=" px-3 py-1 text-xs bg-gradient-to-b from-blue-400 to-blue-600 text-white rounded-full border border-blue-600 hover:from-blue-500 hover:to-blue-700 transition-all duration-200 ">Lihat</a>
+                                                    <button
+                                                        type="button"
+                                                        className=" px-3 py-1 text-xs bg-gradient-to-b from-blue-400 to-blue-600 text-white rounded-full border border-blue-600 hover:from-blue-500 hover:to-blue-700 transition-all duration-200 "
+                                                        onClick={() => openAttachmentModal(item)}
+                                                    >
+                                                        Lihat
+                                                    </button>
                                                 ) : (
                                                     <span className="text-xs opacity-60">-</span>
                                                 )}
@@ -349,14 +388,13 @@ function AtasanReimbursements() {
                             <div className="mt-4">
                                 <p className="opacity-60 text-sm">Lampiran</p>
                                 {selectedItem.attachment ? (
-                                    <a
-                                        href={`${process.env.REACT_APP_API_URL || 'http://localhost:5000'}/${String(selectedItem.attachment).replace(/^\/+/, '')}`}
-                                        target="_blank"
-                                        rel="noreferrer"
-                                        className="link link-primary text-sm"
+                                    <button
+                                        type="button"
+                                        className="btn btn-outline btn-sm mt-2"
+                                        onClick={() => openAttachmentModal(selectedItem)}
                                     >
                                         Lihat lampiran ({String(selectedItem.attachment).split('/').pop()})
-                                    </a>
+                                    </button>
                                 ) : (
                                     <p className="text-sm opacity-70">Tidak ada lampiran.</p>
                                 )}
@@ -418,6 +456,67 @@ function AtasanReimbursements() {
                     </div>
                 )}
             </TitleCard>
+
+            {selectedAttachment ? (
+                <div className="modal modal-open">
+                    <div className="modal-box max-w-4xl">
+                        <button
+                            type="button"
+                            className="btn btn-sm btn-circle absolute right-2 top-2"
+                            onClick={closeAttachmentModal}
+                        >
+                            x
+                        </button>
+                        <h3 className="font-semibold text-xl mb-1">Lampiran Reimbursement</h3>
+                        <p className="text-sm opacity-70 mb-4">
+                            Jenis: {selectedAttachment.title || '-'}
+                        </p>
+
+                        <div className="w-full min-h-[420px] bg-base-200 rounded-lg overflow-hidden flex items-center justify-center">
+                            {selectedAttachment.type === 'image' ? (
+                                <img
+                                    src={getAttachmentUrl(selectedAttachment.path)}
+                                    alt="Lampiran reimbursement"
+                                    className="max-h-[70vh] w-auto object-contain"
+                                />
+                            ) : selectedAttachment.type === 'pdf' ? (
+                                <iframe
+                                    title="Lampiran PDF"
+                                    src={getAttachmentUrl(selectedAttachment.path)}
+                                    className="w-full h-[70vh] border-0"
+                                />
+                            ) : (
+                                <div className="text-center p-6">
+                                    <p className="mb-2">
+                                        Preview tidak tersedia untuk tipe file ini.
+                                    </p>
+                                    <a
+                                        href={getAttachmentUrl(selectedAttachment.path)}
+                                        target="_blank"
+                                        rel="noreferrer"
+                                        className="btn btn-primary btn-sm"
+                                    >
+                                        Buka File
+                                    </a>
+                                </div>
+                            )}
+                        </div>
+
+                        <div className="modal-action">
+                            <button className="btn" onClick={closeAttachmentModal}>
+                                Tutup
+                            </button>
+                        </div>
+                    </div>
+                    <button
+                        type="button"
+                        className="modal-backdrop"
+                        onClick={closeAttachmentModal}
+                    >
+                        Close
+                    </button>
+                </div>
+            ) : null}
 
         </>
     )

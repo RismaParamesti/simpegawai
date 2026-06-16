@@ -2045,11 +2045,27 @@ function FinancePayroll() {
           </div>
 
           <button
-            className={`btn w-full mt-4 rounded-2xl border-none bg-gradient-to-r from-orange-500 to-amber-500 text-white shadow-md hover:from-orange-600 hover:to-amber-600 ${loadingPublishAll ? "loading" : ""}`}
+            className={`btn w-full mt-4 rounded-2xl transition-all duration-200 ${
+              hasDraftToPublish
+                ? "border-none text-white shadow-md hover:shadow-lg"
+                : "border border-base-300 bg-white text-slate-500 shadow-none"
+            } ${loadingPublishAll ? "loading" : ""}`}
+            style={{
+              background: hasDraftToPublish
+                ? "linear-gradient(90deg, #ea580c, #d97706)"
+                : "#ffffff",
+              color: hasDraftToPublish ? "#ffffff" : "#64748b",
+              opacity: 1,
+              boxShadow: hasDraftToPublish
+                ? "0 12px 24px rgba(234, 88, 12, 0.22)"
+                : "none",
+            }}
             onClick={handlePublishAll}
             disabled={!hasDraftToPublish || loadingPublishAll}
           >
-            Publikasikan Semua Slip Bulan Ini
+            {hasDraftToPublish
+              ? "Publikasikan Semua Slip Bulan Ini"
+              : "Tidak Ada Slip Draft untuk Dipublikasikan"}
           </button>
         </TitleCard>
       </div>

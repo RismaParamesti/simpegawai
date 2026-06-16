@@ -377,7 +377,6 @@ export default function HRJobOpenings() {
       await jobService.updateJobOpening(pendingCancelJob.id, {
         ...pendingCancelJob,
         status: "closed",
-        hiring_status: "shortlisting",
       });
       const msg = "Lowongan berhasil ditutup";
       setShowCancelPopup(false);

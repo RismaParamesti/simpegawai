@@ -4,11 +4,7 @@ import { useSelector, useDispatch } from "react-redux";
 import RightSidebar from "./RightSidebar";
 import { useEffect, useState } from "react";
 import { removeNotificationMessage } from "../features/common/headerSlice";
-import {
-  NotificationContainer,
-  NotificationManager,
-} from "react-notifications";
-import "react-notifications/lib/notifications.css";
+import { NotificationManager } from "react-notifications";
 import ModalLayout from "./ModalLayout";
 import axios from "axios";
 import { useNavigate } from "react-router-dom";
@@ -128,9 +124,6 @@ function Layout() {
 
       {/* Right drawer - containing secondary content like notifications list etc.. */}
       <RightSidebar />
-
-      {/** Notification layout container */}
-      <NotificationContainer />
 
       {/* Modal layout container */}
       <ModalLayout />

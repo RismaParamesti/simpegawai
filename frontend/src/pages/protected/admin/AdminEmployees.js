@@ -6,6 +6,7 @@ import {
   showNotification,
 } from "../../../features/common/headerSlice";
 import TitleCard from "../../../components/Cards/TitleCard";
+import PasswordInput from "../../../components/Input/PasswordInput";
 import Pagination from "../../../components/Pagination/Pagination";
 import { adminApi } from "../../../features/admin/api";
 import useTablePagination from "../../../hooks/useTablePagination";
@@ -186,6 +187,8 @@ function AdminEmployees() {
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [createForm, setCreateForm] = useState(INITIAL_FORM);
   const [createDocuments, setCreateDocuments] = useState(INITIAL_DOCUMENTS);
+  const [createDocumentInputKey, setCreateDocumentInputKey] = useState(0);
+  const [editDocumentInputKey, setEditDocumentInputKey] = useState(0);
   const [filters, setFilters] = useState({
     search: "",
     position: "",
@@ -359,6 +362,18 @@ function AdminEmployees() {
     );
   };
 
+  const resetCreateEmployeeForm = () => {
+    setCreateForm(INITIAL_FORM);
+    setCreateDocuments(INITIAL_DOCUMENTS);
+    setCreateDocumentInputKey((prev) => prev + 1);
+  };
+
+  const closeCreateModal = () => {
+    setError("");
+    setShowCreateModal(false);
+    resetCreateEmployeeForm();
+  };
+
   const handleFilterChange = (field, value) => {
     setFilters((prev) => ({
       ...prev,
@@ -476,8 +491,7 @@ function AdminEmployees() {
         );
       }
 
-      setCreateForm(INITIAL_FORM);
-      setCreateDocuments(INITIAL_DOCUMENTS);
+      resetCreateEmployeeForm();
       setShowCreateModal(false);
       await loadData();
     } catch (err) {
@@ -556,6 +570,7 @@ function AdminEmployees() {
 
   const openEditModal = async (employee) => {
     setEditDocuments(INITIAL_DOCUMENTS);
+    setEditDocumentInputKey((prev) => prev + 1);
     setEditingEmployee(mapEmployeeToEditForm(employee));
 
     try {
@@ -711,6 +726,7 @@ function AdminEmployees() {
       );
       setEditingEmployee(null);
       setEditDocuments(INITIAL_DOCUMENTS);
+      setEditDocumentInputKey((prev) => prev + 1);
       await loadData();
     } catch (err) {
       setError(err.message);
@@ -927,10 +943,7 @@ function AdminEmployees() {
         id="create-employee-modal"
         className="modal-toggle"
         checked={showCreateModal}
-        onChange={() => {
-          setError("");
-          setShowCreateModal(false);
-        }}
+        onChange={closeCreateModal}
       />
       <div className="modal z-[9999]">
         <div className="modal-box relative z-[10000] max-w-6xl max-h-[90vh] overflow-y-auto">
@@ -958,10 +971,9 @@ function AdminEmployees() {
                   value={createForm.username}
                   onChange={(e) => updateCreateForm("username", e.target.value)}
                 />
-                <input
-                  className="input input-bordered"
+                <PasswordInput
+                  className="input input-bordered w-full"
                   placeholder="Password"
-                  type="password"
                   value={createForm.password}
                   onChange={(e) => updateCreateForm("password", e.target.value)}
                 />
@@ -1189,6 +1201,7 @@ function AdminEmployees() {
                     </span>
                   </label>
                   <input
+                    key={`create-ktp-${createDocumentInputKey}`}
                     type="file"
                     accept=".pdf,.jpg,.jpeg,.png"
                     className="file-input file-input-bordered w-full"
@@ -1207,6 +1220,7 @@ function AdminEmployees() {
                     </span>
                   </label>
                   <input
+                    key={`create-diploma-${createDocumentInputKey}`}
                     type="file"
                     accept=".pdf,.jpg,.jpeg,.png"
                     className="file-input file-input-bordered w-full"
@@ -1225,6 +1239,7 @@ function AdminEmployees() {
                     </span>
                   </label>
                   <input
+                    key={`create-contract-${createDocumentInputKey}`}
                     type="file"
                     accept=".pdf,.jpg,.jpeg,.png"
                     className="file-input file-input-bordered w-full"
@@ -1251,10 +1266,7 @@ function AdminEmployees() {
               <button
                 type="button"
                 className="btn"
-                onClick={() => {
-                  setError("");
-                  setShowCreateModal(false);
-                }}
+                onClick={closeCreateModal}
               >
                 Batal
               </button>
@@ -1631,7 +1643,11 @@ function AdminEmployees() {
         id="edit-employee-modal"
         className="modal-toggle"
         checked={!!editingEmployee}
-        onChange={() => setEditingEmployee(null)}
+        onChange={() => {
+          setEditingEmployee(null);
+          setEditDocuments(INITIAL_DOCUMENTS);
+          setEditDocumentInputKey((prev) => prev + 1);
+        }}
       />
       <div className="modal z-[9999]">
         <div className="modal-box relative z-[10000] max-w-3xl max-h-[90vh] overflow-y-auto">
@@ -2003,6 +2019,7 @@ function AdminEmployees() {
                       <span className="label-text">Ganti Dokumen KTP</span>
                     </label>
                     <input
+                      key={`edit-ktp-${editDocumentInputKey}`}
                       type="file"
                       accept=".pdf,.jpg,.jpeg,.png"
                       className="file-input file-input-bordered w-full"
@@ -2019,6 +2036,7 @@ function AdminEmployees() {
                       <span className="label-text">Ganti Dokumen Ijazah</span>
                     </label>
                     <input
+                      key={`edit-diploma-${editDocumentInputKey}`}
                       type="file"
                       accept=".pdf,.jpg,.jpeg,.png"
                       className="file-input file-input-bordered w-full"
@@ -2035,6 +2053,7 @@ function AdminEmployees() {
                       <span className="label-text">Ganti Dokumen Kontrak</span>
                     </label>
                     <input
+                      key={`edit-contract-${editDocumentInputKey}`}
                       type="file"
                       accept=".pdf,.jpg,.jpeg,.png"
                       className="file-input file-input-bordered w-full"
@@ -2052,7 +2071,14 @@ function AdminEmployees() {
             </div>
           ) : null}
           <div className="modal-action">
-            <button className="btn" onClick={() => setEditingEmployee(null)}>
+            <button
+              className="btn"
+              onClick={() => {
+                setEditingEmployee(null);
+                setEditDocuments(INITIAL_DOCUMENTS);
+                setEditDocumentInputKey((prev) => prev + 1);
+              }}
+            >
               Batal
             </button>
             <button

@@ -3,6 +3,7 @@ const router = express.Router();
 const path = require("path");
 const multer = require("multer");
 const fs = require("fs");
+const Holidays = require("date-holidays");
 const db = require("../config/db");
 const { verifyToken, verifyRole } = require("../middleware/authMiddleware");
 const { logActivity, getIpAddress, getUserAgent } = require("../middleware/activityLogger");
@@ -30,6 +31,82 @@ const fileFilter = (req, file, cb) => {
 };
 
 const upload = multer({ storage, fileFilter });
+const holidayCalendar = new Holidays("ID");
+
+const formatDateOnly = (date) => {
+    const value = date instanceof Date ? date : new Date(date);
+    return `${value.getFullYear()}-${String(value.getMonth() + 1).padStart(2, "0")}-${String(value.getDate()).padStart(2, "0")}`;
+};
+
+const isPayrollWorkday = (date) => {
+    const dayOfWeek = date.getDay();
+    return dayOfWeek !== 0 && !holidayCalendar.isHoliday(date);
+};
+
+const getPeriodBounds = (periodMonth, periodYear) => {
+    const periodStart = `${periodYear}-${String(periodMonth).padStart(2, "0")}-01`;
+    const periodEndDate = new Date(Number(periodYear), Number(periodMonth), 0);
+    return {
+        periodStart,
+        periodEnd: formatDateOnly(periodEndDate),
+    };
+};
+
+const mapLeaveTypeToPayrollStatus = (leaveType) => {
+    const normalized = String(leaveType || "").toLowerCase();
+    if (normalized === "cuti_sakit" || normalized === "izin_sakit") {
+        return "sakit";
+    }
+    return "izin";
+};
+
+const isDayBasedLeaveForPayroll = (leaveRequest) => {
+    const leaveType = String(leaveRequest?.leave_type || "").toLowerCase();
+    const specialOption = String(leaveRequest?.cuti_khusus_option || "").toLowerCase();
+
+    if (leaveType === "izin_terlambat") return false;
+    if (leaveType === "cuti_khusus" && ["terlambat", "pulang_cepat"].includes(specialOption)) {
+        return false;
+    }
+
+    return true;
+};
+
+const getApprovedLeaveDateSummaryForPeriod = async (employeeId, periodMonth, periodYear) => {
+    const { periodStart, periodEnd } = getPeriodBounds(periodMonth, periodYear);
+    const [rows] = await db.promise().query(
+        `SELECT leave_type, start_date, end_date, cuti_khusus_option
+         FROM leave_requests
+         WHERE employee_id = ?
+           AND status = 'approved'
+           AND end_date >= ?
+           AND start_date <= ?`,
+        [employeeId, periodStart, periodEnd]
+    );
+
+    const datesByStatus = {
+        izin: new Set(),
+        sakit: new Set(),
+    };
+
+    for (const row of rows) {
+        if (!isDayBasedLeaveForPayroll(row)) continue;
+
+        const start = new Date(Math.max(new Date(row.start_date).getTime(), new Date(periodStart).getTime()));
+        const end = new Date(Math.min(new Date(row.end_date).getTime(), new Date(periodEnd).getTime()));
+        const status = mapLeaveTypeToPayrollStatus(row.leave_type);
+
+        for (let cursor = new Date(start); cursor <= end; cursor.setDate(cursor.getDate() + 1)) {
+            if (!isPayrollWorkday(cursor)) continue;
+            datesByStatus[status].add(formatDateOnly(cursor));
+        }
+    }
+
+    return {
+        izinDays: datesByStatus.izin.size,
+        sakitDays: datesByStatus.sakit.size,
+    };
+};
 
 const APPEAL_REASON_OPTION_MAP = {
     basic_salary: {
@@ -301,6 +378,26 @@ const getEmployeeIdByUser = async (userId) => {
     return rows.length ? rows[0].id : null;
 };
 
+let salaryAppealCancelledStatusEnsured = false;
+
+const ensureSalaryAppealCancelledStatus = async () => {
+    if (salaryAppealCancelledStatusEnsured) return;
+
+    const [columns] = await db
+        .promise()
+        .query("SHOW COLUMNS FROM salary_appeals LIKE 'status'");
+    const statusType = String(columns?.[0]?.Type || "").toLowerCase();
+
+    if (statusType && !statusType.includes("'cancelled'")) {
+        await db.promise().query(
+            `ALTER TABLE salary_appeals
+             MODIFY status ENUM('pending','approved','rejected','cancelled') DEFAULT 'pending'`
+        );
+    }
+
+    salaryAppealCancelledStatusEnsured = true;
+};
+
 const hasPendingAppeal = async (payrollId) => {
     const [rows] = await db.promise().query(
         `SELECT COUNT(*) AS pending_count
@@ -461,7 +558,10 @@ router.post(
             const [existingAppealRows] = await db.promise().query(
                 `SELECT COUNT(*) AS total
                  FROM salary_appeals
-                 WHERE employee_id = ? AND payroll_id = ? AND deleted_at IS NULL`,
+                 WHERE employee_id = ?
+                   AND payroll_id = ?
+                   AND status <> 'cancelled'
+                   AND deleted_at IS NULL`,
                 [employeeId, payroll_id]
             );
 
@@ -760,7 +860,7 @@ router.put(
 );
 
 // ============================
-// Pegawai delete salary appeal miliknya
+// Pegawai membatalkan salary appeal miliknya
 // ============================
 router.delete(
     "/:id",
@@ -793,41 +893,42 @@ router.delete(
             if (Number(appeal.employee_id) !== Number(employeeId)) {
                 return res
                     .status(403)
-                    .json({ message: "You can only delete your own salary appeal" });
+                    .json({ message: "You can only cancel your own salary appeal" });
             }
 
             if (appeal.status !== "pending") {
                 return res.status(400).json({
-                    message: "Only pending salary appeal can be deleted",
+                    message: "Only pending salary appeal can be cancelled",
                 });
             }
 
+            await ensureSalaryAppealCancelledStatus();
+
             await db.promise().query(
                 `UPDATE salary_appeals
-                 SET deleted_at = NOW(),
-                     status = 'rejected',
-                     review_notes = COALESCE(review_notes, 'Deleted by employee'),
+                 SET status = 'cancelled',
+                     review_notes = COALESCE(review_notes, 'Dibatalkan oleh pegawai'),
                      updated_at = NOW()
                  WHERE id = ? AND deleted_at IS NULL`,
                 [id]
             );
             await syncPayrollAppealStatus(appeal.payroll_id);
 
-            // Log salary appeal deletion
+            // Log salary appeal cancellation
             await logActivity({
                 userId: req.user.id,
                 username: req.user.username || req.user.name || null,
                 role: req.user.roles?.[0] || req.user.role || null,
-                action: "DELETE",
+                action: "UPDATE",
                 module: "salary_appeals",
-                description: `Deleted salary appeal id ${id}`,
+                description: `Cancelled salary appeal id ${id}`,
                 oldValues: { id: appeal.id, status: appeal.status },
-                newValues: { id: id, status: 'rejected', deleted_at: new Date().toISOString() },
+                newValues: { id: id, status: 'cancelled' },
                 ipAddress: getIpAddress(req),
                 userAgent: getUserAgent(req),
             });
 
-            res.json({ message: "Salary appeal deleted successfully" });
+            res.json({ message: "Salary appeal cancelled successfully" });
         } catch (error) {
             console.error(error);
             res.status(500).json({ message: "Server error" });
@@ -884,6 +985,7 @@ router.get(
                      LEFT JOIN users reviewer_user ON reviewer_emp.user_id = reviewer_user.id
                                          WHERE 1=1
                                              AND sa.deleted_at IS NULL
+                                             AND sa.status <> 'cancelled'
                                              AND p.deleted_at IS NULL`;
         const params = [];
 
@@ -1375,6 +1477,11 @@ router.post(
             );
 
             const payrollRow = payrollRows[0] || {};
+            const approvedLeaveSummary = await getApprovedLeaveDateSummaryForPeriod(
+                appeal.employee_id,
+                appeal.period_month,
+                appeal.period_year
+            );
             const nextBasicSalary = Number(
                 basic_salary !== undefined
                     ? basic_salary
@@ -1447,14 +1554,24 @@ router.post(
                     : payrollRow.total_absent_days || 0
             );
             const nextTotalSakitDays = Number(
-                total_sakit_days !== undefined
-                    ? total_sakit_days
-                    : payrollRow.total_sakit_days || 0
+                Math.max(
+                    Number(
+                        total_sakit_days !== undefined
+                            ? total_sakit_days
+                            : payrollRow.total_sakit_days || 0
+                    ),
+                    approvedLeaveSummary.sakitDays
+                )
             );
             const nextTotalIzinDays = Number(
-                total_izin_days !== undefined
-                    ? total_izin_days
-                    : payrollRow.total_izin_days || 0
+                Math.max(
+                    Number(
+                        total_izin_days !== undefined
+                            ? total_izin_days
+                            : payrollRow.total_izin_days || 0
+                    ),
+                    approvedLeaveSummary.izinDays
+                )
             );
             const nextPresentDays = Number(
                 present_days !== undefined

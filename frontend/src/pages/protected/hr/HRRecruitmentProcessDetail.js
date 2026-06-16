@@ -913,10 +913,10 @@ export default function HRRecruitmentProcessDetail() {
       {view === "list" && (
         <div className="mt-4 overflow-hidden rounded-[1.5rem] border border-slate-200/80 bg-white p-4 shadow-[0_20px_70px_rgba(15,23,42,0.07)] dark:border-slate-700 dark:bg-slate-950 dark:shadow-[0_20px_70px_rgba(2,6,23,0.45)] sm:p-7">
           <div className="space-y-6">
-            <div className="relative overflow-hidden rounded-[1.4rem] bg-gradient-to-r from-white via-white to-orange-50/80 px-4 py-5 dark:from-slate-950 dark:via-slate-950 dark:to-slate-900 sm:px-6 sm:py-6">
+            <div className="relative flex flex-col gap-4 overflow-hidden rounded-[1.4rem] bg-gradient-to-r from-white via-white to-orange-50/80 px-4 py-5 dark:from-slate-950 dark:via-slate-950 dark:to-slate-900 sm:px-6 sm:py-6">
               <button
                 type="button"
-                className={`${gradientOrangeButtonClass} absolute right-4 top-4 z-20 h-9 px-3.5 py-0 text-xs sm:h-10 sm:px-4 sm:text-sm`}
+                className={`${gradientOrangeButtonClass} relative z-20 h-9 self-start px-3.5 py-0 text-xs sm:h-10 sm:self-end sm:px-4 sm:text-sm`}
                 style={{
                   background: "#f97316",
                   borderColor: "#ea580c",
@@ -1057,10 +1057,10 @@ export default function HRRecruitmentProcessDetail() {
       {view === "detail" && selected && (
         <div className="mt-4 overflow-hidden rounded-[1.5rem] border border-slate-200/80 bg-white p-4 shadow-[0_20px_70px_rgba(15,23,42,0.07)] dark:border-slate-700 dark:bg-slate-950 dark:shadow-[0_20px_70px_rgba(2,6,23,0.45)] sm:p-7">
           <div className="space-y-6">
-            <div className="relative overflow-hidden rounded-[1.4rem] bg-gradient-to-r from-white via-white to-orange-50/80 p-5 dark:from-slate-950 dark:via-slate-950 dark:to-slate-900">
+            <div className="relative flex flex-col gap-4 overflow-hidden rounded-[1.4rem] bg-gradient-to-r from-white via-white to-orange-50/80 p-5 dark:from-slate-950 dark:via-slate-950 dark:to-slate-900">
               <button
                 type="button"
-                className={`${gradientOrangeButtonClass} absolute right-4 top-4 z-20 px-4 py-2`}
+                className={`${gradientOrangeButtonClass} relative z-20 self-start px-4 py-2 sm:self-end`}
                 style={{
                   background: "#f97316",
                   borderColor: "#ea580c",

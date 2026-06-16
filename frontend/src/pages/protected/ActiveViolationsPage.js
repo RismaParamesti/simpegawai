@@ -75,7 +75,24 @@ function ActiveViolationsPage() {
     employees
       .filter((employee) => {
         const level = normalizeSanctionLevel(employee.alpha_sanction_level);
-        return level && level !== "none" && level !== "0" && level !== "-";
+        const alphaCount = Number(
+          employee.alpha_consecutive_days ||
+            employee.consecutive_alpha_days ||
+            employee.alpha_accumulated_days ||
+            0,
+        );
+        const lateCount = Number(
+          employee.late_consecutive_days ||
+            employee.late_accumulated_days ||
+            0,
+        );
+        return (
+          level &&
+          level !== "none" &&
+          level !== "0" &&
+          level !== "-" &&
+          (alphaCount > 0 || lateCount > 0)
+        );
       })
       .map((employee) => ({
         id: `employee-${employee.employee_id || employee.id}`,

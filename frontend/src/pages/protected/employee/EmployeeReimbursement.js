@@ -8,6 +8,7 @@ import TitleCard from "../../../components/Cards/TitleCard";
 import Pagination from "../../../components/Pagination/Pagination";
 import { pegawaiApi } from "../../../features/pegawai/api";
 import { formatDateOnly, toDateInputValue } from "../../../utils/dateUtils";
+import useAppPopup from "../../../hooks/useAppPopup";
 
 const INITIAL_FORM = {
   reimbursement_type: "",
@@ -38,6 +39,7 @@ const getStatusLabel = (status) => {
     approved: "Disetujui",
     included_in_payroll: "Masuk Payroll",
     rejected: "Ditolak",
+    cancelled: "Dibatalkan",
   };
 
   return labels[status] || status;
@@ -56,6 +58,9 @@ const getStatusBadge = (status) => {
 
     case "rejected":
       return "badge badge-error text-white";
+
+    case "cancelled":
+      return "badge badge-neutral text-white";
 
     default:
       return "badge badge-outline";
@@ -104,6 +109,7 @@ const formatAmountInput = (value) => {
 
 function EmployeeReimbursement() {
   const dispatch = useDispatch();
+  const { popup, confirmPopup } = useAppPopup();
   const [form, setForm] = useState(INITIAL_FORM);
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
@@ -114,6 +120,7 @@ function EmployeeReimbursement() {
   const [dateFilter, setDateFilter] = useState("");
   const [typeFilter, setTypeFilter] = useState("");
   const [statusFilter, setStatusFilter] = useState("");
+  const [attachmentInputKey, setAttachmentInputKey] = useState(0);
 
   const loadData = useCallback(async () => {
     try {
@@ -228,6 +235,7 @@ function EmployeeReimbursement() {
         reimbursement_type: dbType,
       });
       setForm(INITIAL_FORM);
+      setAttachmentInputKey((prev) => prev + 1);
       setCurrentPage(1);
       dispatch(
         showNotification({
@@ -251,8 +259,39 @@ function EmployeeReimbursement() {
     setCurrentPage(1);
   };
 
+  const cancelReimbursement = async (item) => {
+    const confirmed = await confirmPopup({
+      title: "Batalkan Reimbursement",
+      subtitle: "Data tetap tersimpan di riwayat Anda",
+      badge: "Konfirmasi",
+      message:
+        "Batalkan reimbursement ini? Data akan tetap tampil di riwayat Anda dengan status dibatalkan.",
+      confirmLabel: "Batalkan",
+      cancelLabel: "Kembali",
+      variant: "warning",
+    });
+    if (!confirmed) return;
+
+    try {
+      setSubmitting(true);
+      await pegawaiApi.cancelReimbursement(item.id);
+      dispatch(
+        showNotification({
+          message: "Reimbursement berhasil dibatalkan",
+          status: 1,
+        }),
+      );
+      await loadData();
+    } catch (err) {
+      dispatch(showNotification({ message: err.message, status: 0 }));
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
   return (
     <>
+      {popup}
       <TitleCard title="Ajukan Reimbursement" topMargin="mt-0">
         <form
           className="grid md:grid-cols-2 grid-cols-1 gap-4"
@@ -299,6 +338,7 @@ function EmployeeReimbursement() {
               <span className="label-text font-semibold">Upload Bukti</span>
             </div>
             <input
+              key={attachmentInputKey}
               className="file-input file-input-bordered w-full"
               type="file"
               accept=".pdf,.jpg,.jpeg,.png"
@@ -370,6 +410,7 @@ function EmployeeReimbursement() {
                   <option value="approved">Disetujui</option>
                   <option value="included_in_payroll">Masuk Payroll</option>
                   <option value="rejected">Ditolak</option>
+                  <option value="cancelled">Dibatalkan</option>
                 </select>
               </div>
 
@@ -382,13 +423,14 @@ function EmployeeReimbursement() {
               </button>
             </div>
             <div className="w-full overflow-x-auto rounded-2xl border border-base-200">
-              <table className="table table-zebra table-sm w-[1180px] max-w-none table-fixed">
+              <table className="table table-zebra table-sm w-[1320px] max-w-none table-fixed">
                 <colgroup>
                   <col className="w-[120px]" />
                   <col className="w-[190px]" />
                   <col className="w-[150px]" />
                   <col className="w-[190px]" />
                   <col className="w-[110px]" />
+                  <col className="w-[140px]" />
                   <col className="w-[420px]" />
                 </colgroup>
                 <thead>
@@ -398,6 +440,7 @@ function EmployeeReimbursement() {
                     <th>Nominal</th>
                     <th>Status</th>
                     <th>Lampiran</th>
+                    <th>Aksi</th>
                     <th>Deskripsi</th>
                   </tr>
                 </thead>
@@ -434,6 +477,21 @@ function EmployeeReimbursement() {
                           "-"
                         )}
                       </td>
+                      <td className="text-center">
+                        {String(item.status || "").toLowerCase() ===
+                        "pending" ? (
+                          <button
+                            type="button"
+                            className="btn btn-xs btn-warning rounded-full"
+                            disabled={submitting}
+                            onClick={() => cancelReimbursement(item)}
+                          >
+                            Batalkan
+                          </button>
+                        ) : (
+                          "-"
+                        )}
+                      </td>
                       <td>
                         <div
                           className="overflow-hidden whitespace-normal break-words leading-relaxed"
@@ -451,7 +509,7 @@ function EmployeeReimbursement() {
                   ))}
                   {paginatedItems.length === 0 && (
                     <tr>
-                      <td colSpan={6} className="text-center opacity-70">
+                      <td colSpan={7} className="text-center opacity-70">
                         {items.length === 0
                           ? "Belum ada reimbursement"
                           : "Tidak ada data"}

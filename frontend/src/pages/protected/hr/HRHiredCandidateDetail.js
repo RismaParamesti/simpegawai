@@ -266,7 +266,7 @@ const HRHiredCandidateDetail = () => {
                 openDocumentModal(invitationLetterFile, "Surat Undangan")
               }
             >
-              Cetak Surat
+              Lihat Surat
             </button>
           </div>
 

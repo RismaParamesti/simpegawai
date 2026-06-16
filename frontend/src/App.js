@@ -7,6 +7,8 @@ import { BrowserRouter as Router, Route, Routes, Navigate } from 'react-router-d
 import { themeChange } from 'theme-change'
 import checkAuth from './app/auth';
 import initializeApp from './app/init';
+import { NotificationContainer } from 'react-notifications';
+import 'react-notifications/lib/notifications.css';
 
 class ErrorBoundary extends React.Component {
   constructor(props) {
@@ -41,6 +43,7 @@ const ForgotPassword = lazy(() => import('./pages/ForgotPassword'))
 const ResetPassword = lazy(() => import('./pages/ResetPassword'))
 const Register = lazy(() => import('./pages/Register'))
 const Documentation = lazy(() => import('./pages/Documentation'))
+const InternalPortalLandingPage = lazy(() => import('./pages/InternalPortalLandingPage'))
 const CandidateJobsPage = lazy(() => import('./pages/CandidateJobsPage'))
 const CandidateApplyPage = lazy(() => import('./pages/CandidateApplyPage'))
 const CandidateRequestsPage = lazy(() => import('./pages/CandidateRequestsPage'))
@@ -81,6 +84,7 @@ function App() {
         <Routes>
           {/* Public candidate job application routes */}
           <Route path="/" element={<Navigate to="/candidate/jobs" replace />} />
+          <Route path="/portal" element={<InternalPortalLandingPage />} />
           <Route path="/candidate/jobs" element={<CandidateJobsPage />} />
           <Route path="/candidate/jobs/:jobId" element={<CandidateJobDetailPage />} />
           <Route path="/candidate/apply/:jobId" element={<CandidateApplyPage />} />
@@ -99,6 +103,7 @@ function App() {
           <Route path="*" element={<Navigate to="/candidate/jobs" replace />} />
         </Routes>
       </Router>
+      <NotificationContainer />
     </ErrorBoundary>
   )
 }

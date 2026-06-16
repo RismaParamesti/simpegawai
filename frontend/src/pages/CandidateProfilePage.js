@@ -85,6 +85,11 @@ export default function CandidateProfilePage() {
       setForm({ ...form, nik: digits })
       return
     }
+    if (name === 'npwp') {
+      const digits = String(value).replace(/\D/g, '').slice(0, 16)
+      setForm({ ...form, npwp: digits })
+      return
+    }
 
     setForm({
       ...form,
@@ -97,6 +102,14 @@ export default function CandidateProfilePage() {
 
     if (!form.name || !form.email || !form.phone) {
       NotificationManager.error('Mohon isi semua field wajib', 'Validasi Gagal', 3000)
+      return
+    }
+    if (form.nik && form.nik.length !== 16) {
+      NotificationManager.error('NIK harus 16 angka', 'Validasi Gagal', 3000)
+      return
+    }
+    if (form.npwp && form.npwp.length !== 16) {
+      NotificationManager.error('NPWP harus 16 angka', 'Validasi Gagal', 3000)
       return
     }
 
@@ -319,6 +332,9 @@ export default function CandidateProfilePage() {
               placeholder="Masukkan NIK (16 digit)"
               value={form.nik}
               onChange={handleChange}
+              inputMode="numeric"
+              maxLength={16}
+              pattern="\d{16}"
             />
           </div>
 
@@ -330,9 +346,12 @@ export default function CandidateProfilePage() {
               type="text"
               name="npwp"
               className="input input-bordered"
-              placeholder="Masukkan NPWP"
+              placeholder="Masukkan NPWP (16 digit)"
               value={form.npwp}
               onChange={handleChange}
+              inputMode="numeric"
+              maxLength={16}
+              pattern="\d{16}"
             />
           </div>
 
