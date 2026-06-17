@@ -17,6 +17,7 @@ const STANDARD_CHECK_IN_TIME = "08:00:00";
 const STANDARD_CHECK_OUT_TIME = "17:00:00";
 const LATE_TOLERANCE_MINUTES = 60;
 const holidayCalendar = new Holidays("ID");
+let holidayTableAvailable = null;
 
 const MANAGER_POSITION_NAMES = [
   "operations manager",
@@ -435,6 +436,38 @@ const getHolidayName = (dateValue) => {
   return getHolidayInfo(dateValue)?.name || "Tanggal merah";
 };
 
+const getDatabaseHolidayInfo = async (dateStr) => {
+  if (holidayTableAvailable === false) return null;
+
+  try {
+    const [rows] = await db.promise().query(
+      `SELECT name
+       FROM holidays
+       WHERE date = ?
+         AND COALESCE(is_active, 1) = 1
+       LIMIT 1`,
+      [dateStr],
+    );
+
+    holidayTableAvailable = true;
+    return rows[0] || null;
+  } catch (error) {
+    if (error?.code === "ER_NO_SUCH_TABLE" || error?.errno === 1146) {
+      holidayTableAvailable = false;
+      return null;
+    }
+
+    throw error;
+  }
+};
+
+const isAttendanceWorkingDay = (dateValue) => {
+  const localDate = parseLocalDateOnly(dateValue);
+  if (!localDate || Number.isNaN(localDate.getTime())) return false;
+
+  return localDate.getDay() !== 0 && !isPublicHoliday(localDate);
+};
+
 const isNonWorkingDay = (dateValue) => {
   const localDate = parseLocalDateOnly(dateValue);
   if (!localDate || Number.isNaN(localDate.getTime())) return false;
@@ -660,17 +693,32 @@ const getCalculatedRemainingLeaveQuota = async (employeeId) => {
 const getEmployeeCreatedDateOnly = async (employeeId) => {
   const [rows] = await db
     .promise()
-    .query("SELECT created_at FROM employees WHERE id = ? LIMIT 1", [
+    .query("SELECT join_date, created_at FROM employees WHERE id = ? LIMIT 1", [
       employeeId,
     ]);
 
-  if (!rows.length || !rows[0].created_at) return null;
+  if (!rows.length) return null;
 
-  const createdDate = new Date(rows[0].created_at);
+  const createdDate = new Date(rows[0].join_date || rows[0].created_at);
   if (Number.isNaN(createdDate.getTime())) return null;
 
   createdDate.setHours(0, 0, 0, 0);
   return createdDate;
+};
+
+const getApprovedLeaveForDate = async (employeeId, dateStr) => {
+  const [rows] = await db.promise().query(
+    `SELECT id, leave_type, total_days, time, cuti_khusus_option
+     FROM leave_requests
+     WHERE employee_id = ?
+       AND status = 'approved'
+       AND ? BETWEEN start_date AND end_date
+     ORDER BY approved_at DESC, created_at DESC
+     LIMIT 1`,
+    [employeeId, dateStr],
+  );
+
+  return rows[0] || null;
 };
 
 const emptyAutoAlphaWhereSql = (alias = "") => {
@@ -822,42 +870,10 @@ const ensureAlphaAttendanceRecords = async (employeeId, month, year) => {
     cursor <= endDate;
     cursor.setDate(cursor.getDate() + 1)
   ) {
-    // Hari kerja: Senin-Sabtu (Minggu tidak dihitung)
-    if (cursor.getDay() === 0) {
-      continue;
-    }
+    const result = await ensureAlphaAttendanceByDate(employeeId, cursor);
 
-    const dateStr = formatDateOnly(cursor);
-    const [existingAttendance] = await db
-      .promise()
-      .query("SELECT id FROM attendance WHERE employee_id = ? AND date = ?", [
-        employeeId,
-        dateStr,
-      ]);
-
-    if (existingAttendance.length === 0) {
-      if (isPublicHoliday(cursor)) {
-        await db.promise().query(
-          `INSERT INTO attendance 
-                    (employee_id, date, status, notes, is_late, late_minutes, created_at) 
-                    VALUES (?, ?, 'libur', ?, 0, 0, NOW())
-                    ON DUPLICATE KEY UPDATE employee_id = employee_id`,
-          [employeeId, dateStr, `Libur: ${getHolidayName(cursor)}`],
-        );
-        continue;
-      }
-
-      const [insertResult] = await db.promise().query(
-        `INSERT INTO attendance 
-                (employee_id, date, status, is_late, late_minutes, created_at) 
-                VALUES (?, ?, 'alpha', 0, 0, NOW())
-                ON DUPLICATE KEY UPDATE employee_id = employee_id`,
-        [employeeId, dateStr],
-      );
-
-      if (insertResult.affectedRows === 1) {
-        createdAlphaCount += 1;
-      }
+    if (result?.status === "alpha") {
+      createdAlphaCount += 1;
     }
   }
 
@@ -878,12 +894,8 @@ const ensureAlphaAttendanceByDate = async (employeeId, dateObj) => {
     }
   }
 
-  // Hari kerja: Senin-Sabtu (Minggu tidak dihitung)
-  if (dateObj.getDay() === 0) {
-    return false;
-  }
-
   const dateStr = formatDateOnly(dateObj);
+
   const [existingAttendance] = await db
     .promise()
     .query("SELECT id FROM attendance WHERE employee_id = ? AND date = ?", [
@@ -895,6 +907,33 @@ const ensureAlphaAttendanceByDate = async (employeeId, dateObj) => {
     return false;
   }
 
+  if (dateObj.getDay() === 0) {
+    const [insertResult] = await db.promise().query(
+      `INSERT INTO attendance 
+            (employee_id, date, status, notes, is_late, late_minutes, created_at) 
+            VALUES (?, ?, 'libur', 'Libur: Minggu', 0, 0, NOW())
+            ON DUPLICATE KEY UPDATE employee_id = employee_id`,
+      [employeeId, dateStr],
+    );
+    return insertResult.affectedRows === 1
+      ? { status: "libur", date: dateStr }
+      : false;
+  }
+
+  const databaseHoliday = await getDatabaseHolidayInfo(dateStr);
+  if (databaseHoliday) {
+    const [insertResult] = await db.promise().query(
+      `INSERT INTO attendance 
+            (employee_id, date, status, notes, is_late, late_minutes, created_at) 
+            VALUES (?, ?, 'libur', ?, 0, 0, NOW())
+            ON DUPLICATE KEY UPDATE employee_id = employee_id`,
+      [employeeId, dateStr, `Libur: ${databaseHoliday.name || "Hari libur"}`],
+    );
+    return insertResult.affectedRows === 1
+      ? { status: "libur", date: dateStr }
+      : false;
+  }
+
   if (isPublicHoliday(dateObj)) {
     const [insertResult] = await db.promise().query(
       `INSERT INTO attendance 
@@ -903,23 +942,102 @@ const ensureAlphaAttendanceByDate = async (employeeId, dateObj) => {
             ON DUPLICATE KEY UPDATE employee_id = employee_id`,
       [employeeId, dateStr, `Libur: ${getHolidayName(dateObj)}`],
     );
-    return insertResult.affectedRows === 1;
+    return insertResult.affectedRows === 1
+      ? { status: "libur", date: dateStr }
+      : false;
+  }
+
+  const approvedLeave = await getApprovedLeaveForDate(employeeId, dateStr);
+  if (approvedLeave) {
+    return false;
   }
 
   const [insertResult] = await db.promise().query(
     `INSERT INTO attendance 
-        (employee_id, date, status, is_late, late_minutes, created_at) 
-        VALUES (?, ?, 'alpha', 0, 0, NOW())
+        (employee_id, date, status, notes, is_late, late_minutes, created_at) 
+        VALUES (?, ?, 'alpha', 'Auto Alpha: tidak ada presensi masuk/pulang sampai batas hari kerja.', 0, 0, NOW())
         ON DUPLICATE KEY UPDATE employee_id = employee_id`,
     [employeeId, dateStr],
   );
 
   if (insertResult.affectedRows === 1) {
     await evaluateAlphaDisciplineForEmployee(employeeId);
-    return true;
+    return { status: "alpha", date: dateStr };
   }
 
   return false;
+};
+
+const autoGenerateAlphaForEmployee = async (
+  employeeId,
+  { startDate: explicitStartDate = null, endDate = null } = {},
+) => {
+  const startDate =
+    parseLocalDateOnly(explicitStartDate) ||
+    (await getEmployeeCreatedDateOnly(employeeId));
+  const cutoffDate = parseLocalDateOnly(endDate);
+
+  if (!startDate || !cutoffDate || cutoffDate < startDate) {
+    return {
+      employee_id: employeeId,
+      start_date: startDate ? formatDateOnly(startDate) : null,
+      end_date: cutoffDate ? formatDateOnly(cutoffDate) : null,
+      generated_alpha: 0,
+      generated_holiday: 0,
+      skipped: true,
+    };
+  }
+
+  let generatedAlpha = 0;
+  let generatedHoliday = 0;
+
+  for (
+    let cursor = new Date(startDate);
+    cursor <= cutoffDate;
+    cursor.setDate(cursor.getDate() + 1)
+  ) {
+    const result = await ensureAlphaAttendanceByDate(employeeId, cursor);
+
+    if (result?.status === "alpha") {
+      generatedAlpha += 1;
+    } else if (result?.status === "libur") {
+      generatedHoliday += 1;
+    }
+  }
+
+  if (generatedAlpha > 0) {
+    await evaluateAlphaDisciplineForEmployee(employeeId);
+  }
+
+  return {
+    employee_id: employeeId,
+    start_date: formatDateOnly(startDate),
+    end_date: formatDateOnly(cutoffDate),
+    generated_alpha: generatedAlpha,
+    generated_holiday: generatedHoliday,
+    skipped: false,
+  };
+};
+
+const autoGenerateAlphaUntilYesterdayForUser = async (userId) => {
+  const [employeeRows] = await db.promise().query(
+    `SELECT id FROM employees
+     WHERE user_id = ? AND deleted_at IS NULL
+     LIMIT 1`,
+    [userId],
+  );
+
+  if (!employeeRows.length) {
+    return null;
+  }
+
+  const yesterday = new Date();
+  yesterday.setHours(0, 0, 0, 0);
+  yesterday.setDate(yesterday.getDate() - 1);
+
+  return autoGenerateAlphaForEmployee(employeeRows[0].id, {
+    endDate: yesterday,
+  });
 };
 
 // Determine sanction level based on active attendance_warning_rules in DB.
@@ -2848,7 +2966,7 @@ router.put(
 const runDailyAlphaGeneration = async (targetDateInput) => {
   const targetDate = targetDateInput
     ? new Date(targetDateInput)
-    : new Date(Date.now() - 24 * 60 * 60 * 1000);
+    : new Date();
 
   if (Number.isNaN(targetDate.getTime())) {
     const error = new Error("Invalid date format. Use YYYY-MM-DD");
@@ -2857,17 +2975,6 @@ const runDailyAlphaGeneration = async (targetDateInput) => {
   }
 
   targetDate.setHours(0, 0, 0, 0);
-
-  // Hari Minggu diskip
-  if (targetDate.getDay() === 0) {
-    return {
-      skipped: true,
-      message: "Skipped. Target date is Sunday",
-      date: formatDateOnly(targetDate),
-      total_employees: 0,
-      generated_alpha: 0,
-    };
-  }
 
   const [employees] = await db.promise().query(
     `SELECT e.id
@@ -2878,10 +2985,32 @@ const runDailyAlphaGeneration = async (targetDateInput) => {
   );
 
   let generatedAlphaCount = 0;
+  let generatedHolidayCount = 0;
+  let skippedBeforeCheckoutCount = 0;
+  const todayStr = formatDateOnly(new Date());
+  const targetDateStr = formatDateOnly(targetDate);
+  const isTargetWorkday = isAttendanceWorkingDay(targetDate);
+  const currentSeconds =
+    new Date().getHours() * 3600 +
+    new Date().getMinutes() * 60 +
+    new Date().getSeconds();
+
   for (const employee of employees) {
-    const inserted = await ensureAlphaAttendanceByDate(employee.id, targetDate);
-    if (inserted) {
+    if (isTargetWorkday && targetDateStr === todayStr) {
+      const workingHours = await getWorkingHoursByEmployee(employee.id);
+      const workingHoursWindow = getWorkingHoursWindow(workingHours);
+
+      if (currentSeconds <= workingHoursWindow.check_out_seconds) {
+        skippedBeforeCheckoutCount += 1;
+        continue;
+      }
+    }
+
+    const result = await ensureAlphaAttendanceByDate(employee.id, targetDate);
+    if (result?.status === "alpha") {
       generatedAlphaCount += 1;
+    } else if (result?.status === "libur") {
+      generatedHolidayCount += 1;
     }
   }
 
@@ -2891,11 +3020,40 @@ const runDailyAlphaGeneration = async (targetDateInput) => {
     date: formatDateOnly(targetDate),
     total_employees: employees.length,
     generated_alpha: generatedAlphaCount,
+    generated_holiday: generatedHolidayCount,
+    skipped_before_checkout: skippedBeforeCheckoutCount,
   };
 };
 
 router.runDailyAlphaGeneration = runDailyAlphaGeneration;
 router.runDailyDisciplineEscalation = runDailyDisciplineEscalation;
+
+router.post(
+  "/auto-alpha/me",
+  verifyToken,
+  verifyRole(["pegawai"]),
+  async (req, res) => {
+    try {
+      const result = await autoGenerateAlphaUntilYesterdayForUser(req.user.id);
+
+      if (!result) {
+        return res.status(404).json({
+          message: "Employee record not found. Please contact HR.",
+        });
+      }
+
+      res.status(200).json({
+        message: "Auto-generate Alpha pegawai selesai",
+        data: result,
+      });
+    } catch (error) {
+      console.error(error);
+      res.status(error.statusCode || 500).json({
+        message: error.message || "Server error",
+      });
+    }
+  },
+);
 
 // Endpoint untuk scheduler harian agar alpha tercatat tanpa menunggu user buka halaman
 router.post("/cron/generate-alpha", async (req, res) => {
@@ -3832,4 +3990,8 @@ module.exports = router;
 // Export evaluator for administrative use (backfill scripts)
 module.exports.evaluateAlphaDisciplineForEmployee =
   evaluateAlphaDisciplineForEmployee;
+module.exports.autoGenerateAlphaForEmployee = autoGenerateAlphaForEmployee;
+module.exports.autoGenerateAlphaUntilYesterdayForUser =
+  autoGenerateAlphaUntilYesterdayForUser;
+module.exports.runDailyAlphaGeneration = runDailyAlphaGeneration;
 module.exports.runDailyDisciplineEscalation = runDailyDisciplineEscalation;

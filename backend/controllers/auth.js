@@ -8,6 +8,7 @@ require("dotenv").config(); // Load variabel lingkungan dari .env
 const tokenBlacklist = require("../middleware/tokenBlacklist");
 const { verifyToken, verifyRole } = require("../middleware/authMiddleware");
 const uploadProfilePhoto = require("../middleware/profilePhotoUpload");
+const attendanceRoutes = require("./attendance");
 const {
     logActivity,
     getIpAddress,
@@ -665,6 +666,21 @@ router.post("/login", async (req, res) => {
             normalizedRolesSet.add("pegawai");
         }
         const finalRoles = Array.from(normalizedRolesSet);
+        let autoAlphaResult = null;
+
+        if (finalRoles.includes("pegawai")) {
+            try {
+                autoAlphaResult =
+                    await attendanceRoutes.autoGenerateAlphaUntilYesterdayForUser(
+                        user.id,
+                    );
+            } catch (autoAlphaError) {
+                console.error(
+                    "Failed to auto-generate alpha attendance on login:",
+                    autoAlphaError,
+                );
+            }
+        }
 
         // Buat token JWT
         const token = jwt.sign(
@@ -699,6 +715,7 @@ router.post("/login", async (req, res) => {
             phone: user.phone,
             photo: user.photo,
             status: user.status,
+            auto_alpha: autoAlphaResult,
         });
     } catch (error) {
         console.error(error);
